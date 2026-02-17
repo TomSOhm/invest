@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__21stdev__21st_magic_component_inspiration",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

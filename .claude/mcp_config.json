@@ -1,0 +1,46 @@
+{
+	"mcpServers": {
+		"context7": {
+			"type": "http",
+			"url": "https://mcp.context7.com/mcp",
+			"headers": {
+				"CONTEXT7_API_KEY": "${env:CONTEXT7_API_KEY}"
+			}
+		},
+		"@21st-dev/magic": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@21st-dev/magic@latest",
+				"API_KEY=${env:21STDEV_API_KEY}"
+			]
+		},
+		"next-devtools": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"next-devtools-mcp@latest"
+			]
+		},
+		"supabase": {
+			"command": "npx",
+			"args": [
+				"-y",
+				"@supabase/mcp-server-supabase@latest",
+				"--access-token",
+				"${env:SUPABASEMCP_API_KEY}"
+			]
+		},
+		"hf-mcp-server": {
+			"url": "https://huggingface.co/mcp?login"
+		},
+		"skills Docs": {
+			"type": "sse",
+			"url": "https://gitmcp.io/anthropics/skills"
+    	},
+		"knowledge-work-plugins-claude-doc": {
+			"type": "sse",
+			"url": "https://gitmcp.io/anthropics/knowledge-work-plugins"
+		}
+  }
+}
