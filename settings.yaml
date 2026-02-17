@@ -1,0 +1,125 @@
+# Invest Solo — Global Configuration
+# Copy to E:\Projet_Solo\invest\config\settings.yaml
+
+project:
+  name: "Invest Solo"
+  version: "0.1.0"
+  owner: "Ohm-T"
+
+# ── Data Sources Priority ──
+data:
+  primary_source: "yfinance"        # Free, no key needed
+  secondary_source: "fmp"           # Financial Modeling Prep (needs key)
+  cache_ttl_hours: 24               # Re-fetch data after this period
+  max_retries: 3
+  request_delay_seconds: 0.5        # Avoid rate limits
+
+# ── PEA Universe ──
+pea:
+  enabled: true
+  eligible_countries:
+    - FR    # France
+    - DE    # Germany
+    - NL    # Netherlands
+    - BE    # Belgium
+    - IT    # Italy
+    - ES    # Spain
+    - PT    # Portugal
+    - IE    # Ireland
+    - AT    # Austria
+    - FI    # Finland
+    - SE    # Sweden
+    - DK    # Denmark
+    - "NO"  # Norway (quoted because YAML treats NO as false)
+    - PL    # Poland
+    - LU    # Luxembourg
+    - GR    # Greece
+  max_deposit: 150000               # EUR
+  pea_pme_max_deposit: 225000       # EUR
+  tax_rate_after_5y: 0.172          # Social charges only
+
+# ── Valuation Parameters ──
+valuation:
+  dcf:
+    projection_years: 10
+    terminal_growth_rate: 0.025     # 2.5%
+    risk_free_rate: 0.03            # Update with current 10Y OAT
+    equity_risk_premium: 0.055      # 5.5% (Damodaran)
+    tax_rate_default: 0.25          # French corporate tax
+    scenarios:
+      pessimistic_weight: 0.25
+      base_weight: 0.50
+      optimistic_weight: 0.25
+  
+  graham:
+    pe_base: 8.5
+    growth_multiplier: 2.0
+    aaa_bond_yield: 0.044           # Graham constant
+    current_aaa_yield: 0.052        # Update periodically
+
+# ── Scoring Weights ──
+scoring:
+  valuation_weight: 0.25
+  financial_health_weight: 0.20
+  profitability_weight: 0.20
+  growth_weight: 0.15
+  shareholder_return_weight: 0.10
+  risk_weight: 0.10
+
+# ── Signal Thresholds ──
+signals:
+  strong_buy:
+    min_score: 80
+    max_price_to_intrinsic: 0.70    # Price < 70% of intrinsic value
+  buy:
+    min_score: 65
+    max_price_to_intrinsic: 0.85
+  hold:
+    min_score: 40
+    max_score: 65
+  sell:
+    max_score: 40
+    min_price_to_intrinsic: 1.30
+  strong_sell:
+    max_score: 25
+    min_price_to_intrinsic: 1.50
+
+# ── Portfolio Constraints ──
+portfolio:
+  max_single_position: 0.10         # 10% max per stock
+  max_sector_exposure: 0.25         # 25% max per sector
+  min_positions: 15
+  cash_reserve_target: 0.10         # 10% cash
+  rebalance_trigger: 0.05           # Rebalance when drift > 5%
+
+# ── Risk Parameters ──
+risk:
+  max_drawdown_alert: 0.20          # Alert at -20%
+  var_confidence: 0.95              # 95% VaR
+  min_sharpe_ratio: 0.5             # Minimum acceptable Sharpe
+  max_beta: 1.5
+  max_debt_equity: 2.0
+
+# ── Screening Filters ──
+screener:
+  min_market_cap: 100000000         # €100M minimum
+  min_avg_volume: 50000             # Minimum daily volume
+  min_years_listed: 3               # At least 3 years of data
+  exclude_sectors:
+    - "Tobacco"
+    - "Gambling"
+    # Add ESG exclusions as needed
+
+# ── Reporting ──
+reporting:
+  daily_report_time: "07:00"        # Generate daily report at 7 AM
+  report_format: "markdown"         # markdown, docx, xlsx
+  export_path: "data/exports/"
+  include_charts: true
+
+# ── Logging ──
+logging:
+  level: "INFO"
+  file: "data/logs/invest_solo.log"
+  rotation: "10 MB"
+  retention: "30 days"

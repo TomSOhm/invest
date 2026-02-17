@@ -1,0 +1,55 @@
+# ═══════════════════════════════════════════
+# Invest Solo — Git Ignore
+# ═══════════════════════════════════════════
+
+# Environment & secrets
+.env
+*.env
+config/secrets/
+
+# Data (large files, local only)
+data/raw/
+data/processed/
+data/cache/
+data/exports/
+data/logs/
+*.csv
+*.parquet
+*.sqlite
+*.db
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_output/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# Generated reports (keep templates, ignore generated)
+data/exports/*.xlsx
+data/exports/*.docx
+data/exports/*.pdf
+
+# Temporary
+*.tmp
+*.bak
+*.log
