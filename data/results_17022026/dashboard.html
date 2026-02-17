@@ -1,0 +1,1099 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Invest Solo — Dashboard 2026-02-17 17:25</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=DM+Sans:wght@400;500;600;700;800&display=swap');
+  :root {
+    --bg: #0f0f1a; --surface: #1a1a2e; --border: #2a2a3e;
+    --text: #e4e4f0; --muted: #888; --accent: #3b82f6;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; padding: 20px; }
+  h1 { font-size: 28px; font-weight: 800; background: linear-gradient(135deg, #3b82f6, #8b5cf6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  h2 { font-size: 18px; font-weight: 700; margin: 24px 0 12px; color: #c4c4dd; }
+  h3 { font-size: 14px; font-weight: 600; color: #999; margin-bottom: 8px; }
+  .header { display: flex; justify-content: space-between; align-items: center; padding: 16px 0; border-bottom: 1px solid var(--border); margin-bottom: 20px; }
+  .stats { display: flex; gap: 24px; }
+  .stat { text-align: center; }
+  .stat-value { font-size: 24px; font-weight: 800; color: var(--accent); }
+  .stat-label { font-size: 11px; color: var(--muted); }
+  .strategies { display: flex; gap: 12px; overflow-x: auto; padding: 4px 0; }
+  .top5 { display: flex; gap: 12px; overflow-x: auto; padding: 4px 0; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  th { background: var(--surface); padding: 8px 6px; text-align: left; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.5px; position: sticky; top: 0; z-index: 10; }
+  td { padding: 6px; border-bottom: 1px solid var(--border); }
+  tr:hover { background: rgba(59,130,246,0.08) !important; }
+  .table-container { max-height: 600px; overflow-y: auto; border-radius: 8px; border: 1px solid var(--border); }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+  .heatmap { border-collapse: collapse; width: 100%; }
+  .heatmap th { font-size: 10px; padding: 4px 6px; }
+  .heatmap td { padding: 4px 6px; border: 1px solid var(--border); }
+  .filters { display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap; }
+  .filter-btn { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 4px 12px; border-radius: 16px; cursor: pointer; font-size: 11px; transition: all 0.2s; }
+  .filter-btn:hover, .filter-btn.active { background: var(--accent); border-color: var(--accent); }
+  .hist { display: flex; align-items: flex-end; gap: 4px; height: 160px; padding: 8px 0; }
+  input[type=text] { background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 6px 12px; border-radius: 8px; font-size: 12px; width: 200px; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div>
+    <h1>📊 Invest Solo</h1>
+    <div style="font-size:12px;color:var(--muted);margin-top:4px">Quantitative Fundamental Analysis · 2026-02-17 17:25 · 31 companies</div>
+  </div>
+  <div class="stats">
+    <div class="stat"><div class="stat-value">31</div><div class="stat-label">Universe</div></div>
+    <div class="stat"><div class="stat-value">5</div><div class="stat-label">Buy Signals</div></div>
+    <div class="stat"><div class="stat-value">54</div><div class="stat-label">Avg Score</div></div>
+    <div class="stat"><div class="stat-value">31</div><div class="stat-label">PEA Eligible</div></div>
+  </div>
+</div>
+
+<h2>🏆 Strategy Screens</h2>
+<div class="strategies">
+        <div style="background:linear-gradient(135deg,#2563eb22,#2563eb08);border:1px solid #2563eb44;border-radius:12px;padding:16px;min-width:220px">
+            <div style="font-weight:700;font-size:15px;margin-bottom:8px">🎯 PEA Value</div>
+            <div style="font-size:28px;font-weight:800;color:#2563eb">14</div>
+            <div style="font-size:11px;color:#888;margin-bottom:8px">stocks passed | avg score 60.7</div>
+            <div style="font-size:12px"><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>Equinor ASA</span><span style="font-weight:700">75</span></div><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>BBVA SA</span><span style="font-weight:700">68</span></div><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>TotalEnergies SE</span><span style="font-weight:700">68</span></div></div>
+        </div>
+        <div style="background:linear-gradient(135deg,#7c3aed22,#7c3aed08);border:1px solid #7c3aed44;border-radius:12px;padding:16px;min-width:220px">
+            <div style="font-weight:700;font-size:15px;margin-bottom:8px">🚀 PEA Quality Growth</div>
+            <div style="font-size:28px;font-weight:800;color:#7c3aed">3</div>
+            <div style="font-size:11px;color:#888;margin-bottom:8px">stocks passed | avg score 65.9</div>
+            <div style="font-size:12px"><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>BBVA SA</span><span style="font-weight:700">68</span></div><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>Intesa Sanpaolo SpA</span><span style="font-weight:700">65</span></div><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>ASML Holding NV</span><span style="font-weight:700">64</span></div></div>
+        </div>
+        <div style="background:linear-gradient(135deg,#05966922,#05966908);border:1px solid #05966944;border-radius:12px;padding:16px;min-width:220px">
+            <div style="font-weight:700;font-size:15px;margin-bottom:8px">💰 Dividend Income</div>
+            <div style="font-size:28px;font-weight:800;color:#059669">15</div>
+            <div style="font-size:11px;color:#888;margin-bottom:8px">stocks passed | avg score 60.3</div>
+            <div style="font-size:12px"><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>Equinor ASA</span><span style="font-weight:700">75</span></div><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>BBVA SA</span><span style="font-weight:700">68</span></div><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>TotalEnergies SE</span><span style="font-weight:700">68</span></div></div>
+        </div>
+        <div style="background:linear-gradient(135deg,#f59e0b22,#f59e0b08);border:1px solid #f59e0b44;border-radius:12px;padding:16px;min-width:220px">
+            <div style="font-weight:700;font-size:15px;margin-bottom:8px">🌍 Global Best</div>
+            <div style="font-size:28px;font-weight:800;color:#f59e0b">21</div>
+            <div style="font-size:11px;color:#888;margin-bottom:8px">stocks passed | avg score 57.3</div>
+            <div style="font-size:12px"><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>Equinor ASA</span><span style="font-weight:700">75</span></div><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>BBVA SA</span><span style="font-weight:700">68</span></div><div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>TotalEnergies SE</span><span style="font-weight:700">68</span></div></div>
+        </div></div>
+
+<h2>⭐ Top 5 Picks</h2>
+<div class="top5">
+        <div style="background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:16px;min-width:200px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:700;font-size:16px">Equinor ASA</span>
+                <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Buy</span>
+            </div>
+            <div style="font-size:11px;color:#888;margin:4px 0">Energy · NO</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;font-size:12px">
+                <div>Score <strong style="color:rgba(130,200,60,1.0)">75</strong></div>
+                <div>P/E <strong>5.0</strong></div>
+                <div>ROE <strong>34.5%</strong></div>
+                <div>Div <strong>7.8%</strong></div>
+                <div>F-Score <strong>9/9</strong></div>
+                <div>Graham MoS <strong style="color:#10b981">+62.5%</strong></div>
+            </div>
+        </div>
+        <div style="background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:16px;min-width:200px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:700;font-size:16px">BBVA SA</span>
+                <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Buy</span>
+            </div>
+            <div style="font-size:11px;color:#888;margin:4px 0">Financials · ES</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;font-size:12px">
+                <div>Score <strong style="color:rgba(153,200,60,1.0)">68</strong></div>
+                <div>P/E <strong>7.9</strong></div>
+                <div>ROE <strong>16.4%</strong></div>
+                <div>Div <strong>4.8%</strong></div>
+                <div>F-Score <strong>5/9</strong></div>
+                <div>Graham MoS <strong style="color:#10b981">+47.5%</strong></div>
+            </div>
+        </div>
+        <div style="background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:16px;min-width:200px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:700;font-size:16px">TotalEnergies SE</span>
+                <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Buy</span>
+            </div>
+            <div style="font-size:11px;color:#888;margin:4px 0">Energy · FR</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;font-size:12px">
+                <div>Score <strong style="color:rgba(154,200,60,1.0)">68</strong></div>
+                <div>P/E <strong>7.8</strong></div>
+                <div>ROE <strong>14.6%</strong></div>
+                <div>Div <strong>5.4%</strong></div>
+                <div>F-Score <strong>9/9</strong></div>
+                <div>Graham MoS <strong style="color:#10b981">+59.9%</strong></div>
+            </div>
+        </div>
+        <div style="background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:16px;min-width:200px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:700;font-size:16px">Sanofi SA</span>
+                <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Buy</span>
+            </div>
+            <div style="font-size:11px;color:#888;margin:4px 0">Healthcare · FR</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;font-size:12px">
+                <div>Score <strong style="color:rgba(162,200,60,1.0)">66</strong></div>
+                <div>P/E <strong>18.0</strong></div>
+                <div>ROE <strong>10.4%</strong></div>
+                <div>Div <strong>3.7%</strong></div>
+                <div>F-Score <strong>9/9</strong></div>
+                <div>Graham MoS <strong style="color:#ef4444">-18.6%</strong></div>
+            </div>
+        </div>
+        <div style="background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:16px;min-width:200px">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+                <span style="font-weight:700;font-size:16px">Intesa Sanpaolo SpA</span>
+                <span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Buy</span>
+            </div>
+            <div style="font-size:11px;color:#888;margin:4px 0">Financials · IT</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;font-size:12px">
+                <div>Score <strong style="color:rgba(166,200,60,1.0)">65</strong></div>
+                <div>P/E <strong>9.0</strong></div>
+                <div>ROE <strong>12.1%</strong></div>
+                <div>Div <strong>6.5%</strong></div>
+                <div>F-Score <strong>5/9</strong></div>
+                <div>Graham MoS <strong style="color:#10b981">+52.2%</strong></div>
+            </div>
+        </div></div>
+
+<div class="grid-2" style="margin-top:20px">
+  <div class="card">
+    <h3>Score Distribution</h3>
+    <div class="hist"><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">0</span>
+            <div style="width:28px;height:0px;background:rgba(220,114,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">0-20</span>
+        </div><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">0</span>
+            <div style="width:28px;height:0px;background:rgba(220,165,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">20-30</span>
+        </div><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">3</span>
+            <div style="width:28px;height:40px;background:rgba(220,199,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">30-40</span>
+        </div><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">9</span>
+            <div style="width:28px;height:120px;background:rgba(220,233,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">40-50</span>
+        </div><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">4</span>
+            <div style="width:28px;height:53px;background:rgba(211,200,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">50-55</span>
+        </div><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">4</span>
+            <div style="width:28px;height:53px;background:rgba(193,200,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">55-60</span>
+        </div><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">6</span>
+            <div style="width:28px;height:80px;background:rgba(175,200,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">60-65</span>
+        </div><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">4</span>
+            <div style="width:28px;height:53px;background:rgba(157,200,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">65-70</span>
+        </div><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">1</span>
+            <div style="width:28px;height:13px;background:rgba(139,200,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">70-75</span>
+        </div><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">0</span>
+            <div style="width:28px;height:0px;background:rgba(121,200,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">75-80</span>
+        </div><div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+            <span style="font-size:10px;font-weight:600">0</span>
+            <div style="width:28px;height:0px;background:rgba(76,200,60,0.85);border-radius:4px 4px 0 0"></div>
+            <span style="font-size:9px;color:#888">80+</span>
+        </div></div>
+  </div>
+  <div class="card">
+    <h3>Signal Breakdown</h3>
+    <div style="padding:8px 0"><div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+            <span style="width:80px;font-size:12px;text-align:right">Strong Buy</span>
+            <div style="width:0%;height:16px;background:#059669;border-radius:3px;min-width:4px"></div>
+            <span style="font-size:12px;font-weight:600">0</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+            <span style="width:80px;font-size:12px;text-align:right">Buy</span>
+            <div style="width:16%;height:16px;background:#10b981;border-radius:3px;min-width:4px"></div>
+            <span style="font-size:12px;font-weight:600">5</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+            <span style="width:80px;font-size:12px;text-align:right">Hold</span>
+            <div style="width:74%;height:16px;background:#f59e0b;border-radius:3px;min-width:4px"></div>
+            <span style="font-size:12px;font-weight:600">23</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+            <span style="width:80px;font-size:12px;text-align:right">Sell</span>
+            <div style="width:9%;height:16px;background:#ef4444;border-radius:3px;min-width:4px"></div>
+            <span style="font-size:12px;font-weight:600">3</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+            <span style="width:80px;font-size:12px;text-align:right">Strong Sell</span>
+            <div style="width:0%;height:16px;background:#991b1b;border-radius:3px;min-width:4px"></div>
+            <span style="font-size:12px;font-weight:600">0</span>
+        </div></div>
+  </div>
+</div>
+
+<div class="grid-2" style="margin-top:16px">
+  <div class="card">
+    <h3>Sector Distribution</h3>
+    <div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Financials</span>
+            <div style="width:100%;height:18px;background:#3b82f6;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">8</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Industrials</span>
+            <div style="width:75%;height:18px;background:#ef4444;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">6</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Energy</span>
+            <div style="width:37%;height:18px;background:#10b981;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">3</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Utilities</span>
+            <div style="width:37%;height:18px;background:#f59e0b;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">3</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Technology</span>
+            <div style="width:25%;height:18px;background:#8b5cf6;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">2</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Basic Materials</span>
+            <div style="width:25%;height:18px;background:#ec4899;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">2</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Consumer Discretionary</span>
+            <div style="width:25%;height:18px;background:#14b8a6;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">2</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Communication Services</span>
+            <div style="width:25%;height:18px;background:#f97316;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">2</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Healthcare</span>
+            <div style="width:12%;height:18px;background:#6366f1;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">1</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Consumer Staples</span>
+            <div style="width:12%;height:18px;background:#84cc16;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">1</span>
+        </div><div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+            <span style="width:140px;font-size:12px;text-align:right">Real Estate</span>
+            <div style="width:12%;height:18px;background:#3b82f6;border-radius:4px;min-width:20px"></div>
+            <span style="font-size:12px;font-weight:600">1</span>
+        </div>
+  </div>
+  <div class="card">
+    <h3>Score Heatmap (Top 20)</h3>
+    <div style="overflow-x:auto">
+    <table class="heatmap">
+      <tr><th></th><th>Valuation</th><th>Health</th><th>Profitability</th><th>Growth</th><th>Shareholder</th><th>Risk</th></tr>
+      <tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Equinor ASA</td><td style="background:rgba(68,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">92</td><td style="background:rgba(127,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">76</td><td style="background:rgba(74,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">90</td><td style="background:rgba(220,99,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">6</td><td style="background:rgba(58,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">95</td><td style="background:rgba(103,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">82</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">BBVA SA</td><td style="background:rgba(98,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">84</td><td style="background:rgba(207,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">54</td><td style="background:rgba(136,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">73</td><td style="background:rgba(142,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">71</td><td style="background:rgba(94,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">85</td><td style="background:rgba(220,180,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">30</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">TotalEnergies SE</td><td style="background:rgba(70,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">92</td><td style="background:rgba(143,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">71</td><td style="background:rgba(213,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">52</td><td style="background:rgba(220,157,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">23</td><td style="background:rgba(76,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">90</td><td style="background:rgba(98,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">84</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Sanofi SA</td><td style="background:rgba(181,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">61</td><td style="background:rgba(153,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">68</td><td style="background:rgba(150,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">69</td><td style="background:rgba(220,235,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">46</td><td style="background:rgba(149,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">70</td><td style="background:rgba(55,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">96</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Intesa Sanpaolo SpA</td><td style="background:rgba(115,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">79</td><td style="background:rgba(200,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">56</td><td style="background:rgba(158,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">67</td><td style="background:rgba(214,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">51</td><td style="background:rgba(58,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">95</td><td style="background:rgba(220,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">35</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">ASML Holding NV</td><td style="background:rgba(220,80,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">0</td><td style="background:rgba(100,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">83</td><td style="background:rgba(40,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">100</td><td style="background:rgba(40,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">100</td><td style="background:rgba(213,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">52</td><td style="background:rgba(130,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">75</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Crédit Agricole SA</td><td style="background:rgba(90,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">86</td><td style="background:rgba(220,225,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">43</td><td style="background:rgba(182,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">60</td><td style="background:rgba(220,245,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">49</td><td style="background:rgba(58,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">95</td><td style="background:rgba(220,175,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">28</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Allianz SE</td><td style="background:rgba(111,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">80</td><td style="background:rgba(161,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">66</td><td style="background:rgba(220,201,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">36</td><td style="background:rgba(220,235,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">46</td><td style="background:rgba(112,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">80</td><td style="background:rgba(171,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">63</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">BNP Paribas SA</td><td style="background:rgba(92,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">86</td><td style="background:rgba(220,235,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">46</td><td style="background:rgba(179,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">61</td><td style="background:rgba(220,225,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">43</td><td style="background:rgba(64,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">93</td><td style="background:rgba(220,166,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">26</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">AXA SA</td><td style="background:rgba(109,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">81</td><td style="background:rgba(181,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">61</td><td style="background:rgba(220,217,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">40</td><td style="background:rgba(220,216,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">40</td><td style="background:rgba(87,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">87</td><td style="background:rgba(207,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">53</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">ING Groep NV</td><td style="background:rgba(112,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">80</td><td style="background:rgba(220,239,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">47</td><td style="background:rgba(163,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">66</td><td style="background:rgba(220,216,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">40</td><td style="background:rgba(73,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">91</td><td style="background:rgba(220,162,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">24</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Société Générale SA</td><td style="background:rgba(69,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">92</td><td style="background:rgba(220,218,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">41</td><td style="background:rgba(203,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">55</td><td style="background:rgba(220,206,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">37</td><td style="background:rgba(58,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">95</td><td style="background:rgba(220,143,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">19</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Vinci SA</td><td style="background:rgba(121,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">77</td><td style="background:rgba(220,223,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">42</td><td style="background:rgba(220,228,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">44</td><td style="background:rgba(214,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">51</td><td style="background:rgba(130,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">75</td><td style="background:rgba(188,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">59</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">McPhy Energy SA</td><td style="background:rgba(135,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">74</td><td style="background:rgba(48,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">98</td><td style="background:rgba(220,80,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">0</td><td style="background:rgba(40,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">100</td><td style="background:rgba(220,165,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">25</td><td style="background:rgba(220,109,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">9</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Vicat SA</td><td style="background:rgba(91,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">86</td><td style="background:rgba(195,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">57</td><td style="background:rgba(220,207,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">37</td><td style="background:rgba(220,138,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">17</td><td style="background:rgba(132,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">74</td><td style="background:rgba(198,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">56</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Safran SA</td><td style="background:rgba(220,136,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">16</td><td style="background:rgba(175,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">62</td><td style="background:rgba(176,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">62</td><td style="background:rgba(112,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">80</td><td style="background:rgba(213,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">52</td><td style="background:rgba(141,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">72</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Engie SA</td><td style="background:rgba(82,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">88</td><td style="background:rgba(220,212,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">39</td><td style="background:rgba(220,196,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">34</td><td style="background:rgba(220,128,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">14</td><td style="background:rgba(67,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">92</td><td style="background:rgba(220,239,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">47</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Sodexo SA</td><td style="background:rgba(123,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">77</td><td style="background:rgba(220,205,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">37</td><td style="background:rgba(220,186,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">31</td><td style="background:rgba(220,235,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">46</td><td style="background:rgba(141,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">72</td><td style="background:rgba(201,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">55</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Enel SpA</td><td style="background:rgba(112,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">80</td><td style="background:rgba(220,209,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">38</td><td style="background:rgba(220,225,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">43</td><td style="background:rgba(220,99,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">6</td><td style="background:rgba(79,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">89</td><td style="background:rgba(220,235,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">46</td></tr><tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">Volkswagen AG</td><td style="background:rgba(65,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">93</td><td style="background:rgba(220,213,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">39</td><td style="background:rgba(220,136,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">16</td><td style="background:rgba(220,167,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">26</td><td style="background:rgba(110,200,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">80</td><td style="background:rgba(220,197,60,0.8);text-align:center;font-weight:600;font-size:12px;padding:6px">35</td></tr>
+    </table>
+    </div>
+  </div>
+</div>
+
+<h2>📋 Full Scoreboard</h2>
+<div style="margin-bottom:8px">
+  <input type="text" id="search" placeholder="Search ticker or name..." oninput="filterTable()">
+  <div class="filters" style="margin-top:8px">
+    <button class="filter-btn active" onclick="filterSignal('all',this)">All</button>
+    <button class="filter-btn" onclick="filterSignal('Strong Buy',this)">Strong Buy</button>
+    <button class="filter-btn" onclick="filterSignal('Buy',this)">Buy</button>
+    <button class="filter-btn" onclick="filterSignal('Hold',this)">Hold</button>
+    <button class="filter-btn" onclick="filterSignal('Sell',this)">Sell</button>
+  </div>
+</div>
+<div class="table-container">
+<table id="scoreboard">
+  <thead>
+  <tr>
+    <th>Ticker</th><th>Name</th><th>Sector</th><th>🌍</th><th>Price</th>
+    <th>Score</th><th>Signal</th><th>Valuation</th><th>Health</th><th>Profit</th>
+    <th>P/E</th><th>ROE</th><th>Div%</th><th>F-Score</th><th>Z-Score</th><th>Graham MoS</th><th>PEA</th>
+  </tr>
+  </thead>
+  <tbody>
+        <tr style="background:rgba(130,200,60,0.12)" class="data-row" data-sector="Energy" data-country="NO" data-signal="Buy">
+            <td style="font-weight:700;font-family:monospace">EQNR.OL</td>
+            <td>Equinor ASA</td>
+            <td><span style="font-size:11px">Energy</span></td>
+            <td>NO</td>
+            <td style="text-align:right">€275.00</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:74.8px;height:14px;background:rgba(130,200,60,0.85);border-radius:4px"></div>
+                    <strong>74.8</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Buy</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:92.0px;height:6px;background:rgba(68,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">92</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:75.8px;height:6px;background:rgba(127,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">76</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:90.4px;height:6px;background:rgba(74,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">90</span></div></td>
+            <td style="text-align:right">5.0</td>
+            <td style="text-align:right">34.5%</td>
+            <td style="text-align:right">7.8%</td>
+            <td style="text-align:center;font-weight:600">9/9</td>
+            <td style="text-align:right">1.97</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+62%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(153,200,60,0.12)" class="data-row" data-sector="Financials" data-country="ES" data-signal="Buy">
+            <td style="font-weight:700;font-family:monospace">BBVA.MC</td>
+            <td>BBVA SA</td>
+            <td><span style="font-size:11px">Financials</span></td>
+            <td>ES</td>
+            <td style="text-align:right">€12.80</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:68.4px;height:14px;background:rgba(153,200,60,0.85);border-radius:4px"></div>
+                    <strong>68.4</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Buy</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:83.7px;height:6px;background:rgba(98,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">84</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:53.5px;height:6px;background:rgba(207,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">54</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:73.1px;height:6px;background:rgba(136,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">73</span></div></td>
+            <td style="text-align:right">7.9</td>
+            <td style="text-align:right">16.4%</td>
+            <td style="text-align:right">4.8%</td>
+            <td style="text-align:center;font-weight:600">5/9</td>
+            <td style="text-align:right">0.36</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+48%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(154,200,60,0.12)" class="data-row" data-sector="Energy" data-country="FR" data-signal="Buy">
+            <td style="font-weight:700;font-family:monospace">TTE.PA</td>
+            <td>TotalEnergies SE</td>
+            <td><span style="font-size:11px">Energy</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€56.80</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:68.3px;height:14px;background:rgba(154,200,60,0.85);border-radius:4px"></div>
+                    <strong>68.3</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Buy</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:91.6px;height:6px;background:rgba(70,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">92</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:71.2px;height:6px;background:rgba(143,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">71</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:51.7px;height:6px;background:rgba(213,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">52</span></div></td>
+            <td style="text-align:right">7.8</td>
+            <td style="text-align:right">14.6%</td>
+            <td style="text-align:right">5.4%</td>
+            <td style="text-align:center;font-weight:600">9/9</td>
+            <td style="text-align:right">1.88</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+60%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(162,200,60,0.12)" class="data-row" data-sector="Healthcare" data-country="FR" data-signal="Buy">
+            <td style="font-weight:700;font-family:monospace">SAN.PA</td>
+            <td>Sanofi SA</td>
+            <td><span style="font-size:11px">Healthcare</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€102.50</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:66.1px;height:14px;background:rgba(162,200,60,0.85);border-radius:4px"></div>
+                    <strong>66.1</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Buy</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:60.8px;height:6px;background:rgba(181,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">61</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:68.5px;height:6px;background:rgba(153,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">68</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:69.2px;height:6px;background:rgba(150,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">69</span></div></td>
+            <td style="text-align:right">18.0</td>
+            <td style="text-align:right">10.4%</td>
+            <td style="text-align:right">3.7%</td>
+            <td style="text-align:center;font-weight:600">9/9</td>
+            <td style="text-align:right">2.23</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-19%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(166,200,60,0.12)" class="data-row" data-sector="Financials" data-country="IT" data-signal="Buy">
+            <td style="font-weight:700;font-family:monospace">ISP.MI</td>
+            <td>Intesa Sanpaolo SpA</td>
+            <td><span style="font-size:11px">Financials</span></td>
+            <td>IT</td>
+            <td style="text-align:right">€4.50</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:65.0px;height:14px;background:rgba(166,200,60,0.85);border-radius:4px"></div>
+                    <strong>65.0</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#10b981;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Buy</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:79.1px;height:6px;background:rgba(115,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">79</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:55.5px;height:6px;background:rgba(200,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">56</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:67.0px;height:6px;background:rgba(158,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">67</span></div></td>
+            <td style="text-align:right">9.0</td>
+            <td style="text-align:right">12.1%</td>
+            <td style="text-align:right">6.5%</td>
+            <td style="text-align:center;font-weight:600">5/9</td>
+            <td style="text-align:right">0.34</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+52%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(168,200,60,0.12)" class="data-row" data-sector="Technology" data-country="NL" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">ASML.AS</td>
+            <td>ASML Holding NV</td>
+            <td><span style="font-size:11px">Technology</span></td>
+            <td>NL</td>
+            <td style="text-align:right">€750.00</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:64.3px;height:14px;background:rgba(168,200,60,0.85);border-radius:4px"></div>
+                    <strong>64.3</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:2px;height:6px;background:rgba(220,80,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">0</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:83.1px;height:6px;background:rgba(100,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">83</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:100.0px;height:6px;background:rgba(40,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">100</span></div></td>
+            <td style="text-align:right">38.8</td>
+            <td style="text-align:right">41.1%</td>
+            <td style="text-align:right">0.8%</td>
+            <td style="text-align:center;font-weight:600">9/9</td>
+            <td style="text-align:right">7.63</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-81%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(177,200,60,0.12)" class="data-row" data-sector="Financials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">ACA.PA</td>
+            <td>Crédit Agricole SA</td>
+            <td><span style="font-size:11px">Financials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€16.80</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:61.7px;height:14px;background:rgba(177,200,60,0.85);border-radius:4px"></div>
+                    <strong>61.7</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:85.9px;height:6px;background:rgba(90,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">86</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:42.8px;height:6px;background:rgba(220,225,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">43</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:60.5px;height:6px;background:rgba(182,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">60</span></div></td>
+            <td style="text-align:right">8.2</td>
+            <td style="text-align:right">7.9%</td>
+            <td style="text-align:right">6.5%</td>
+            <td style="text-align:center;font-weight:600">5/9</td>
+            <td style="text-align:right">0.17</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+104%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(178,200,60,0.12)" class="data-row" data-sector="Financials" data-country="DE" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">ALV.DE</td>
+            <td>Allianz SE</td>
+            <td><span style="font-size:11px">Financials</span></td>
+            <td>DE</td>
+            <td style="text-align:right">€320.00</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:61.6px;height:14px;background:rgba(178,200,60,0.85);border-radius:4px"></div>
+                    <strong>61.6</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:80.1px;height:6px;background:rgba(111,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">80</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:66.2px;height:6px;background:rgba(161,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">66</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:35.6px;height:6px;background:rgba(220,201,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">36</span></div></td>
+            <td style="text-align:right">13.1</td>
+            <td style="text-align:right">11.5%</td>
+            <td style="text-align:right">4.2%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">0.32</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+7%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(180,200,60,0.12)" class="data-row" data-sector="Financials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">BNP.PA</td>
+            <td>BNP Paribas SA</td>
+            <td><span style="font-size:11px">Financials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€76.50</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:61.1px;height:14px;background:rgba(180,200,60,0.85);border-radius:4px"></div>
+                    <strong>61.1</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:85.5px;height:6px;background:rgba(92,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">86</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:45.7px;height:6px;background:rgba(220,235,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">46</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:61.2px;height:6px;background:rgba(179,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">61</span></div></td>
+            <td style="text-align:right">9.2</td>
+            <td style="text-align:right">7.8%</td>
+            <td style="text-align:right">5.8%</td>
+            <td style="text-align:center;font-weight:600">5/9</td>
+            <td style="text-align:right">0.24</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+84%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(182,200,60,0.12)" class="data-row" data-sector="Financials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">CS.PA</td>
+            <td>AXA SA</td>
+            <td><span style="font-size:11px">Financials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€39.20</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:60.4px;height:14px;background:rgba(182,200,60,0.85);border-radius:4px"></div>
+                    <strong>60.4</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:80.7px;height:6px;background:rgba(109,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">81</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:60.6px;height:6px;background:rgba(181,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">61</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:40.3px;height:6px;background:rgba(220,217,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">40</span></div></td>
+            <td style="text-align:right">11.9</td>
+            <td style="text-align:right">13.8%</td>
+            <td style="text-align:right">5.0%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">0.31</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+7%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(184,200,60,0.12)" class="data-row" data-sector="Financials" data-country="NL" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">INGA.AS</td>
+            <td>ING Groep NV</td>
+            <td><span style="font-size:11px">Financials</span></td>
+            <td>NL</td>
+            <td style="text-align:right">€18.60</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:60.0px;height:14px;background:rgba(184,200,60,0.85);border-radius:4px"></div>
+                    <strong>60.0</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:80.0px;height:6px;background:rgba(112,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">80</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:46.9px;height:6px;background:rgba(220,239,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">47</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:65.7px;height:6px;background:rgba(163,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">66</span></div></td>
+            <td style="text-align:right">8.9</td>
+            <td style="text-align:right">11.7%</td>
+            <td style="text-align:right">5.5%</td>
+            <td style="text-align:center;font-weight:600">5/9</td>
+            <td style="text-align:right">0.31</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+56%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(187,200,60,0.12)" class="data-row" data-sector="Financials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">GLE.PA</td>
+            <td>Société Générale SA</td>
+            <td><span style="font-size:11px">Financials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€42.80</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:58.9px;height:14px;background:rgba(187,200,60,0.85);border-radius:4px"></div>
+                    <strong>58.9</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:91.8px;height:6px;background:rgba(69,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">92</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:40.6px;height:6px;background:rgba(220,218,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">41</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:54.6px;height:6px;background:rgba(203,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">55</span></div></td>
+            <td style="text-align:right">8.1</td>
+            <td style="text-align:right">6.2%</td>
+            <td style="text-align:right">6.2%</td>
+            <td style="text-align:center;font-weight:600">5/9</td>
+            <td style="text-align:right">0.25</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+134%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(192,200,60,0.12)" class="data-row" data-sector="Industrials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">DG.PA</td>
+            <td>Vinci SA</td>
+            <td><span style="font-size:11px">Industrials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€118.50</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:57.6px;height:14px;background:rgba(192,200,60,0.85);border-radius:4px"></div>
+                    <strong>57.6</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:77.3px;height:6px;background:rgba(121,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">77</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:42.2px;height:6px;background:rgba(220,223,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">42</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:43.8px;height:6px;background:rgba(220,228,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">44</span></div></td>
+            <td style="text-align:right">13.3</td>
+            <td style="text-align:right">13.7%</td>
+            <td style="text-align:right">3.6%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">1.52</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-4%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(197,200,60,0.12)" class="data-row" data-sector="Industrials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">MCPHY.PA</td>
+            <td>McPhy Energy SA</td>
+            <td><span style="font-size:11px">Industrials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€1.15</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:56.3px;height:14px;background:rgba(197,200,60,0.85);border-radius:4px"></div>
+                    <strong>56.3</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:73.6px;height:6px;background:rgba(135,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">74</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:97.7px;height:6px;background:rgba(48,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">98</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:2px;height:6px;background:rgba(220,80,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">0</span></div></td>
+            <td style="text-align:right">-1.3</td>
+            <td style="text-align:right">-44.7%</td>
+            <td style="text-align:right">0.0%</td>
+            <td style="text-align:center;font-weight:600">4/9</td>
+            <td style="text-align:right">0.57</td>
+            <td style="text-align:right;color:#999;font-weight:600">—</td>
+            <td style="text-align:center"><span style="background:#7c3aed;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PME</span></td>
+        </tr>
+        <tr style="background:rgba(198,200,60,0.12)" class="data-row" data-sector="Basic Materials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">VCT.PA</td>
+            <td>Vicat SA</td>
+            <td><span style="font-size:11px">Basic Materials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€56.55</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:55.9px;height:14px;background:rgba(198,200,60,0.85);border-radius:4px"></div>
+                    <strong>55.9</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:85.8px;height:6px;background:rgba(91,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">86</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:56.9px;height:6px;background:rgba(195,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">57</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:37.4px;height:6px;background:rgba(220,207,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">37</span></div></td>
+            <td style="text-align:right">9.3</td>
+            <td style="text-align:right">9.2%</td>
+            <td style="text-align:right">3.5%</td>
+            <td style="text-align:center;font-weight:600">8/9</td>
+            <td style="text-align:right">1.42</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+72%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(207,200,60,0.12)" class="data-row" data-sector="Industrials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">SAF.PA</td>
+            <td>Safran SA</td>
+            <td><span style="font-size:11px">Industrials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€272.00</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:53.4px;height:14px;background:rgba(207,200,60,0.85);border-radius:4px"></div>
+                    <strong>53.4</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:16.5px;height:6px;background:rgba(220,136,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">16</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:62.5px;height:6px;background:rgba(175,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">62</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:62.1px;height:6px;background:rgba(176,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">62</span></div></td>
+            <td style="text-align:right">41.1</td>
+            <td style="text-align:right">18.1%</td>
+            <td style="text-align:right">0.8%</td>
+            <td style="text-align:center;font-weight:600">9/9</td>
+            <td style="text-align:right">2.76</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-73%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(210,200,60,0.12)" class="data-row" data-sector="Utilities" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">ENGI.PA</td>
+            <td>Engie SA</td>
+            <td><span style="font-size:11px">Utilities</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€17.90</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:52.7px;height:14px;background:rgba(210,200,60,0.85);border-radius:4px"></div>
+                    <strong>52.7</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:88.2px;height:6px;background:rgba(82,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">88</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:38.9px;height:6px;background:rgba(220,212,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">39</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:34.2px;height:6px;background:rgba(220,196,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">34</span></div></td>
+            <td style="text-align:right">9.7</td>
+            <td style="text-align:right">10.7%</td>
+            <td style="text-align:right">5.7%</td>
+            <td style="text-align:center;font-weight:600">7/9</td>
+            <td style="text-align:right">0.93</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+50%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(211,200,60,0.12)" class="data-row" data-sector="Consumer Discretionary" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">SW.PA</td>
+            <td>Sodexo SA</td>
+            <td><span style="font-size:11px">Consumer Discretio</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€68.40</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:52.4px;height:14px;background:rgba(211,200,60,0.85);border-radius:4px"></div>
+                    <strong>52.4</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:76.9px;height:6px;background:rgba(123,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">77</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:37.0px;height:6px;background:rgba(220,205,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">37</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:31.3px;height:6px;background:rgba(220,186,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">31</span></div></td>
+            <td style="text-align:right">14.7</td>
+            <td style="text-align:right">15.1%</td>
+            <td style="text-align:right">3.2%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">1.88</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-17%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(218,200,60,0.12)" class="data-row" data-sector="Utilities" data-country="IT" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">ENEL.MI</td>
+            <td>Enel SpA</td>
+            <td><span style="font-size:11px">Utilities</span></td>
+            <td>IT</td>
+            <td style="text-align:right">€7.20</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:50.5px;height:14px;background:rgba(218,200,60,0.85);border-radius:4px"></div>
+                    <strong>50.5</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:79.9px;height:6px;background:rgba(112,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">80</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:38.0px;height:6px;background:rgba(220,209,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">38</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:42.8px;height:6px;background:rgba(220,225,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">43</span></div></td>
+            <td style="text-align:right">11.2</td>
+            <td style="text-align:right">13.5%</td>
+            <td style="text-align:right">5.8%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">1.17</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+15%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(220,249,60,0.12)" class="data-row" data-sector="Consumer Discretionary" data-country="DE" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">VOW3.DE</td>
+            <td>Volkswagen AG</td>
+            <td><span style="font-size:11px">Consumer Discretio</span></td>
+            <td>DE</td>
+            <td style="text-align:right">€98.00</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:49.8px;height:14px;background:rgba(220,249,60,0.85);border-radius:4px"></div>
+                    <strong>49.8</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:93.0px;height:6px;background:rgba(65,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">93</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:39.2px;height:6px;background:rgba(220,213,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">39</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:16.5px;height:6px;background:rgba(220,136,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">16</span></div></td>
+            <td style="text-align:right">6.0</td>
+            <td style="text-align:right">5.4%</td>
+            <td style="text-align:right">4.5%</td>
+            <td style="text-align:center;font-weight:600">7/9</td>
+            <td style="text-align:right">0.87</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+239%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(220,248,60,0.12)" class="data-row" data-sector="Basic Materials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">AI.PA</td>
+            <td>Air Liquide SA</td>
+            <td><span style="font-size:11px">Basic Materials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€185.60</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:49.7px;height:14px;background:rgba(220,248,60,0.85);border-radius:4px"></div>
+                    <strong>49.7</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:36.0px;height:6px;background:rgba(220,202,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">36</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:49.6px;height:6px;background:rgba(220,248,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">50</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:60.5px;height:6px;background:rgba(182,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">60</span></div></td>
+            <td style="text-align:right">28.3</td>
+            <td style="text-align:right">11.1%</td>
+            <td style="text-align:right">1.9%</td>
+            <td style="text-align:center;font-weight:600">7/9</td>
+            <td style="text-align:right">2.09</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-50%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(220,242,60,0.12)" class="data-row" data-sector="Communication Services" data-country="ES" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">TEF.MC</td>
+            <td>Telefónica SA</td>
+            <td><span style="font-size:11px">Communication Serv</span></td>
+            <td>ES</td>
+            <td style="text-align:right">€4.75</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:47.9px;height:14px;background:rgba(220,242,60,0.85);border-radius:4px"></div>
+                    <strong>47.9</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:82.3px;height:6px;background:rgba(103,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">82</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:17.9px;height:6px;background:rgba(220,140,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">18</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:34.7px;height:6px;background:rgba(220,197,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">35</span></div></td>
+            <td style="text-align:right">12.3</td>
+            <td style="text-align:right">10.0%</td>
+            <td style="text-align:right">6.3%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">0.78</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+22%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(220,240,60,0.12)" class="data-row" data-sector="Communication Services" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">ORA.PA</td>
+            <td>Orange SA</td>
+            <td><span style="font-size:11px">Communication Serv</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€13.17</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:47.3px;height:14px;background:rgba(220,240,60,0.85);border-radius:4px"></div>
+                    <strong>47.3</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:71.6px;height:6px;background:rgba(142,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">72</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:34.4px;height:6px;background:rgba(220,196,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">34</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:30.4px;height:6px;background:rgba(220,183,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">30</span></div></td>
+            <td style="text-align:right">18.1</td>
+            <td style="text-align:right">6.2%</td>
+            <td style="text-align:right">5.7%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">1.03</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+7%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(220,240,60,0.12)" class="data-row" data-sector="Industrials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">GLO.PA</td>
+            <td>GL Events SA</td>
+            <td><span style="font-size:11px">Industrials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€28.95</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:47.3px;height:14px;background:rgba(220,240,60,0.85);border-radius:4px"></div>
+                    <strong>47.3</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:79.6px;height:6px;background:rgba(113,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">80</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:9.8px;height:6px;background:rgba(220,113,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">10</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:41.3px;height:6px;background:rgba(220,220,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">41</span></div></td>
+            <td style="text-align:right">9.9</td>
+            <td style="text-align:right">19.3%</td>
+            <td style="text-align:right">3.1%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">1.06</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+10%</td>
+            <td style="text-align:center"><span style="background:#7c3aed;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PME</span></td>
+        </tr>
+        <tr style="background:rgba(220,238,60,0.12)" class="data-row" data-sector="Consumer Staples" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">RCO.PA</td>
+            <td>Rémy Cointreau SA</td>
+            <td><span style="font-size:11px">Consumer Staples</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€62.80</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:46.5px;height:14px;background:rgba(220,238,60,0.85);border-radius:4px"></div>
+                    <strong>46.5</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:49.9px;height:6px;background:rgba(220,249,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">50</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:61.6px;height:6px;background:rgba(178,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">62</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:50.8px;height:6px;background:rgba(217,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">51</span></div></td>
+            <td style="text-align:right">24.8</td>
+            <td style="text-align:right">6.4%</td>
+            <td style="text-align:right">2.9%</td>
+            <td style="text-align:center;font-weight:600">7/9</td>
+            <td style="text-align:right">1.48</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-24%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(220,236,60,0.12)" class="data-row" data-sector="Industrials" data-country="DE" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">SIE.DE</td>
+            <td>Siemens AG</td>
+            <td><span style="font-size:11px">Industrials</span></td>
+            <td>DE</td>
+            <td style="text-align:right">€215.00</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:46.1px;height:14px;background:rgba(220,236,60,0.85);border-radius:4px"></div>
+                    <strong>46.1</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:39.2px;height:6px;background:rgba(220,213,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">39</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:50.5px;height:6px;background:rgba(218,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">50</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:42.5px;height:6px;background:rgba(220,224,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">42</span></div></td>
+            <td style="text-align:right">29.7</td>
+            <td style="text-align:right">10.5%</td>
+            <td style="text-align:right">2.2%</td>
+            <td style="text-align:center;font-weight:600">8/9</td>
+            <td style="text-align:right">1.93</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-51%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(220,231,60,0.12)" class="data-row" data-sector="Industrials" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">HO.PA</td>
+            <td>Thales SA</td>
+            <td><span style="font-size:11px">Industrials</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€235.20</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:44.7px;height:14px;background:rgba(220,231,60,0.85);border-radius:4px"></div>
+                    <strong>44.7</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:33.5px;height:6px;background:rgba(220,193,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">34</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:44.1px;height:6px;background:rgba(220,229,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">44</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:44.5px;height:6px;background:rgba(220,231,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">44</span></div></td>
+            <td style="text-align:right">46.3</td>
+            <td style="text-align:right">14.6%</td>
+            <td style="text-align:right">1.6%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">1.69</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-73%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(220,221,60,0.12)" class="data-row" data-sector="Technology" data-country="FR" data-signal="Hold">
+            <td style="font-weight:700;font-family:monospace">CLA.PA</td>
+            <td>Claranova SE</td>
+            <td><span style="font-size:11px">Technology</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€2.51</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:41.7px;height:14px;background:rgba(220,221,60,0.85);border-radius:4px"></div>
+                    <strong>41.7</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#f59e0b;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Hold</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:83.0px;height:6px;background:rgba(101,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">83</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:24.0px;height:6px;background:rgba(220,161,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">24</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:39.9px;height:6px;background:rgba(220,215,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">40</span></div></td>
+            <td style="text-align:right">-47.7</td>
+            <td style="text-align:right">nan%</td>
+            <td style="text-align:right">0.0%</td>
+            <td style="text-align:center;font-weight:600">8/9</td>
+            <td style="text-align:right">1.50</td>
+            <td style="text-align:right;color:#999;font-weight:600">—</td>
+            <td style="text-align:center"><span style="background:#7c3aed;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PME</span></td>
+        </tr>
+        <tr style="background:rgba(220,211,60,0.12)" class="data-row" data-sector="Real Estate" data-country="FR" data-signal="Sell">
+            <td style="font-weight:700;font-family:monospace">ALTUR.PA</td>
+            <td>Altarea SCA</td>
+            <td><span style="font-size:11px">Real Estate</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€92.00</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:38.8px;height:14px;background:rgba(220,211,60,0.85);border-radius:4px"></div>
+                    <strong>38.8</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Sell</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:65.8px;height:6px;background:rgba(163,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">66</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:22.4px;height:6px;background:rgba(220,156,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">22</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:18.0px;height:6px;background:rgba(220,141,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">18</span></div></td>
+            <td style="text-align:right">20.0</td>
+            <td style="text-align:right">4.0%</td>
+            <td style="text-align:right">4.3%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">0.48</td>
+            <td style="text-align:right;color:#059669;font-weight:600">+21%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr>
+        <tr style="background:rgba(220,210,60,0.12)" class="data-row" data-sector="Utilities" data-country="FR" data-signal="Sell">
+            <td style="font-weight:700;font-family:monospace">ABIO.PA</td>
+            <td>Albioma SA</td>
+            <td><span style="font-size:11px">Utilities</span></td>
+            <td>FR</td>
+            <td style="text-align:right">€52.00</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:38.4px;height:14px;background:rgba(220,210,60,0.85);border-radius:4px"></div>
+                    <strong>38.4</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Sell</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:40.5px;height:6px;background:rgba(220,217,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">40</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:15.2px;height:6px;background:rgba(220,131,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">15</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:41.8px;height:6px;background:rgba(220,222,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">42</span></div></td>
+            <td style="text-align:right">29.1</td>
+            <td style="text-align:right">7.3%</td>
+            <td style="text-align:right">1.5%</td>
+            <td style="text-align:center;font-weight:600">6/9</td>
+            <td style="text-align:right">0.59</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-40%</td>
+            <td style="text-align:center"><span style="background:#7c3aed;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PME</span></td>
+        </tr>
+        <tr style="background:rgba(220,206,60,0.12)" class="data-row" data-sector="Energy" data-country="FI" data-signal="Sell">
+            <td style="font-weight:700;font-family:monospace">NESTE.HE</td>
+            <td>Neste Oyj</td>
+            <td><span style="font-size:11px">Energy</span></td>
+            <td>FI</td>
+            <td style="text-align:right">€12.50</td>
+            <td style="text-align:center">
+                <div style="display:flex;align-items:center;gap:4px">
+                    <div style="width:37.1px;height:14px;background:rgba(220,206,60,0.85);border-radius:4px"></div>
+                    <strong>37.1</strong>
+                </div>
+            </td>
+            <td style="text-align:center"><span style="background:#ef4444;color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">Sell</span></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:65.7px;height:6px;background:rgba(163,200,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">66</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:43.3px;height:6px;background:rgba(220,227,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">43</span></div></td>
+            <td style="text-align:center"><div style="display:flex;align-items:center;gap:4px"><div style="width:17.3px;height:6px;background:rgba(220,138,60,0.9);border-radius:3px"></div><span style="font-size:10px;color:#888">17</span></div></td>
+            <td style="text-align:right">22.9</td>
+            <td style="text-align:right">5.8%</td>
+            <td style="text-align:right">5.6%</td>
+            <td style="text-align:center;font-weight:600">7/9</td>
+            <td style="text-align:right">2.22</td>
+            <td style="text-align:right;color:#ef4444;font-weight:600">-14%</td>
+            <td style="text-align:center"><span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span></td>
+        </tr></tbody>
+</table>
+</div>
+
+<div style="margin-top:24px;padding:16px;background:var(--surface);border-radius:12px;border:1px solid var(--border)">
+  <h3>📐 Methodology Quick Reference</h3>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px;font-size:11px;color:#aaa;margin-top:8px">
+    <div><strong>Composite Score</strong>: Valuation 25% + Health 20% + Profitability 20% + Growth 15% + Shareholder 10% + Risk 10%</div>
+    <div><strong>Piotroski F-Score</strong>: 9-point financial strength indicator (8-9 strong, &lt;5 weak)</div>
+    <div><strong>Graham MoS</strong>: Margin of Safety = (Graham Number / Price - 1) × 100. Positive = undervalued</div>
+    <div><strong>Altman Z-Score</strong>: &gt;2.99 safe, 1.81-2.99 grey zone, &lt;1.81 distress</div>
+    <div><strong>PEA</strong>: EU/EEA HQ companies eligible for French tax-advantaged wrapper</div>
+    <div><strong>Signals</strong>: Strong Buy ≥80, Buy ≥65, Hold 40-65, Sell &lt;40, Strong Sell &lt;25</div>
+  </div>
+</div>
+
+<div style="text-align:center;margin-top:16px;font-size:11px;color:#555">
+  Invest Solo v0.2.0 · Generated 2026-02-17 17:25 · Data for illustration · Not financial advice
+</div>
+
+<script>
+function filterTable() {
+  const q = document.getElementById('search').value.toLowerCase();
+  document.querySelectorAll('.data-row').forEach(r => {
+    const text = r.textContent.toLowerCase();
+    r.style.display = text.includes(q) ? '' : 'none';
+  });
+}
+function filterSignal(signal, btn) {
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  document.querySelectorAll('.data-row').forEach(r => {
+    if (signal === 'all') { r.style.display = ''; }
+    else { r.style.display = r.dataset.signal === signal ? '' : 'none'; }
+  });
+}
+</script>
+</body>
+</html>
