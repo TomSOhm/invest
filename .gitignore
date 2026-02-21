@@ -49,6 +49,15 @@ data/exports/*.xlsx
 data/exports/*.docx
 data/exports/*.pdf
 
+# Frontend (Next.js)
+frontend/.next/
+frontend/node_modules/
+frontend/out/
+
+# Portfolio/Watchlist data (user-specific)
+data/portfolio.json
+data/watchlist.json
+
 # Temporary
 *.tmp
 *.bak
