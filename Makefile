@@ -2,7 +2,7 @@
 # Invest Solo — Makefile
 # ═══════════════════════════════════════════
 
-.PHONY: install setup daily screen test clean
+.PHONY: install setup daily screen test clean backend frontend dev
 
 # Install all dependencies
 install:
@@ -41,6 +41,26 @@ test:
 # Launch dashboard
 dashboard:
 	streamlit run src/reporting/dashboard.py
+
+# ═══════════════════════════════════════════
+# Full-Stack Development
+# ═══════════════════════════════════════════
+
+# Start FastAPI backend (port 8000)
+backend:
+	python -m uvicorn backend.app.main:app --reload --port 8000
+
+# Start Next.js frontend (port 3000)
+frontend:
+	cd frontend && npm run dev
+
+# Install frontend dependencies
+frontend-install:
+	cd frontend && npm install
+
+# Build frontend for production
+frontend-build:
+	cd frontend && npm run build
 
 # Clean cache and temporary files
 clean:
