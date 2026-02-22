@@ -106,8 +106,17 @@ export default function ScreenerPage() {
 
   function handleRunScreen() {
     setActivePreset(null);
+    // Percentage-based filters are entered by the user as whole numbers (e.g. 10 for 10%)
+    // but the backend stores data in decimal form (0.10). Divide by 100 before sending.
+    const convertedFilters: ScreenerFilters = {
+      ...filters,
+      min_roe: filters.min_roe != null ? filters.min_roe / 100 : undefined,
+      min_operating_margin: filters.min_operating_margin != null ? filters.min_operating_margin / 100 : undefined,
+      min_div_yield: filters.min_div_yield != null ? filters.min_div_yield / 100 : undefined,
+      min_revenue_growth: filters.min_revenue_growth != null ? filters.min_revenue_growth / 100 : undefined,
+    };
     runScreen({
-      filters,
+      filters: convertedFilters,
       pea_only: peaOnly,
       sort_by: "composite_score",
       sort_desc: true,
@@ -341,15 +350,15 @@ export default function ScreenerPage() {
                           <td
                             className={clsx(
                               `${tdCls} text-right font-mono`,
-                              item.roe != null && item.roe > 10
+                              item.roe != null && item.roe > 0.10
                                 ? "text-emerald-600 dark:text-emerald-400"
                                 : "text-slate-500"
                             )}
                           >
-                            {item.roe != null ? formatPercent(item.roe) : "—"}
+                            {item.roe != null ? formatPercent(item.roe * 100) : "—"}
                           </td>
                           <td className={`${tdCls} text-right font-mono text-slate-500`}>
-                            {item.div_yield != null ? formatPercent(item.div_yield) : "—"}
+                            {item.div_yield != null ? formatPercent(item.div_yield * 100) : "—"}
                           </td>
                           <td
                             className={clsx(
@@ -359,7 +368,7 @@ export default function ScreenerPage() {
                                 : "text-red-500 dark:text-red-400"
                             )}
                           >
-                            {item.revenue_growth != null ? formatPercent(item.revenue_growth) : "—"}
+                            {item.revenue_growth != null ? formatPercent(item.revenue_growth * 100) : "—"}
                           </td>
                           <td className={`${tdCls} text-right font-mono`}>
                             <span
