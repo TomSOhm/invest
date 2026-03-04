@@ -9,7 +9,7 @@ yfinance>=0.2.30
 pandas>=2.0
 numpy>=1.24
 scipy>=1.11
-requests>=2.31
+requests>=2.32.2
 
 # ── Financial Analysis ──
 financetoolkit>=1.9
@@ -59,3 +59,8 @@ sqlalchemy>=2.0             # Optional: database backend
 # ── Testing ──
 pytest>=7.4
 pytest-cov>=4.1
+pillow>=10.0.0 # not directly required, pinned by Snyk to avoid a vulnerability
+urllib3>=1.26.19 # not directly required, pinned by Snyk to avoid a vulnerability
+protobuf>=4.25.8 # not directly required, pinned by Snyk to avoid a vulnerability
+fonttools>=4.43.0 # not directly required, pinned by Snyk to avoid a vulnerability
+zipp>=3.19.1 # not directly required, pinned by Snyk to avoid a vulnerability
