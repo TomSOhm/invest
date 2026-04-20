@@ -52,15 +52,15 @@ backend:
 
 # Start Next.js frontend (port 3000)
 frontend:
-	cd frontend && npm run dev
+	cd frontend && bun run dev
 
 # Install frontend dependencies
 frontend-install:
-	cd frontend && npm install
+	cd frontend && bun install
 
 # Build frontend for production
 frontend-build:
-	cd frontend && npm run build
+	cd frontend && bun run build
 
 # Clean cache and temporary files
 clean:

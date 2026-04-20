@@ -26,7 +26,7 @@ Thank you for your interest in contributing! This document provides guidelines a
    ```
 4. **Set up the frontend:**
    ```bash
-   cd frontend && npm install && cd ..
+   cd frontend && bun install && cd ..
    ```
 5. **Start development servers:**
    ```bash

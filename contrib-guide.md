@@ -6,7 +6,7 @@ Thank you for your interest in contributing! This guide will help you get starte
 
 - Python 3.11+
 - Node.js 18+
-- npm
+- bun
 - Git
 
 ## Development Setup
@@ -23,7 +23,7 @@ cp .env.example .env
 pip install -r requirements.txt
 
 # Install frontend dependencies
-cd frontend && npm install && cd ..
+cd frontend && bun install && cd ..
 
 # Start the backend (terminal 1)
 make backend
