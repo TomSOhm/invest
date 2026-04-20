@@ -108,7 +108,7 @@ invest/
 
 - Python 3.11+
 - Node.js 18+
-- npm or yarn
+- bun
 
 ### Installation
 
@@ -125,7 +125,7 @@ cp .env.example .env
 pip install -r requirements.txt
 
 # Install frontend dependencies
-cd frontend && npm install && cd ..
+cd frontend && bun install && cd ..
 ```
 
 ### Running
