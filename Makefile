@@ -4,9 +4,9 @@
 
 .PHONY: install setup daily screen test clean backend frontend dev
 
-# Install all dependencies
+# Install backend dependencies
 install:
-	pip install -r requirements.txt
+	pip install -r backend/requirements.txt
 
 # First-time setup
 setup:
