@@ -21,6 +21,7 @@ import Spinner from "@/components/ui/Spinner";
 import { ScoreBar } from "@/components/ui/ScoreGauge";
 import HorizonSelector from "@/components/ui/HorizonSelector";
 import CTOWarningBanner from "@/components/ui/CTOWarningBanner";
+import MetricInfo from "@/components/ui/MetricInfo";
 import { api } from "@/lib/api";
 import type { PortfolioPosition } from "@/lib/types";
 import clsx from "clsx";
@@ -317,12 +318,42 @@ export default function WatchlistPage() {
                   <th className={thCls}>Ticker</th>
                   <th className={thCls}>Name</th>
                   <th className={`${thCls} text-right`}>Price</th>
-                  <th className={thCls}>Score</th>
-                  <th className={thCls}>Signal</th>
-                  <th className={`${thCls} text-right`}>P/E</th>
-                  <th className={`${thCls} text-right`}>ROE</th>
-                  <th className={`${thCls} text-right`}>Graham MoS</th>
-                  <th className={`${thCls} text-right`}>DCF MoS</th>
+                  <th className={thCls}>
+                    <span className="inline-flex items-center gap-1">
+                      Score
+                      <MetricInfo metricId="score_lt" size={11} />
+                    </span>
+                  </th>
+                  <th className={thCls}>
+                    <span className="inline-flex items-center gap-1">
+                      Signal
+                      <MetricInfo metricId="signal" size={11} />
+                    </span>
+                  </th>
+                  <th className={`${thCls} text-right`}>
+                    <span className="inline-flex items-center gap-1">
+                      P/E
+                      <MetricInfo metricId="pe" size={11} />
+                    </span>
+                  </th>
+                  <th className={`${thCls} text-right`}>
+                    <span className="inline-flex items-center gap-1">
+                      ROE
+                      <MetricInfo metricId="roe" size={11} />
+                    </span>
+                  </th>
+                  <th className={`${thCls} text-right`}>
+                    <span className="inline-flex items-center gap-1">
+                      Graham MoS
+                      <MetricInfo metricId="graham_mos" size={11} />
+                    </span>
+                  </th>
+                  <th className={`${thCls} text-right`}>
+                    <span className="inline-flex items-center gap-1">
+                      DCF MoS
+                      <MetricInfo metricId="dcf_mos" size={11} />
+                    </span>
+                  </th>
                   <th className={thCls}>Analyst</th>
                   <th className={thCls}>PEA</th>
                   {horizon === "short_term" && <th className={thCls}>Account</th>}

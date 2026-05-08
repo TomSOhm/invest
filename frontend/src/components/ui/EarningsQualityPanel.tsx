@@ -4,6 +4,7 @@ import clsx from "clsx";
 import { Check, X, AlertTriangle } from "lucide-react";
 import type { QualitySignals } from "@/lib/types";
 import { formatNumber, formatPercent, formatCurrency } from "@/lib/formatters";
+import MetricInfo from "./MetricInfo";
 
 interface EarningsQualityPanelProps {
   quality: QualitySignals;
@@ -34,7 +35,7 @@ export default function EarningsQualityPanel({
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
         {/* Piotroski F-Score */}
         <div className="space-y-1.5">
-          <div className="text-xs text-slate-500">Piotroski F-Score</div>
+          <div className="text-xs text-slate-500 inline-flex items-center gap-1">Piotroski F-Score<MetricInfo metricId="piotroski_f" size={11} /></div>
           {f != null ? (
             <>
               <div className="flex gap-0.5">
@@ -74,7 +75,7 @@ export default function EarningsQualityPanel({
 
         {/* Altman Z */}
         <div className="space-y-1.5">
-          <div className="text-xs text-slate-500">Altman Z-Score</div>
+          <div className="text-xs text-slate-500 inline-flex items-center gap-1">Altman Z-Score<MetricInfo metricId="altman_z" size={11} /></div>
           {z != null ? (
             <>
               <div
@@ -98,7 +99,7 @@ export default function EarningsQualityPanel({
 
         {/* Beneish M-Score */}
         <div className="space-y-1.5">
-          <div className="text-xs text-slate-500">Beneish M-Score</div>
+          <div className="text-xs text-slate-500 inline-flex items-center gap-1">Beneish M-Score<MetricInfo metricId="m_score" size={11} /></div>
           {m != null ? (
             <>
               <div
@@ -128,7 +129,7 @@ export default function EarningsQualityPanel({
 
         {/* Sloan Accruals */}
         <div className="space-y-1.5">
-          <div className="text-xs text-slate-500">Sloan Accruals</div>
+          <div className="text-xs text-slate-500 inline-flex items-center gap-1">Sloan Accruals<MetricInfo metricId="sloan_accruals" size={11} /></div>
           {sloan != null ? (
             <>
               <div
@@ -158,7 +159,7 @@ export default function EarningsQualityPanel({
 
         {/* Cash Conversion Ratio */}
         <div className="space-y-1.5">
-          <div className="text-xs text-slate-500">CCR 5yr</div>
+          <div className="text-xs text-slate-500 inline-flex items-center gap-1">CCR 5yr<MetricInfo metricId="cash_conversion_ratio_5y" size={11} /></div>
           {ccr != null ? (
             <>
               <div
@@ -188,7 +189,7 @@ export default function EarningsQualityPanel({
 
         {/* Graham MoS */}
         <div className="space-y-1.5">
-          <div className="text-xs text-slate-500">Graham MoS</div>
+          <div className="text-xs text-slate-500 inline-flex items-center gap-1">Graham MoS<MetricInfo metricId="graham_mos" size={11} /></div>
           {grahamMos != null ? (
             <>
               <div

@@ -6,11 +6,18 @@ import clsx from "clsx";
 import type { Horizon, HorizonScoring } from "@/lib/types";
 import { signalToBgColor, scoreToColor } from "@/lib/constants";
 import SignalBadge from "./SignalBadge";
+import MetricInfo from "./MetricInfo";
 
 const HORIZON_LABELS: Record<Horizon, string> = {
   long_term: "Long Term",
   medium_term: "Medium Term",
   short_term: "Short Term",
+};
+
+const HORIZON_SCORE_ID: Record<Horizon, string> = {
+  long_term: "score_lt",
+  medium_term: "score_mt",
+  short_term: "score_st",
 };
 
 interface HorizonScoreCardProps {
@@ -41,16 +48,21 @@ export default function HorizonScoreCard({
     <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
       {/* Header row */}
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide inline-flex items-center gap-1">
           {HORIZON_LABELS[horizon]}
+          <MetricInfo metricId={HORIZON_SCORE_ID[horizon]} size={12} />
         </span>
         <div className="flex items-center gap-2">
           {showCTOPill && (
-            <span className="px-2 py-0.5 text-xs font-semibold rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+            <span className="px-2 py-0.5 text-xs font-semibold rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300 inline-flex items-center gap-1">
               CTO
+              <MetricInfo metricId="recommended_account" size={11} />
             </span>
           )}
-          <SignalBadge signal={scoring.signal} />
+          <span className="inline-flex items-center gap-1">
+            <SignalBadge signal={scoring.signal} />
+            <MetricInfo metricId="signal" size={12} />
+          </span>
         </div>
       </div>
 
@@ -81,8 +93,9 @@ export default function HorizonScoreCard({
                   className="text-emerald-500 shrink-0"
                   aria-hidden
                 />
-                <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                <span className="text-emerald-600 dark:text-emerald-400 font-medium inline-flex items-center gap-1">
                   All gates passed
+                  <MetricInfo metricId="passes_gates" size={11} />
                 </span>
               </>
             ) : (
@@ -92,9 +105,10 @@ export default function HorizonScoreCard({
                   className="text-red-500 shrink-0"
                   aria-hidden
                 />
-                <span className="text-red-500 dark:text-red-400 font-medium">
+                <span className="text-red-500 dark:text-red-400 font-medium inline-flex items-center gap-1">
                   {scoring.blockers.length} gate
                   {scoring.blockers.length !== 1 ? "s" : ""} failing
+                  <MetricInfo metricId="passes_gates" size={11} />
                 </span>
               </>
             )}
@@ -105,6 +119,10 @@ export default function HorizonScoreCard({
       {/* Blockers list */}
       {scoring.blockers.length > 0 && (
         <div className="space-y-1">
+          <div className="text-xs font-medium text-slate-500 dark:text-slate-400 inline-flex items-center gap-1">
+            Blockers
+            <MetricInfo metricId="blockers" size={11} />
+          </div>
           <ul className="space-y-0.5">
             {visibleBlockers.map((b) => (
               <li

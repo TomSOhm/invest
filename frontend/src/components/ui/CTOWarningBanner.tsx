@@ -2,6 +2,7 @@
 
 import { AlertTriangle, X } from "lucide-react";
 import { useState } from "react";
+import MetricInfo from "./MetricInfo";
 
 /**
  * Banner shown when the Short-Term horizon is selected.
@@ -25,7 +26,11 @@ export default function CTOWarningBanner() {
         aria-hidden
       />
       <p className="text-xs flex-1">
-        <strong>Short-term trading in a PEA is sub-optimal.</strong> Use a{" "}
+        <strong className="inline-flex items-center gap-1">
+          Short-term trading in a PEA is sub-optimal.
+          <MetricInfo metricId="recommended_account" size={11} />
+        </strong>{" "}
+        Use a{" "}
         <strong>CTO (compte-titres ordinaire)</strong> for short-term positions.
         Early withdrawals from a PEA within 5 years trigger a{" "}
         <strong>30% flat tax (PFU)</strong> on capital gains, versus only 17.2%

@@ -32,6 +32,7 @@ import Spinner from "@/components/ui/Spinner";
 import Card from "@/components/ui/Card";
 import { ScoreBar } from "@/components/ui/ScoreGauge";
 import HorizonSelector from "@/components/ui/HorizonSelector";
+import MetricInfo from "@/components/ui/MetricInfo";
 import clsx from "clsx";
 
 // ---------------------------------------------------------------------------
@@ -59,15 +60,20 @@ function SummaryCard({
   value,
   sub,
   positive,
+  metricId,
 }: {
   label: string;
   value: string;
   sub?: string;
   positive?: boolean | null;
+  metricId?: string;
 }) {
   return (
     <Card className="flex flex-col gap-1 min-w-0">
-      <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-xs text-slate-500 dark:text-slate-400 inline-flex items-center gap-1">
+        {label}
+        {metricId && <MetricInfo metricId={metricId} size={11} />}
+      </span>
       <span
         className={clsx(
           "text-xl font-bold tabular-nums",
@@ -622,17 +628,20 @@ export default function PortfolioPage() {
             label="Total Value"
             value={formatCurrency(summary.total_value)}
             sub={`PEA: ${formatCurrency(summary.pea_value)}`}
+            metricId="total_value"
           />
           <SummaryCard
             label="Total P&L"
             value={formatCurrency(summary.total_gain_loss)}
             sub={formatPercent(summary.total_gain_loss_pct)}
             positive={summary.total_gain_loss >= 0}
+            metricId="total_gain_loss"
           />
           <SummaryCard
             label="Avg Score (LT)"
             value={formatNumber(summary.avg_score_lt, 1)}
             sub="Long-term (0-100)"
+            metricId="avg_score_lt"
           />
           <SummaryCard
             label="Positions"
@@ -640,6 +649,7 @@ export default function PortfolioPage() {
             sub={`Signals: ${Object.entries(summary.signal_distribution)
               .map(([k, v]) => `${v} ${k}`)
               .join(", ")}`}
+            metricId="position_count"
           />
         </div>
       )}
@@ -713,6 +723,7 @@ export default function PortfolioPage() {
                   >
                     <span className="flex items-center justify-end gap-1">
                       P&L% <SortIcon col="gain_loss_pct" />
+                      <MetricInfo metricId="gain_loss_pct" size={11} />
                     </span>
                   </th>
                   <th
@@ -721,6 +732,7 @@ export default function PortfolioPage() {
                   >
                     <span className="flex items-center justify-end gap-1">
                       Weight <SortIcon col="weight_pct" />
+                      <MetricInfo metricId="weight_pct" size={11} />
                     </span>
                   </th>
                   <th
@@ -730,10 +742,30 @@ export default function PortfolioPage() {
                     <span className="flex items-center gap-1">
                       Score ({horizon === "long_term" ? "LT" : horizon === "medium_term" ? "MT" : "ST"})
                       <SortIcon col={scoreKey} />
+                      <MetricInfo
+                        metricId={
+                          horizon === "long_term"
+                            ? "score_lt"
+                            : horizon === "medium_term"
+                            ? "score_mt"
+                            : "score_st"
+                        }
+                        size={11}
+                      />
                     </span>
                   </th>
-                  <th className={thCls}>Signal</th>
-                  <th className={thCls}>PEA</th>
+                  <th className={thCls}>
+                    <span className="inline-flex items-center gap-1">
+                      Signal
+                      <MetricInfo metricId="signal" size={11} />
+                    </span>
+                  </th>
+                  <th className={thCls}>
+                    <span className="inline-flex items-center gap-1">
+                      PEA
+                      <MetricInfo metricId="pea_eligible" size={11} />
+                    </span>
+                  </th>
                   <th className={thCls}></th>
                 </tr>
               </thead>

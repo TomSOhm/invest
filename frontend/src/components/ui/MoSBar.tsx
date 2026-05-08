@@ -1,6 +1,7 @@
 "use client";
 
 import clsx from "clsx";
+import MetricInfo from "./MetricInfo";
 
 interface MoSBarProps {
   mos: number;
@@ -25,8 +26,9 @@ export default function MoSBar({ mos, label, className }: MoSBarProps) {
     <div className={clsx("space-y-1", className)}>
       {label && (
         <div className="flex justify-between items-center">
-          <span className="text-xs text-slate-500 dark:text-slate-400">
+          <span className="text-xs text-slate-500 dark:text-slate-400 inline-flex items-center gap-1">
             {label}
+            <MetricInfo metricId="dcf_mos" size={11} />
           </span>
           <span
             className={clsx(

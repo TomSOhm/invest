@@ -21,6 +21,7 @@ import DCFFairValueRange from "@/components/ui/DCFFairValueRange";
 import EarningsQualityPanel from "@/components/ui/EarningsQualityPanel";
 import MomentumPanel from "@/components/ui/MomentumPanel";
 import { ScoreBar } from "@/components/ui/ScoreGauge";
+import MetricInfo from "@/components/ui/MetricInfo";
 import type { AnalystRatings, RiskSignals, SubScores } from "@/lib/types";
 import clsx from "clsx";
 
@@ -29,14 +30,19 @@ function MetricRow({
   label,
   value,
   isGood,
+  metricId,
 }: {
   label: string;
   value: string;
   isGood?: boolean | null;
+  metricId?: string;
 }) {
   return (
     <div className="flex justify-between items-center py-1 border-b border-slate-100 dark:border-slate-800 last:border-0">
-      <span className="text-xs text-slate-500 dark:text-slate-400">{label}</span>
+      <span className="text-xs text-slate-500 dark:text-slate-400 inline-flex items-center gap-1">
+        {label}
+        {metricId && <MetricInfo metricId={metricId} size={11} />}
+      </span>
       <span
         className={clsx(
           "text-xs font-mono font-semibold",
@@ -111,7 +117,10 @@ function RiskPanel({ risk }: { risk: RiskSignals }) {
       <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
         {risk.risk_score != null && (
           <div>
-            <div className="text-xs text-slate-400 mb-0.5">Risk Score</div>
+            <div className="text-xs text-slate-400 mb-0.5 inline-flex items-center gap-1">
+              Risk Score
+              <MetricInfo metricId="risk_score" size={11} />
+            </div>
             <ScoreBar score={risk.risk_score} />
           </div>
         )}
@@ -120,6 +129,7 @@ function RiskPanel({ risk }: { risk: RiskSignals }) {
             label="Vol 1Y"
             value={formatPercent(risk.realized_vol_1y * 100)}
             isGood={risk.realized_vol_1y < 0.25}
+            metricId="realized_vol_1y"
           />
         )}
         {risk.max_drawdown_3y != null && (
@@ -127,6 +137,7 @@ function RiskPanel({ risk }: { risk: RiskSignals }) {
             label="Max DD 3Y"
             value={formatPercent(risk.max_drawdown_3y * 100)}
             isGood={risk.max_drawdown_3y > -0.3}
+            metricId="max_drawdown_3y"
           />
         )}
         {risk.net_debt_ebitda != null && (
@@ -134,6 +145,7 @@ function RiskPanel({ risk }: { risk: RiskSignals }) {
             label="ND/EBITDA"
             value={formatNumber(risk.net_debt_ebitda, 1) + "x"}
             isGood={risk.net_debt_ebitda < 3}
+            metricId="net_debt_ebitda"
           />
         )}
         {risk.interest_coverage != null && (
@@ -141,12 +153,14 @@ function RiskPanel({ risk }: { risk: RiskSignals }) {
             label="Interest Cov."
             value={formatNumber(risk.interest_coverage, 1) + "x"}
             isGood={risk.interest_coverage > 3}
+            metricId="interest_coverage"
           />
         )}
         {risk.beta != null && (
           <MetricRow
             label="Beta"
             value={formatNumber(risk.beta, 2)}
+            metricId="beta"
           />
         )}
       </div>
@@ -157,12 +171,12 @@ function RiskPanel({ risk }: { risk: RiskSignals }) {
 // Sub-scores panel (collapsible)
 function SubScoresPanel({ subScores }: { subScores: SubScores }) {
   const items = [
-    { label: "Valuation", score: subScores.valuation },
-    { label: "Profitability", score: subScores.profitability },
-    { label: "Financial Health", score: subScores.health },
-    { label: "Growth", score: subScores.growth },
-    { label: "Shareholder Returns", score: subScores.shareholder },
-    { label: "Risk (Legacy)", score: subScores.risk_legacy },
+    { label: "Valuation", score: subScores.valuation, metricId: "sub_valuation" },
+    { label: "Profitability", score: subScores.profitability, metricId: "sub_profitability" },
+    { label: "Financial Health", score: subScores.health, metricId: "sub_health" },
+    { label: "Growth", score: subScores.growth, metricId: "sub_growth" },
+    { label: "Shareholder Returns", score: subScores.shareholder, metricId: "sub_shareholder" },
+    { label: "Risk (Legacy)", score: subScores.risk_legacy, metricId: "sub_risk_legacy" },
   ];
 
   return (
@@ -176,7 +190,10 @@ function SubScoresPanel({ subScores }: { subScores: SubScores }) {
           return (
             <div key={item.label} className="space-y-1">
               <div className="flex justify-between items-center">
-                <span className="text-xs text-slate-600 dark:text-slate-400">{item.label}</span>
+                <span className="text-xs text-slate-600 dark:text-slate-400 inline-flex items-center gap-1">
+                  {item.label}
+                  <MetricInfo metricId={item.metricId} size={11} />
+                </span>
                 <span className="text-xs font-mono font-bold" style={{ color }}>
                   {Math.round(item.score)}
                 </span>
@@ -391,36 +408,36 @@ export default function CompanyPage() {
       <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
         {/* Valuation */}
         <Card title="Valuation">
-          <MetricRow label="P/E" value={formatNumber(metrics.pe, 1)} isGood={metrics.pe != null ? metrics.pe < 25 : null} />
-          <MetricRow label="Fwd P/E" value={formatNumber(metrics.forward_pe, 1)} />
-          <MetricRow label="P/B" value={formatNumber(metrics.pb, 2)} isGood={metrics.pb != null ? metrics.pb < 3 : null} />
-          <MetricRow label="P/S" value={formatNumber(metrics.ps, 2)} />
-          <MetricRow label="P/FCF" value={formatNumber(metrics.pfcf, 1)} />
-          <MetricRow label="EV/EBITDA" value={formatNumber(metrics.ev_ebitda, 1)} />
-          <MetricRow label="EV/Sales" value={formatNumber(metrics.ev_sales, 2)} />
-          <MetricRow label="PEG" value={formatNumber(metrics.peg, 2)} isGood={metrics.peg != null ? metrics.peg < 1.5 : null} />
+          <MetricRow label="P/E" value={formatNumber(metrics.pe, 1)} isGood={metrics.pe != null ? metrics.pe < 25 : null} metricId="pe" />
+          <MetricRow label="Fwd P/E" value={formatNumber(metrics.forward_pe, 1)} metricId="forward_pe" />
+          <MetricRow label="P/B" value={formatNumber(metrics.pb, 2)} isGood={metrics.pb != null ? metrics.pb < 3 : null} metricId="pb" />
+          <MetricRow label="P/S" value={formatNumber(metrics.ps, 2)} metricId="ps" />
+          <MetricRow label="P/FCF" value={formatNumber(metrics.pfcf, 1)} metricId="pfcf" />
+          <MetricRow label="EV/EBITDA" value={formatNumber(metrics.ev_ebitda, 1)} metricId="ev_ebitda" />
+          <MetricRow label="EV/Sales" value={formatNumber(metrics.ev_sales, 2)} metricId="ev_sales" />
+          <MetricRow label="PEG" value={formatNumber(metrics.peg, 2)} isGood={metrics.peg != null ? metrics.peg < 1.5 : null} metricId="peg" />
         </Card>
 
         {/* Profitability */}
         <Card title="Profitability">
-          <MetricRow label="ROE" value={metrics.roe != null ? formatPercent(metrics.roe) : "—"} isGood={metrics.roe != null ? metrics.roe > 10 : null} />
-          <MetricRow label="ROA" value={metrics.roa != null ? formatPercent(metrics.roa) : "—"} isGood={metrics.roa != null ? metrics.roa > 5 : null} />
-          <MetricRow label="ROIC" value={metrics.roic != null ? formatPercent(metrics.roic) : "—"} isGood={metrics.roic != null ? metrics.roic > 10 : null} />
-          <MetricRow label="Gross Margin" value={metrics.gross_margin != null ? formatPercent(metrics.gross_margin) : "—"} />
-          <MetricRow label="Operating Margin" value={metrics.operating_margin != null ? formatPercent(metrics.operating_margin) : "—"} isGood={metrics.operating_margin != null ? metrics.operating_margin > 10 : null} />
-          <MetricRow label="Net Margin" value={metrics.net_margin != null ? formatPercent(metrics.net_margin) : "—"} />
-          <MetricRow label="FCF Margin" value={metrics.fcf_margin != null ? formatPercent(metrics.fcf_margin) : "—"} />
+          <MetricRow label="ROE" value={metrics.roe != null ? formatPercent(metrics.roe) : "—"} isGood={metrics.roe != null ? metrics.roe > 10 : null} metricId="roe" />
+          <MetricRow label="ROA" value={metrics.roa != null ? formatPercent(metrics.roa) : "—"} isGood={metrics.roa != null ? metrics.roa > 5 : null} metricId="roa" />
+          <MetricRow label="ROIC" value={metrics.roic != null ? formatPercent(metrics.roic) : "—"} isGood={metrics.roic != null ? metrics.roic > 10 : null} metricId="roic" />
+          <MetricRow label="Gross Margin" value={metrics.gross_margin != null ? formatPercent(metrics.gross_margin) : "—"} metricId="gross_margin" />
+          <MetricRow label="Operating Margin" value={metrics.operating_margin != null ? formatPercent(metrics.operating_margin) : "—"} isGood={metrics.operating_margin != null ? metrics.operating_margin > 10 : null} metricId="operating_margin" />
+          <MetricRow label="Net Margin" value={metrics.net_margin != null ? formatPercent(metrics.net_margin) : "—"} metricId="net_margin" />
+          <MetricRow label="FCF Margin" value={metrics.fcf_margin != null ? formatPercent(metrics.fcf_margin) : "—"} metricId="fcf_margin" />
         </Card>
 
         {/* Financial Health */}
         <Card title="Financial Health">
-          <MetricRow label="Current Ratio" value={formatNumber(metrics.current_ratio, 2)} isGood={metrics.current_ratio != null ? metrics.current_ratio > 1.5 : null} />
-          <MetricRow label="D/E Ratio" value={formatNumber(metrics.debt_equity, 2)} isGood={metrics.debt_equity != null ? metrics.debt_equity < 1 : null} />
-          <MetricRow label="Interest Coverage" value={formatNumber(metrics.interest_coverage, 1)} isGood={metrics.interest_coverage != null ? metrics.interest_coverage > 3 : null} />
-          <MetricRow label="Beta" value={formatNumber(metrics.beta, 2)} />
-          <MetricRow label="Rev Growth" value={metrics.revenue_growth != null ? formatPercent(metrics.revenue_growth) : "—"} isGood={metrics.revenue_growth != null ? metrics.revenue_growth > 0 : null} />
-          <MetricRow label="Div Yield" value={metrics.div_yield != null ? formatPercent(metrics.div_yield) : "—"} />
-          <MetricRow label="Payout Ratio" value={metrics.payout_ratio != null ? formatPercent(metrics.payout_ratio) : "—"} />
+          <MetricRow label="Current Ratio" value={formatNumber(metrics.current_ratio, 2)} isGood={metrics.current_ratio != null ? metrics.current_ratio > 1.5 : null} metricId="current_ratio" />
+          <MetricRow label="D/E Ratio" value={formatNumber(metrics.debt_equity, 2)} isGood={metrics.debt_equity != null ? metrics.debt_equity < 1 : null} metricId="debt_equity" />
+          <MetricRow label="Interest Coverage" value={formatNumber(metrics.interest_coverage, 1)} isGood={metrics.interest_coverage != null ? metrics.interest_coverage > 3 : null} metricId="interest_coverage" />
+          <MetricRow label="Beta" value={formatNumber(metrics.beta, 2)} metricId="beta" />
+          <MetricRow label="Rev Growth" value={metrics.revenue_growth != null ? formatPercent(metrics.revenue_growth) : "—"} isGood={metrics.revenue_growth != null ? metrics.revenue_growth > 0 : null} metricId="revenue_growth" />
+          <MetricRow label="Div Yield" value={metrics.div_yield != null ? formatPercent(metrics.div_yield) : "—"} metricId="div_yield" />
+          <MetricRow label="Payout Ratio" value={metrics.payout_ratio != null ? formatPercent(metrics.payout_ratio) : "—"} metricId="payout_ratio" />
         </Card>
 
         {/* Market & Ownership */}

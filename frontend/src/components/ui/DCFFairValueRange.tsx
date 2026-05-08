@@ -5,6 +5,7 @@ import type { DCFValuation } from "@/lib/types";
 import { formatCurrency, formatPercent } from "@/lib/formatters";
 import MoSBar from "./MoSBar";
 import { AlertTriangle } from "lucide-react";
+import MetricInfo from "./MetricInfo";
 
 interface DCFFairValueRangeProps {
   valuation: DCFValuation;
@@ -31,8 +32,9 @@ export default function DCFFairValueRange({
   if (!hasDCF) {
     return (
       <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-2">
-        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide inline-flex items-center gap-1">
           DCF Fair Value
+          <MetricInfo metricId="dcf_fair_value" size={12} />
         </span>
         <p className="text-sm text-slate-400">No DCF data available.</p>
         {warnings.length > 0 && <WarningsList warnings={warnings} />}
@@ -64,13 +66,14 @@ export default function DCFFairValueRange({
   return (
     <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide inline-flex items-center gap-1">
           DCF Fair Value Range
+          <MetricInfo metricId="dcf_fair_value" size={12} />
         </span>
         {mos_mid != null && (
           <span
             className={clsx(
-              "text-sm font-bold font-mono",
+              "text-sm font-bold font-mono inline-flex items-center gap-1",
               mos_mid >= 0
                 ? "text-emerald-600 dark:text-emerald-400"
                 : "text-red-500 dark:text-red-400"
@@ -78,6 +81,7 @@ export default function DCFFairValueRange({
           >
             MoS {mos_mid >= 0 ? "+" : ""}
             {(mos_mid * 100).toFixed(1)}%
+            <MetricInfo metricId="dcf_mos" size={12} />
           </span>
         )}
       </div>
@@ -224,6 +228,7 @@ function WarningsList({ warnings }: { warnings: string[] }) {
         >
           <AlertTriangle size={12} className="shrink-0 mt-0.5" aria-hidden />
           {w}
+          {i === 0 && <MetricInfo metricId="wacc_used" size={11} />}
         </li>
       ))}
     </ul>

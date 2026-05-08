@@ -12,6 +12,7 @@ import Spinner from "@/components/ui/Spinner";
 import { ScoreBar } from "@/components/ui/ScoreGauge";
 import HorizonSelector from "@/components/ui/HorizonSelector";
 import CTOWarningBanner from "@/components/ui/CTOWarningBanner";
+import MetricInfo from "@/components/ui/MetricInfo";
 import { fetchScreenerPresets } from "@/lib/api";
 import clsx from "clsx";
 
@@ -342,13 +343,15 @@ export default function ScreenerPage() {
           {results && !loading && (
             <>
               <div className="flex flex-wrap items-center gap-3 px-4 py-2.5 rounded-lg bg-slate-100 dark:bg-slate-800/60 text-sm">
-                <span className="font-semibold text-slate-700 dark:text-slate-300">
+                <span className="font-semibold text-slate-700 dark:text-slate-300 inline-flex items-center gap-1">
                   {results.summary.total_passed} stocks passed
+                  <MetricInfo metricId="total_passed" size={12} />
                 </span>
                 <span className="text-slate-400">|</span>
-                <span className="text-slate-600 dark:text-slate-400">
+                <span className="text-slate-600 dark:text-slate-400 inline-flex items-center gap-1">
                   Avg Score:{" "}
                   <strong>{formatNumber(results.summary.avg_score, 1)}</strong>
+                  <MetricInfo metricId="avg_score_lt" size={12} />
                 </span>
                 <span className="text-slate-400">|</span>
                 {Object.entries(summarySignals).map(([signal, count]) => (
@@ -356,6 +359,7 @@ export default function ScreenerPage() {
                     {count} {signal}
                   </span>
                 ))}
+                <MetricInfo metricId="signal_distribution" size={12} />
                 <span className="ml-auto text-xs text-slate-400 capitalize">
                   {results.summary.horizon.replace("_", " ")}
                 </span>
@@ -376,7 +380,10 @@ export default function ScreenerPage() {
                             horizon === "long_term" && "bg-emerald-50/50 dark:bg-emerald-900/10"
                           )}
                         >
-                          Score LT
+                          <span className="inline-flex items-center gap-1">
+                            Score LT
+                            <MetricInfo metricId="score_lt" size={11} />
+                          </span>
                         </th>
                         <th
                           className={clsx(
@@ -384,7 +391,10 @@ export default function ScreenerPage() {
                             horizon === "medium_term" && "bg-emerald-50/50 dark:bg-emerald-900/10"
                           )}
                         >
-                          Score MT
+                          <span className="inline-flex items-center gap-1">
+                            Score MT
+                            <MetricInfo metricId="score_mt" size={11} />
+                          </span>
                         </th>
                         <th
                           className={clsx(
@@ -392,19 +402,44 @@ export default function ScreenerPage() {
                             horizon === "short_term" && "bg-emerald-50/50 dark:bg-emerald-900/10"
                           )}
                         >
-                          Score ST
+                          <span className="inline-flex items-center gap-1">
+                            Score ST
+                            <MetricInfo metricId="score_st" size={11} />
+                          </span>
                         </th>
-                        <th className={thCls}>Signal</th>
+                        <th className={thCls}>
+                          <span className="inline-flex items-center gap-1">
+                            Signal
+                            <MetricInfo metricId="signal" size={11} />
+                          </span>
+                        </th>
                         <th className={thCls}>Sector</th>
                         <th className={`${thCls} text-right`}>Mkt Cap</th>
                         <th className={`${thCls} text-right`}>
-                          {horizon === "long_term"
-                            ? "P/E"
-                            : horizon === "medium_term"
-                            ? "DCF MoS"
-                            : "ROE%"}
+                          <span className="inline-flex items-center gap-1">
+                            {horizon === "long_term"
+                              ? "P/E"
+                              : horizon === "medium_term"
+                              ? "DCF MoS"
+                              : "ROE%"}
+                            <MetricInfo
+                              metricId={
+                                horizon === "long_term"
+                                  ? "pe"
+                                  : horizon === "medium_term"
+                                  ? "dcf_mos"
+                                  : "roe"
+                              }
+                              size={11}
+                            />
+                          </span>
                         </th>
-                        <th className={`${thCls} text-right`}>F-Score</th>
+                        <th className={`${thCls} text-right`}>
+                          <span className="inline-flex items-center gap-1">
+                            F-Score
+                            <MetricInfo metricId="piotroski_f" size={11} />
+                          </span>
+                        </th>
                         <th className={thCls}>PEA</th>
                       </tr>
                     </thead>
