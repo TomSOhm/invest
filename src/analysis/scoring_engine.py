@@ -6,6 +6,12 @@ import pandas as pd
 import numpy as np
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+# M5 informational aggregators (sector-relative). Composite weighting unchanged
+# in M5 (M7 owns reshuffling); these are exposed as new columns only.
+from src.analysis.earnings_quality import earnings_quality_score  # noqa: F401
+from src.analysis.quality_moat import moat_score  # noqa: F401
+from src.analysis.risk_metrics import risk_score_real  # noqa: F401
+
 # ══════════════════════════════════════════════════════════════
 # SCORING THRESHOLDS (from settings.yaml)
 # ══════════════════════════════════════════════════════════════
@@ -488,6 +494,22 @@ def score_universe(
         np.nan
     )
     merged["Graham_MoS"] = merged["Graham_MoS"].round(1)
+
+    # ------------------------------------------------------------------
+    # M5: Informational sector-relative scores (NOT yet in Composite_Score).
+    # ------------------------------------------------------------------
+    try:
+        merged["EarningsQuality_Score"] = earnings_quality_score(merged)
+    except Exception:
+        merged["EarningsQuality_Score"] = 50.0
+    try:
+        merged["Moat_Score"] = moat_score(merged)
+    except Exception:
+        merged["Moat_Score"] = 50.0
+    try:
+        merged["Risk_Score_v2"] = risk_score_real(merged, price_history_map=price_history_map)
+    except Exception:
+        merged["Risk_Score_v2"] = 50.0
 
     # ---- M9: optional momentum / revisions / sentiment column blocks ----
     if price_history_map:

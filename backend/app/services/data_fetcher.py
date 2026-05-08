@@ -47,6 +47,25 @@ SCORING_COLUMNS = [
     "AvgVolume", "YearsListed", "Shares_PriorYear",
     "Name", "Sector", "Industry", "Country", "Exchange",
     "PEA", "PEA_PME",
+    # M5 additions: history columns for Earnings Quality, Moat, and Risk modules.
+    # These are JSON-serialisable lists (oldest-last when stored as JSON; the
+    # consumers tolerate either ordering because they reduce by mean/stddev).
+    "FCF_History_5y", "NetIncome_History_5y",
+    "ROIC_History_5y", "OperatingMargin_History_5y",
+    "EBIT_History_3y", "InvestedCapital_History_3y",
+    # M5: Beneish M-Score paired prior-year inputs (numeric scalars).
+    "Receivables", "Receivables_PriorYear",
+    "Revenue_PriorYear", "GrossMargin_PriorYear",
+    "TotalAssets_PriorYear", "CurrentAssets_PriorYear",
+    "PPE", "PPE_PriorYear",
+    "DepreciationAmortization", "DepreciationAmortization_PriorYear",
+    "SGA", "SGA_PriorYear",
+    "LongTermDebt", "LongTermDebt_PriorYear",
+    "CurrentLiabilities_PriorYear",
+    "COGS",
+    "InterestExpense",
+    # M5 placeholder; M6 fills with real WACC.
+    "WACC",
 ]
 
 # Extra fields we fetch beyond what the scoring engine needs

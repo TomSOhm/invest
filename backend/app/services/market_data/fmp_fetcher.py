@@ -725,4 +725,102 @@ class FMPDataFetcher:
         _get_field("returnOnEquity", "ROE")
         _get_field("returnOnAssets", "ROA")
 
+        # ------------------------------------------------------------------
+        # M5: Prior-year scalars for Beneish M-Score
+        # ------------------------------------------------------------------
+        # Pull the SECOND-most-recent (prior-year) value of select FMP fields
+        # so the Beneish formula has its t-1 inputs.
+        def _get_field_prior(fmp_name: str, scoring_name: str) -> None:
+            if fmp_name not in ann.index:
+                result.setdefault(scoring_name, np.nan)
+                return
+            row = ann.loc[fmp_name]
+            cols = list(row.index)
+            # Most-recent first; we want index 1 (prior year)
+            if len(cols) < 2:
+                result.setdefault(scoring_name, np.nan)
+                return
+            for col in cols[1:]:
+                val = row[col]
+                try:
+                    fval = float(val)
+                    if np.isfinite(fval):
+                        result[scoring_name] = fval
+                        return
+                except (TypeError, ValueError):
+                    continue
+            result.setdefault(scoring_name, np.nan)
+
+        # Beneish prior-year inputs
+        _get_field_prior("revenue", "Revenue_PriorYear")
+        _get_field_prior("grossProfitRatio", "GrossMargin_PriorYear")
+        _get_field_prior("totalAssets", "TotalAssets_PriorYear")
+        _get_field_prior("totalCurrentAssets", "CurrentAssets_PriorYear")
+        _get_field_prior("totalCurrentLiabilities", "CurrentLiabilities_PriorYear")
+        _get_field_prior("longTermDebt", "LongTermDebt_PriorYear")
+
+        # Beneish current-year inputs not already present
+        _get_field("netReceivables", "Receivables")
+        _get_field_prior("netReceivables", "Receivables_PriorYear")
+        _get_field("propertyPlantEquipmentNet", "PPE")
+        _get_field_prior("propertyPlantEquipmentNet", "PPE_PriorYear")
+        _get_field("depreciationAndAmortization", "DepreciationAmortization")
+        _get_field_prior("depreciationAndAmortization", "DepreciationAmortization_PriorYear")
+        _get_field("sellingGeneralAndAdministrativeExpenses", "SGA")
+        _get_field_prior("sellingGeneralAndAdministrativeExpenses", "SGA_PriorYear")
+        _get_field("longTermDebt", "LongTermDebt")
+        _get_field("costOfRevenue", "COGS")
+        _get_field("interestExpense", "InterestExpense")
+
+        # ------------------------------------------------------------------
+        # M5: 5y / 3y history arrays for Moat + Earnings Quality modules
+        # ------------------------------------------------------------------
+        def _get_history(fmp_name: str, n: int) -> List[float]:
+            """Extract the n most-recent finite values for fmp_name."""
+            if fmp_name not in ann.index:
+                return []
+            row = ann.loc[fmp_name]
+            out: List[float] = []
+            for col in list(row.index)[:n]:
+                try:
+                    fval = float(row[col])
+                    if np.isfinite(fval):
+                        out.append(fval)
+                except (TypeError, ValueError):
+                    continue
+            return out
+
+        result["FCF_History_5y"] = _get_history("freeCashFlow", 5)
+        result["NetIncome_History_5y"] = _get_history("netIncome", 5)
+        result["OperatingMargin_History_5y"] = _get_history("operatingIncomeRatio", 5)
+
+        # ROIC history: derive from operatingIncome and (equity + debt - cash) per year
+        roic_hist: List[float] = []
+        ic_hist: List[float] = []
+        ebit_hist: List[float] = []
+        if "operatingIncome" in ann.index:
+            opi = ann.loc["operatingIncome"]
+            eq = ann.loc["totalStockholdersEquity"] if "totalStockholdersEquity" in ann.index else None
+            debt = ann.loc["totalDebt"] if "totalDebt" in ann.index else None
+            cash = ann.loc["cashAndCashEquivalents"] if "cashAndCashEquivalents" in ann.index else None
+            cols = list(opi.index)
+            for col in cols[:5]:
+                try:
+                    e = float(opi[col]) if col in opi.index else float("nan")
+                    eq_v = float(eq[col]) if eq is not None and col in eq.index else float("nan")
+                    d_v = float(debt[col]) if debt is not None and col in debt.index else float("nan")
+                    c_v = float(cash[col]) if cash is not None and col in cash.index else float("nan")
+                    if all(np.isfinite(x) for x in (e, eq_v, d_v, c_v)):
+                        invested = eq_v + d_v - c_v
+                        if invested > 0:
+                            roic_hist.append((e * 0.75) / invested)
+                            ic_hist.append(invested)
+                        if np.isfinite(e):
+                            ebit_hist.append(e)
+                except (TypeError, ValueError):
+                    continue
+        result["ROIC_History_5y"] = roic_hist
+        result["EBIT_History_3y"] = ebit_hist[:3]
+        result["InvestedCapital_History_3y"] = ic_hist[:3]
+
         return result
