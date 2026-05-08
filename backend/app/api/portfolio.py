@@ -33,7 +33,11 @@ async def get_portfolio(
     ),
     svc: PortfolioService = Depends(get_portfolio_service),
 ) -> Dict[str, Any]:
-    """Return the full portfolio with live data, three-horizon scoring, and P&L.
+    """Return the full portfolio with cached data, three-horizon scoring, and P&L.
+
+    This endpoint is cache-only: no live FMP/yfinance calls are made.
+    Positions without a cache entry return degraded rows (NaN scoring fields,
+    None price/market_value).  Use POST /refresh to trigger a live re-fetch.
 
     All three horizon scores (score_lt, score_mt, score_st) are present on
     every position. The ``horizon`` param only affects which signal column is
@@ -53,7 +57,11 @@ async def add_position(
     req: AddPositionRequest,
     svc: PortfolioService = Depends(get_portfolio_service),
 ) -> Dict[str, Any]:
-    """Add a new position to the portfolio."""
+    """Add a new position to the portfolio.
+
+    Triggers a live fetch for the new ticker only. Returns 200 even if both
+    FMP and yfinance fail (degraded row).
+    """
     position = svc.add_position(req)
     return {"success": True, "position": position}
 
@@ -64,7 +72,10 @@ async def update_position(
     req: UpdatePositionRequest,
     svc: PortfolioService = Depends(get_portfolio_service),
 ) -> Dict[str, Any]:
-    """Update an existing position."""
+    """Update an existing position.
+
+    If the ticker is unchanged, re-fetches live data for that ticker only.
+    """
     result = svc.update_position(position_id, req)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Position {position_id} not found")
@@ -88,7 +99,11 @@ async def refresh_portfolio(
     horizon: str = Query("long_term", description="Horizon for summary signal_distribution"),
     svc: PortfolioService = Depends(get_portfolio_service),
 ) -> Dict[str, Any]:
-    """Force-refresh all live data for the portfolio."""
+    """Force-refresh all live data for the portfolio.
+
+    Invalidates the cache for every stored ticker and re-fetches live data
+    from FMP (with yfinance fallback). Analyst ratings are included.
+    """
     if horizon not in _VALID_HORIZONS:
         raise HTTPException(
             status_code=422,

@@ -19,7 +19,11 @@ router = APIRouter(tags=["watchlist"])
 async def get_watchlist(
     svc: WatchlistService = Depends(get_watchlist_service),
 ) -> Dict[str, Any]:
-    """Return the full watchlist with live data and three-horizon scoring.
+    """Return the full watchlist with cached data and three-horizon scoring.
+
+    This endpoint is cache-only: no live FMP/yfinance calls are made.
+    Tickers without a cache entry return degraded rows (NaN scoring fields).
+    Use POST /refresh to trigger a live re-fetch.
 
     All three horizon scores (score_lt, score_mt, score_st) are present on
     every item. Use signal_lt / signal_mt / signal_st as appropriate for the
@@ -33,7 +37,11 @@ async def add_to_watchlist(
     req: AddWatchlistRequest,
     svc: WatchlistService = Depends(get_watchlist_service),
 ) -> Dict[str, Any]:
-    """Add a ticker to the watchlist."""
+    """Add a ticker to the watchlist.
+
+    Triggers a live fetch for the new ticker only so scoring fields populate
+    immediately. Returns 200 even if both FMP and yfinance fail (degraded row).
+    """
     item = svc.add_item(req)
     return {"success": True, "item": item}
 
@@ -54,8 +62,9 @@ async def remove_from_watchlist(
 async def refresh_watchlist(
     svc: WatchlistService = Depends(get_watchlist_service),
 ) -> Dict[str, Any]:
-    """Force-refresh all live data for watchlist items."""
-    items = svc._store.get_items()
-    for item in items:
-        svc._fetcher._cache.invalidate(f"ticker_{item['ticker']}")
-    return svc.get_watchlist()
+    """Force-refresh all live data for watchlist items.
+
+    Invalidates the cache for every stored ticker and re-fetches live data
+    from FMP (with yfinance fallback). Analyst ratings are included.
+    """
+    return svc.refresh()

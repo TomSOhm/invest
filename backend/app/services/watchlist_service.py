@@ -5,6 +5,12 @@ Enriches stored watchlist items with live data and three-horizon scoring.
 Key changes vs M9:
 - composite_score / signal replaced by score_lt/mt/st + signal_lt/mt/st
 - dcf_mos_mid exposed on each item
+
+Cache strategy (T1):
+- get_watchlist(): cache-only -- no live FMP/yfinance calls.
+- refresh(): force-live -- invalidates cache, then fetches live data.
+- add_item(): live fetch for the single new ticker only.
+- Per-ticker try/except prevents one bad ticker from 500-ing the whole list.
 """
 from __future__ import annotations
 
@@ -36,8 +42,64 @@ class WatchlistService:
 
     def get_watchlist(self) -> Dict[str, Any]:
         """
-        Load watchlist, enrich with live data and three-horizon scoring.
+        Load watchlist, enrich with cached data and three-horizon scoring.
+
+        This method is cache-only: it never fires live FMP or yfinance calls.
+        Tickers without a cache entry return degraded rows (NaN scoring fields).
+        Per-ticker try/except ensures one bad ticker never 500s the whole list.
+
         Returns a dict matching WatchlistResponse schema.
+        """
+        return self._build_enriched_response(cache_only=True)
+
+    def refresh(self) -> Dict[str, Any]:
+        """
+        Force-refresh: invalidate cache for all stored tickers and re-fetch live.
+
+        Returns the freshly enriched watchlist.
+        """
+        items = self._store.get_items()
+        for item in items:
+            ticker = item["ticker"]
+            self._fetcher._cache.invalidate(f"hybrid:{ticker}")
+            # Also invalidate the legacy key pattern used elsewhere
+            self._fetcher._cache.invalidate(f"ticker_{ticker}")
+        return self._build_enriched_response(cache_only=False)
+
+    def add_item(self, req: AddWatchlistRequest) -> Dict[str, Any]:
+        """Add a ticker to the watchlist with a live fetch for that ticker only."""
+        stored = self._store.add_item(ticker=req.ticker, notes=req.notes)
+
+        # Trigger a live fetch for the new ticker so its scoring fields are
+        # populated immediately. Wrap in try/except -- if both FMP and yf fail
+        # the stored row is returned with NaN scoring fields.
+        try:
+            self._fetcher.fetch_single(req.ticker, cache_only=False)
+        except Exception as exc:
+            logger.warning(
+                f"Live fetch failed for newly added ticker {req.ticker}: {exc}. "
+                "Row will have degraded scoring fields until next Refresh."
+            )
+
+        return stored
+
+    def remove_item(self, item_id: str) -> bool:
+        """Remove a watchlist item by id."""
+        return self._store.remove_item(item_id)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _build_enriched_response(self, cache_only: bool) -> Dict[str, Any]:
+        """
+        Build the full enriched watchlist response.
+
+        Parameters
+        ----------
+        cache_only:
+            When True, only serve cached data (no live FMP/yfinance calls).
+            When False, force-live (all tickers re-fetched).
         """
         raw_items = self._store.get_items()
         if not raw_items:
@@ -47,110 +109,157 @@ class WatchlistService:
             }
 
         tickers = list({item["ticker"] for item in raw_items})
-        logger.info(f"Enriching {len(raw_items)} watchlist items ({len(tickers)} unique)")
+        mode = "cache-only" if cache_only else "force-live"
+        logger.info(
+            f"Enriching {len(raw_items)} watchlist items "
+            f"({len(tickers)} unique) [{mode}]"
+        )
 
-        # Fetch live data
+        # Fetch data per ticker (cache_only flag governs whether live calls fire)
         live_data: Dict[str, Dict[str, Any]] = {}
         for ticker in tickers:
-            live_data[ticker] = self._fetcher.fetch_single(ticker)
+            try:
+                live_data[ticker] = self._fetcher.fetch_single(
+                    ticker, cache_only=cache_only
+                )
+            except Exception as exc:
+                logger.warning(
+                    f"fetch_single failed for watchlist ticker {ticker}: {exc}. "
+                    "Using empty row."
+                )
+                live_data[ticker] = {}
 
-        # Score each
+        # Score each ticker
         scored: Dict[str, Dict[str, Any]] = {}
         for ticker, data in live_data.items():
-            series = pd.Series(data)
-            scored[ticker] = self._scorer.score_single(series)
+            if not data:
+                scored[ticker] = {}
+                continue
+            try:
+                series = pd.Series(data)
+                scored[ticker] = self._scorer.score_single(series)
+            except Exception as exc:
+                logger.warning(f"score_single failed for {ticker}: {exc}")
+                scored[ticker] = {}
 
-        # Fetch analyst ratings
+        # Fetch analyst ratings -- only in force-live mode (they involve FMP calls)
         analyst_data: Dict[str, Optional[Dict[str, Any]]] = {}
-        for ticker in tickers:
-            analyst_data[ticker] = self._fetcher.fetch_analyst_ratings(ticker)
+        if not cache_only:
+            for ticker in tickers:
+                try:
+                    analyst_data[ticker] = self._fetcher.fetch_analyst_ratings(ticker)
+                except Exception as exc:
+                    logger.warning(
+                        f"fetch_analyst_ratings failed for {ticker}: {exc}"
+                    )
+                    analyst_data[ticker] = None
+        else:
+            # In cache-only mode analyst data is decorative; skip FMP calls.
+            analyst_data = {ticker: None for ticker in tickers}
 
         enriched: List[Dict[str, Any]] = []
         for item in raw_items:
             ticker = item["ticker"]
-            ld = live_data.get(ticker, {})
-            sc = scored.get(ticker, {})
-            an = analyst_data.get(ticker)
+            try:
+                ld = live_data.get(ticker, {})
+                sc = scored.get(ticker, {})
+                an = analyst_data.get(ticker)
 
-            current_price = self._num(ld.get("Price"))
+                current_price = self._num(ld.get("Price"))
 
-            high_52 = self._num(ld.get("FiftyTwoWeekHigh"))
-            fifty_two_pct: Optional[float] = None
-            if current_price and high_52 and high_52 > 0:
-                fifty_two_pct = round((current_price / high_52 - 1) * 100, 1)
+                high_52 = self._num(ld.get("FiftyTwoWeekHigh"))
+                fifty_two_pct: Optional[float] = None
+                if current_price and high_52 and high_52 > 0:
+                    fifty_two_pct = round((current_price / high_52 - 1) * 100, 1)
 
-            analyst_rating: Optional[str] = None
-            analyst_target: Optional[float] = None
-            if an:
-                total = (
-                    an.get("buy", 0) + an.get("hold", 0) + an.get("sell", 0)
-                    + an.get("strong_buy", 0) + an.get("strong_sell", 0)
+                analyst_rating: Optional[str] = None
+                analyst_target: Optional[float] = None
+                if an:
+                    total = (
+                        an.get("buy", 0) + an.get("hold", 0) + an.get("sell", 0)
+                        + an.get("strong_buy", 0) + an.get("strong_sell", 0)
+                    )
+                    if total > 0:
+                        buys = an.get("strong_buy", 0) + an.get("buy", 0)
+                        sells = an.get("sell", 0) + an.get("strong_sell", 0)
+                        if buys > sells:
+                            analyst_rating = "Buy"
+                        elif sells > buys:
+                            analyst_rating = "Sell"
+                        else:
+                            analyst_rating = "Hold"
+                    analyst_target = an.get("target_mean")
+
+                # Extract horizon scores
+                h = sc.get("horizons", {})
+                lt = h.get("long_term", {})
+                mt = h.get("medium_term", {})
+                st = h.get("short_term", {})
+
+                enriched.append({
+                    "id": item["id"],
+                    "ticker": ticker,
+                    "name": ld.get("Name") or ticker,
+                    "sector": ld.get("Sector") or None,
+                    "country": ld.get("Country") or None,
+                    "added_date": item.get("added_date"),
+                    "notes": item.get("notes"),
+                    "current_price": current_price,
+                    "pe": self._num(ld.get("PE")),
+                    "pb": self._num(ld.get("PB")),
+                    "roe": self._num(ld.get("ROE")),
+                    # Three-horizon scoring
+                    "score_lt": lt.get("score"),
+                    "score_mt": mt.get("score"),
+                    "score_st": st.get("score"),
+                    "signal_lt": lt.get("signal"),
+                    "signal_mt": mt.get("signal"),
+                    "signal_st": st.get("signal"),
+                    # Quality
+                    "piotroski_f": sc.get("piotroski_f"),
+                    "altman_z": sc.get("altman_z"),
+                    "graham_number": sc.get("graham_number"),
+                    "graham_mos": sc.get("graham_mos"),
+                    "dcf_mos_mid": sc.get("dcf", {}).get("mos_mid"),
+                    # PEA
+                    "pea_eligible": bool(ld.get("PEA", False)),
+                    "pea_pme_eligible": bool(ld.get("PEA_PME", False)),
+                    # Analyst
+                    "analyst_rating": analyst_rating,
+                    "analyst_target_price": analyst_target,
+                    "forward_pe": self._num(ld.get("ForwardPE")),
+                    "peg": self._num(ld.get("PEG")),
+                    "fifty_two_week_high_pct": fifty_two_pct,
+                })
+            except Exception as exc:
+                logger.warning(
+                    f"Enrichment failed for watchlist ticker {ticker}: {exc}. "
+                    "Inserting degraded row."
                 )
-                if total > 0:
-                    buys = an.get("strong_buy", 0) + an.get("buy", 0)
-                    sells = an.get("sell", 0) + an.get("strong_sell", 0)
-                    if buys > sells:
-                        analyst_rating = "Buy"
-                    elif sells > buys:
-                        analyst_rating = "Sell"
-                    else:
-                        analyst_rating = "Hold"
-                analyst_target = an.get("target_mean")
-
-            # Extract horizon scores
-            h = sc.get("horizons", {})
-            lt = h.get("long_term", {})
-            mt = h.get("medium_term", {})
-            st = h.get("short_term", {})
-
-            enriched.append({
-                "id": item["id"],
-                "ticker": ticker,
-                "name": ld.get("Name") or ticker,
-                "sector": ld.get("Sector") or None,
-                "country": ld.get("Country") or None,
-                "added_date": item.get("added_date"),
-                "notes": item.get("notes"),
-                "current_price": current_price,
-                "pe": self._num(ld.get("PE")),
-                "pb": self._num(ld.get("PB")),
-                "roe": self._num(ld.get("ROE")),
-                # Three-horizon scoring
-                "score_lt": lt.get("score"),
-                "score_mt": mt.get("score"),
-                "score_st": st.get("score"),
-                "signal_lt": lt.get("signal"),
-                "signal_mt": mt.get("signal"),
-                "signal_st": st.get("signal"),
-                # Quality
-                "piotroski_f": sc.get("piotroski_f"),
-                "altman_z": sc.get("altman_z"),
-                "graham_number": sc.get("graham_number"),
-                "graham_mos": sc.get("graham_mos"),
-                "dcf_mos_mid": sc.get("dcf", {}).get("mos_mid"),
-                # PEA
-                "pea_eligible": bool(ld.get("PEA", False)),
-                "pea_pme_eligible": bool(ld.get("PEA_PME", False)),
-                # Analyst
-                "analyst_rating": analyst_rating,
-                "analyst_target_price": analyst_target,
-                "forward_pe": self._num(ld.get("ForwardPE")),
-                "peg": self._num(ld.get("PEG")),
-                "fifty_two_week_high_pct": fifty_two_pct,
-            })
+                enriched.append({
+                    "id": item["id"],
+                    "ticker": ticker,
+                    "name": ticker,
+                    "sector": None,
+                    "country": None,
+                    "added_date": item.get("added_date"),
+                    "notes": item.get("notes"),
+                    "current_price": None,
+                    "pe": None, "pb": None, "roe": None,
+                    "score_lt": None, "score_mt": None, "score_st": None,
+                    "signal_lt": None, "signal_mt": None, "signal_st": None,
+                    "piotroski_f": None, "altman_z": None,
+                    "graham_number": None, "graham_mos": None, "dcf_mos_mid": None,
+                    "pea_eligible": False, "pea_pme_eligible": False,
+                    "analyst_rating": None, "analyst_target_price": None,
+                    "forward_pe": None, "peg": None,
+                    "fifty_two_week_high_pct": None,
+                })
 
         return {
             "items": enriched,
             "last_refreshed": datetime.now(timezone.utc).isoformat(),
         }
-
-    def add_item(self, req: AddWatchlistRequest) -> Dict[str, Any]:
-        """Add a ticker to the watchlist."""
-        return self._store.add_item(ticker=req.ticker, notes=req.notes)
-
-    def remove_item(self, item_id: str) -> bool:
-        """Remove a watchlist item by id."""
-        return self._store.remove_item(item_id)
 
     @staticmethod
     def _num(value: Any) -> Optional[float]:

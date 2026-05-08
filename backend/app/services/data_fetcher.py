@@ -126,9 +126,9 @@ class DataFetcher:
     # Delegate to hybrid
     # ------------------------------------------------------------------
 
-    def fetch_single(self, ticker_symbol: str) -> Dict[str, Any]:
+    def fetch_single(self, ticker_symbol: str, cache_only: bool = False) -> Dict[str, Any]:
         """Delegate to HybridDataFetcher.fetch_single()."""
-        return self._hybrid.fetch_single(ticker_symbol)
+        return self._hybrid.fetch_single(ticker_symbol, cache_only=cache_only)
 
     def fetch_batch(self, tickers: List[str]) -> pd.DataFrame:
         """Delegate to HybridDataFetcher.fetch_batch()."""

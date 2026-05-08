@@ -101,8 +101,19 @@ class HybridDataFetcher:
     # Public API (matches legacy DataFetcher surface)
     # ------------------------------------------------------------------
 
-    def fetch_single(self, ticker: str) -> Dict[str, Any]:
+    def fetch_single(self, ticker: str, cache_only: bool = False) -> Dict[str, Any]:
         """Fetch a complete scoring row for *ticker*.
+
+        Parameters
+        ----------
+        ticker:
+            The ticker symbol to fetch.
+        cache_only:
+            When True and the cache is empty: return a base row of NaN with
+            ``field_sources`` all set to ``"missing"`` and
+            ``data_completeness=0.0``. No FMP or yfinance calls are made.
+            When True and cached: return the cached row unchanged.
+            When False (default): existing live-fetch path.
 
         Returns a dict with keys matching ``SCORING_COLUMNS + EXTRA_FIELDS``
         plus:
@@ -111,7 +122,7 @@ class HybridDataFetcher:
         - ``"data_completeness"``: fraction of SCORING_COLUMNS that are finite.
         - ``"Ticker"``: the ticker symbol.
 
-        Strategy:
+        Strategy (cache_only=False):
         1. Check the hybrid-level cache (``hybrid:{ticker}``).
         2. Get the yfinance full row as the base (proven by M1).
         3. Overlay FMP fundamental fields where FMP can supply them and they
@@ -129,6 +140,21 @@ class HybridDataFetcher:
         if cached is not None:
             logger.debug(f"Hybrid cache hit for {ticker}")
             return cached
+
+        # cache_only=True with a cache miss: return a degraded NaN row immediately
+        # without firing any FMP or yfinance calls.
+        if cache_only:
+            logger.debug(f"cache_only=True, cache miss for {ticker}: returning NaN row")
+            nan_row: Dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
+            nan_row["Ticker"] = ticker
+            nan_row["field_sources"] = {
+                col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS
+            }
+            nan_row["data_completeness"] = 0.0
+            # Set boolean fields to safe defaults
+            nan_row["PEA"] = False
+            nan_row["PEA_PME"] = False
+            return nan_row
 
         logger.info(f"HybridDataFetcher: assembling row for {ticker}")
 
