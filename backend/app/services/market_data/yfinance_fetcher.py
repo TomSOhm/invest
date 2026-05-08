@@ -521,11 +521,34 @@ class YFinanceDataFetcher:
                 return None
             result = []
             for item in news[:limit]:
+                # yfinance 0.2.40+ wraps news items under a "content" sub-dict;
+                # older versions are flat. Support both.
+                content = item.get("content", item)
+                title = content.get("title", "") or item.get("title", "")
+                published = (
+                    content.get("pubDate")
+                    or content.get("displayTime")
+                    or item.get("providerPublishTime", "")
+                )
+                publisher = (
+                    content.get("provider", {}).get("displayName", "")
+                    if isinstance(content.get("provider"), dict)
+                    else item.get("publisher", "")
+                )
+                url = (
+                    content.get("canonicalUrl", {}).get("url", "")
+                    if isinstance(content.get("canonicalUrl"), dict)
+                    else item.get("link", "")
+                )
                 result.append({
-                    "title": item.get("title", ""),
-                    "publishedAt": item.get("providerPublishTime", ""),
-                    "source": item.get("publisher", ""),
-                    "url": item.get("link", ""),
+                    "title": title,
+                    # M9 sentiment scorer reads `text` first; fall back to title.
+                    "text": content.get("summary", "") or title,
+                    # Keep both keys: `publishedAt` (M2) and `published_date` (M9 spec).
+                    "publishedAt": published,
+                    "published_date": published,
+                    "source": publisher,
+                    "url": url,
                 })
             return result if result else None
         except Exception as exc:
