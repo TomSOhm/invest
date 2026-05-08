@@ -135,6 +135,32 @@ class AppConfig:
     def signal_thresholds(self) -> Dict[str, Any]:
         return self._raw["signals"]
 
+    # -- horizons (M7) --
+    @property
+    def horizons_block(self) -> Dict[str, Any]:
+        """Full ``horizons:`` block from settings.yaml.
+
+        Returns an empty dict when missing, so legacy configs (pre-M7) keep
+        loading without crashing — callers should treat empty as "fall back
+        to legacy single-composite path".
+        """
+        return self._raw.get("horizons", {}) or {}
+
+    @property
+    def horizons_long_term(self) -> Dict[str, Any]:
+        """Weights + gates for the long-term horizon (>3y holding)."""
+        return self.horizons_block.get("long_term", {}) or {}
+
+    @property
+    def horizons_medium_term(self) -> Dict[str, Any]:
+        """Weights + gates for the medium-term horizon (~6mo-3y)."""
+        return self.horizons_block.get("medium_term", {}) or {}
+
+    @property
+    def horizons_short_term(self) -> Dict[str, Any]:
+        """Weights + gates for the short-term horizon (<6mo, momentum-led)."""
+        return self.horizons_block.get("short_term", {}) or {}
+
     # -- portfolio --
     @property
     def portfolio_max_single_position(self) -> float:

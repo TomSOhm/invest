@@ -189,20 +189,41 @@ def test_score_universe_is_alias(small_universe: pd.DataFrame) -> None:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def test_composite_equals_weighted_subscores(small_universe: pd.DataFrame) -> None:
-    """For every row, Composite_Score = sum(sub_score * weight) ± rounding."""
+def test_composite_aliases_score_lt(small_universe: pd.DataFrame) -> None:
+    """M7: ``Composite_Score`` is now an alias for the long-term horizon
+    composite (``score_lt``).  Pre-M7 this test verified a fixed weight
+    formula across the six legacy sub-scores; M7 introduces the
+    horizon-specific weight schemes (LT weights live under
+    ``settings.horizons.long_term.weights``), so the legacy formula no
+    longer matches.
+
+    M10 will atomically swap the public schema and delete this alias.
+    Until then the contract we test is: every row's ``Composite_Score``
+    equals its ``score_lt`` (with NaN-safe fallback to the underlying
+    legacy composite when the row was so sparse the horizon block
+    couldn't compute a finite value).
+    """
     out = score_dataframe(small_universe)
-    expected = (
-        out["Valuation_Score"] * SCORING_WEIGHTS["valuation"]
-        + out["Health_Score"] * SCORING_WEIGHTS["financial_health"]
-        + out["Profitability_Score"] * SCORING_WEIGHTS["profitability"]
-        + out["Growth_Score"] * SCORING_WEIGHTS["growth"]
-        + out["Shareholder_Score"] * SCORING_WEIGHTS["shareholder_return"]
-        + out["Risk_Score"] * SCORING_WEIGHTS["risk"]
-    )
+    # Every row that has a finite score_lt should match Composite_Score exactly.
+    has_lt = out["score_lt"].notna()
     np.testing.assert_allclose(
-        out["Composite_Score"].values, expected.round(1).values, atol=0.11
+        out.loc[has_lt, "Composite_Score"].values,
+        out.loc[has_lt, "score_lt"].values,
+        atol=0.11,
     )
+
+
+def test_subscores_still_use_legacy_weight_keys() -> None:
+    """Sanity: ``SCORING_WEIGHTS`` (legacy single-composite weights) is
+    still exported because ``compute_composite_score`` (per-row API) keeps
+    using it. Just verify the keys haven't drifted; M10 owns the rename.
+    """
+    expected_keys = {
+        "valuation", "financial_health", "profitability",
+        "growth", "shareholder_return", "risk",
+    }
+    assert set(SCORING_WEIGHTS.keys()) == expected_keys
+    assert abs(sum(SCORING_WEIGHTS.values()) - 1.0) < 1e-6
 
 
 def test_subscores_in_range(small_universe: pd.DataFrame) -> None:

@@ -46,6 +46,7 @@ from src.analysis.scoring_engine import (  # noqa: E402
     graham_number,
     piotroski_f_score,
     dcf_with_sensitivity,
+    score_dataframe,
 )
 from functools import lru_cache
 
@@ -164,6 +165,25 @@ def _golden_peer_universe() -> pd.DataFrame:
     return pd.DataFrame.from_dict(rows, orient="index")
 
 
+@lru_cache(maxsize=1)
+def _golden_universe_scored() -> pd.DataFrame:
+    """Score the entire frozen peer universe once and cache the result.
+
+    M7 horizon scoring needs the full M5/M9 sub-score columns
+    (``EarningsQuality_Score``, ``Risk_Score_v2``, ``Momentum_Score``)
+    which only ``score_dataframe`` produces. Per-ticker snapshot capture
+    then plucks its row from this cached frame instead of re-running the
+    whole pipeline 25 times.
+
+    The cache is invalidated by callers (``cache_clear``) whenever a new
+    input row is written so the next ``score_row`` call sees it.
+    """
+    peers = _golden_peer_universe()
+    if peers.empty:
+        return pd.DataFrame()
+    return score_dataframe(peers)
+
+
 def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
     """Run the current scoring engine on a frozen input row → snapshot dict.
 
@@ -227,7 +247,7 @@ def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
             return float("nan")
         return round(f, n)
 
-    return {
+    snap = {
         "Composite_Score": round(composite, 1),
         "Valuation_Score": round(breakdown["valuation"], 1),
         "Health_Score": round(breakdown["financial_health"], 1),
@@ -253,6 +273,46 @@ def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
         "WACC_Used": _r(dcf_out.get("wacc_base"), 4),
         "DCF_Warnings": list(dcf_out.get("warnings", [])),
     }
+
+    # ------------------------------------------------------------------
+    # M7: three-horizon columns. Pull from the cached score_dataframe
+    # output so the M5/M9 sub-scores feeding the horizon weights are
+    # consistent with what the production pipeline emits. When the
+    # ticker isn't in the peer universe yet (e.g. ad-hoc capture of a
+    # ticker not in tickers.txt), the horizon block is skipped — the
+    # legacy fields above remain authoritative for those rows.
+    # ------------------------------------------------------------------
+    scored_universe = _golden_universe_scored()
+    horizon_cols = (
+        "score_lt", "signal_lt", "passes_gates_lt", "blockers_lt",
+        "score_mt", "signal_mt", "passes_gates_mt", "blockers_mt",
+        "score_st", "signal_st", "passes_gates_st", "blockers_st",
+        "recommended_account",
+    )
+    if ticker and ticker in scored_universe.index:
+        scored_row = scored_universe.loc[ticker]
+        for col in horizon_cols:
+            if col not in scored_row:
+                continue
+            val = scored_row[col]
+            # Convert numpy types / lists to JSON-friendly forms.
+            if isinstance(val, (list, tuple)):
+                snap[col] = list(val)
+            elif isinstance(val, (np.bool_,)):
+                snap[col] = bool(val)
+            elif isinstance(val, (np.floating, float)):
+                snap[col] = (
+                    float("nan")
+                    if (isinstance(val, float) and math.isnan(val))
+                    or (isinstance(val, np.floating) and math.isnan(float(val)))
+                    else round(float(val), 1)
+                )
+            elif isinstance(val, np.integer):
+                snap[col] = int(val)
+            else:
+                snap[col] = val
+
+    return snap
 
 
 def main(argv: List[str] | None = None) -> int:
@@ -303,9 +363,10 @@ def main(argv: List[str] | None = None) -> int:
         _META_KEYS = {"Ticker", "data_completeness", "field_sources"}
         row_to_save = {k: v for k, v in row.items() if k not in _META_KEYS}
         write_json(INPUTS_DIR / f"{safe_filename(ticker)}.json", row_to_save)
-        # Bust the lru_cache so the freshly-written input shows up in the
+        # Bust the lru_caches so the freshly-written input shows up in the
         # peer universe used to score subsequent tickers in this run.
         _golden_peer_universe.cache_clear()
+        _golden_universe_scored.cache_clear()
         snap = score_row(row_to_save, ticker=ticker)
         write_json(SNAPSHOTS_DIR / f"{safe_filename(ticker)}.json", snap)
         print(f"[captured] {ticker} -> score={snap['Composite_Score']} signal={snap['Signal']}")

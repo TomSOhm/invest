@@ -129,3 +129,56 @@ logging:
   file: "data/logs/invest_solo.log"
   rotation: "10 MB"
   retention: "30 days"
+
+# ── Three-Horizon Scoring (M7) ──
+# Each horizon defines its own weight scheme over the 8 sub-score categories
+# (valuation, profitability, health, earnings_quality, growth, capital_allocation,
+# risk, momentum) plus a set of binary "investability" gates. The legacy single
+# composite path under `scoring:` above stays alive until M10 deletes it.
+horizons:
+  long_term:
+    weights:
+      valuation: 0.20
+      profitability: 0.25
+      health: 0.15
+      earnings_quality: 0.10
+      growth: 0.10
+      capital_allocation: 0.10
+      risk: 0.10
+    gates:
+      min_data_completeness: 0.70
+      max_distress: 1.1     # Altman Z'' / Z floor: below this = excluded
+      min_market_cap: 100000000
+      min_years_listed: 3
+  medium_term:
+    weights:
+      valuation: 0.20
+      profitability: 0.15
+      health: 0.15
+      earnings_quality: 0.10
+      growth: 0.15
+      capital_allocation: 0.05
+      risk: 0.10
+      momentum: 0.10
+    gates:
+      min_data_completeness: 0.60
+      max_distress: 1.1
+      min_market_cap: 100000000
+  short_term:
+    weights:
+      valuation: 0.05
+      profitability: 0.05
+      health: 0.10
+      earnings_quality: 0.05
+      growth: 0.05
+      capital_allocation: 0.05
+      risk: 0.10
+      momentum: 0.55
+    gates:
+      min_data_completeness: 0.50
+      max_distress: 1.5
+      min_market_cap: 500000000
+      min_avg_volume: 2000000
+      max_realized_vol_1y: 0.5
+      pea_warning: true
+      recommended_account: "CTO"

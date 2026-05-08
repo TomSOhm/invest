@@ -42,6 +42,11 @@ from src.analysis.risk_metrics import risk_score_real  # noqa: F401
 # previously-dead price-to-intrinsic ratios via generate_signal(composite, mos).
 from src.analysis.dcf import dcf_with_sensitivity
 
+# M7: three-horizon composite scoring (LT / MT / ST). The horizon module
+# imports back from this one (it needs ``generate_signal``), so importing
+# it eagerly here would create a circular import. We re-export the public
+# entry points lazily via __getattr__ at the bottom of this module.
+
 __all__ = [
     "SCORING_WEIGHTS",
     "SIGNAL_THRESHOLDS",
@@ -66,6 +71,11 @@ __all__ = [
     "moat_score",
     "risk_score_real",
     "dcf_with_sensitivity",
+    # M7 — three-horizon scoring orchestration.
+    "score_three_horizons",
+    "score_long_term",
+    "score_medium_term",
+    "score_short_term",
 ]
 
 # ══════════════════════════════════════════════════════════════
@@ -649,6 +659,30 @@ def _compute_dcf_for_row(row: pd.Series) -> Dict[str, Any]:
 
 
 _DCF_SETTINGS_CACHE: Optional[Dict[str, Any]] = None
+_HORIZONS_SETTINGS_CACHE: Optional[Dict[str, Any]] = None
+
+
+def _load_horizons_settings_once() -> Dict[str, Any]:
+    """Lazily resolve the ``horizons:`` block from settings.yaml.
+
+    Mirrors :func:`_load_dcf_settings_once`: prefers the backend AppConfig
+    when importable, falls back to an empty dict otherwise. Returning an
+    empty dict makes the M7 horizon block a no-op for legacy configs that
+    haven't added the new key yet — ``score_dataframe`` will keep emitting
+    the legacy ``Composite_Score`` / ``Signal`` columns alone.
+    """
+    global _HORIZONS_SETTINGS_CACHE
+    if _HORIZONS_SETTINGS_CACHE is not None:
+        return _HORIZONS_SETTINGS_CACHE
+    try:
+        from backend.app.config import settings as _app_settings  # type: ignore
+
+        block = _app_settings.horizons_block or {}
+        _HORIZONS_SETTINGS_CACHE = block
+        return block
+    except Exception:
+        _HORIZONS_SETTINGS_CACHE = {}
+        return {}
 
 
 def _load_dcf_settings_once() -> Optional[Dict[str, Any]]:
@@ -839,6 +873,30 @@ def score_dataframe(
         sent_df = sentiment_signals_df(news_map)
         out = out.join(sent_df, how="left")
 
+    # ------------------------------------------------------------------
+    # M7: Three-horizon composite scoring (LT / MT / ST). Reads weights +
+    # gates from settings.yaml's `horizons:` block via the lazy loader so
+    # this module stays decoupled from the backend AppConfig at import
+    # time. When the block is missing (legacy config), the call is a no-op
+    # and the legacy aliasing below preserves backward compatibility.
+    # ------------------------------------------------------------------
+    horizons_block = _load_horizons_settings_once()
+    if horizons_block:
+        from src.analysis.horizon_scoring import score_three_horizons
+        out = score_three_horizons(out, horizons_block)
+
+    # Legacy aliases: keep `Composite_Score` and `Signal` pointing at the
+    # long-term horizon so existing consumers (snapshot tests, public API)
+    # don't break. M10 owns the atomic rename.
+    if "score_lt" in out.columns:
+        out["Composite_Score"] = out["score_lt"].fillna(out["Composite_Score"])
+    if "signal_lt" in out.columns:
+        # Only override Signal where the row actually has a horizon signal
+        # (NaN guard: signal_lt is a string column so .notna covers it).
+        sig_lt = out["signal_lt"]
+        mask = sig_lt.notna() & (sig_lt.astype(str) != "")
+        out.loc[mask, "Signal"] = sig_lt[mask]
+
     return out.sort_values("Composite_Score", ascending=False)
 
 
@@ -846,3 +904,21 @@ def score_dataframe(
 # reporting/*.py, ScoringService.score_dataframe) keep working without
 # modification.
 score_universe = score_dataframe
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Lazy re-exports for the M7 horizon module. We expose
+# ``score_three_horizons`` / ``score_long_term`` / ``score_medium_term`` /
+# ``score_short_term`` here as a convenience for callers, but the horizon
+# module imports back from this one (``generate_signal``), so importing it
+# at module top would create a cycle. ``__getattr__`` (PEP 562) defers the
+# import until first attribute access — by which point both modules have
+# finished loading their top-level statements.
+# ──────────────────────────────────────────────────────────────────────────────
+
+
+def __getattr__(name: str):
+    if name in ("score_three_horizons", "score_long_term", "score_medium_term", "score_short_term"):
+        from src.analysis import horizon_scoring as _hz
+        return getattr(_hz, name)
+    raise AttributeError(f"module 'scoring_engine' has no attribute {name!r}")

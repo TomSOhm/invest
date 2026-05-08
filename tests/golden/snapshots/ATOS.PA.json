@@ -21,5 +21,34 @@
   "Signal": "Hold",
   "Valuation_Score": 50.0,
   "WACC_Used": "NaN",
-  "data_completeness": 0.0
+  "blockers_lt": [
+    "min_data_completeness",
+    "missing_altman_z",
+    "missing_market_cap",
+    "missing_years_listed"
+  ],
+  "blockers_mt": [
+    "min_data_completeness",
+    "missing_altman_z",
+    "missing_market_cap"
+  ],
+  "blockers_st": [
+    "min_data_completeness",
+    "missing_altman_z",
+    "missing_market_cap",
+    "missing_avg_volume",
+    "missing_realized_vol_1y",
+    "missing_momentum"
+  ],
+  "data_completeness": 0.0,
+  "passes_gates_lt": false,
+  "passes_gates_mt": false,
+  "passes_gates_st": false,
+  "recommended_account": "",
+  "score_lt": 50.0,
+  "score_mt": 50.0,
+  "score_st": 50.0,
+  "signal_lt": "Hold",
+  "signal_mt": "Hold",
+  "signal_st": "Hold"
 }
