@@ -142,6 +142,22 @@ class AppConfig:
         return float(self._raw["screener"]["min_market_cap"])
 
     @property
+    def screener_min_avg_volume(self) -> float:
+        """Minimum 3-month average daily volume (M1 wiring fix).
+
+        Falls back to 0 if absent so older config files keep working.
+        """
+        return float(self._raw["screener"].get("min_avg_volume", 0))
+
+    @property
+    def screener_min_years_listed(self) -> float:
+        """Minimum years since first listing (M1 wiring fix).
+
+        Falls back to 0 if absent.
+        """
+        return float(self._raw["screener"].get("min_years_listed", 0))
+
+    @property
     def screener_exclude_sectors(self) -> List[str]:
         return self._raw["screener"].get("exclude_sectors", [])
 

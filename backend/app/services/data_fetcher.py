@@ -4,7 +4,8 @@ Fetches live data from yfinance and maps it to the exact column format
 expected by scoring_engine.py.
 """
 import time
-from typing import Any, Dict, List, Optional
+from datetime import datetime, timezone
+from typing import Any, Dict, List, Optional, Sequence
 
 import numpy as np
 import pandas as pd
@@ -15,7 +16,10 @@ from backend.app.config import settings
 from backend.app.services.cache_service import CacheService
 
 
-# The scoring engine expects these exact column names
+# The scoring engine expects these exact column names.
+# Frontend reads composite/sub scores; columns added in M1 (CurrentAssets,
+# CurrentLiabilities, RetainedEarnings, AvgVolume, YearsListed,
+# Shares_PriorYear) are new and consumed only by scoring_engine internals.
 SCORING_COLUMNS = [
     "PE", "PB", "PS", "PFCF", "EV_EBITDA", "EV_Sales",
     "ROE", "ROA", "ROIC", "OperatingMargin", "NetMargin", "FCFMargin", "GrossMargin",
@@ -24,6 +28,9 @@ SCORING_COLUMNS = [
     "Price", "MarketCap", "EV", "Shares",
     "Revenue", "EBITDA", "EBIT", "NetIncome", "FCF", "OperatingCashflow", "CapEx",
     "TotalAssets", "TotalEquity", "TotalDebt", "Cash",
+    # M1 additions (real Altman Z'' inputs, real Piotroski dilution check, screener wiring)
+    "CurrentAssets", "CurrentLiabilities", "RetainedEarnings",
+    "AvgVolume", "YearsListed", "Shares_PriorYear",
     "Name", "Sector", "Industry", "Country", "Exchange",
     "PEA", "PEA_PME",
 ]
@@ -55,6 +62,245 @@ def _safe_div(numerator: Any, denominator: Any) -> float:
         return np.nan
 
 
+def _is_finite_number(val: Any) -> bool:
+    """True iff val is a finite numeric (rejects None, NaN, Inf, non-numeric)."""
+    try:
+        f = float(val)
+    except (TypeError, ValueError):
+        return False
+    return np.isfinite(f)
+
+
+def _latest_from_statement(
+    statement: Optional[pd.DataFrame],
+    candidate_keys: Sequence[str],
+) -> float:
+    """Pull the most-recent value of any candidate row label from a yfinance statement.
+
+    yfinance statements (`tk.financials`, `tk.balance_sheet`, `tk.cashflow`) are
+    DataFrames where rows are line items and columns are period-end dates with
+    the most recent first. Some labels exist as `EBIT`, others as `Operating Income`,
+    `Interest Expense` vs `Interest Expense, Net Operating Interest Expense`, etc.
+    We probe `candidate_keys` in order and return the first non-NaN, non-zero
+    value from the most-recent column. Returns NaN if nothing is found.
+
+    Never raises -- statement access errors surface as NaN.
+    """
+    if statement is None or not isinstance(statement, pd.DataFrame) or statement.empty:
+        return np.nan
+    for key in candidate_keys:
+        if key not in statement.index:
+            continue
+        try:
+            row = statement.loc[key]
+        except KeyError:
+            continue
+        # If multiple rows share the label, .loc returns a DataFrame; take the first.
+        if isinstance(row, pd.DataFrame):
+            if row.empty:
+                continue
+            row = row.iloc[0]
+        # Walk columns left-to-right (most recent first) and return first valid value.
+        for col in row.index:
+            val = row[col]
+            if _is_finite_number(val) and float(val) != 0:
+                return float(val)
+        # All values were NaN/0 -- keep probing other candidate keys.
+    return np.nan
+
+
+def _get_real_ebit(
+    tk: "yf.Ticker",
+    info: Dict[str, Any],
+    ebitda: float,
+    cashflow: Optional[pd.DataFrame] = None,
+    financials: Optional[pd.DataFrame] = None,
+) -> float:
+    """Fetch real EBIT, never aliasing to EBITDA.
+
+    Priority:
+        1. `tk.financials.loc["EBIT"]` (most recent column)
+        2. `tk.financials.loc["Operating Income"]` / `OperatingIncome`
+        3. Fallback: `EBITDA - D&A` where D&A comes from cashflow
+        4. NaN
+
+    Returns
+    -------
+    float
+        EBIT in the same currency/scale as the income statement, or NaN.
+    """
+    try:
+        if financials is None:
+            financials = tk.financials
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"financials access failed: {exc}")
+        financials = None
+
+    ebit = _latest_from_statement(
+        financials,
+        ["EBIT", "Operating Income", "OperatingIncome", "Total Operating Income As Reported"],
+    )
+    if _is_finite_number(ebit):
+        return ebit
+
+    # Fallback: EBIT = EBITDA - D&A (D&A from cashflow)
+    if not _is_finite_number(ebitda):
+        return np.nan
+    try:
+        if cashflow is None:
+            cashflow = tk.cashflow
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"cashflow access failed: {exc}")
+        cashflow = None
+
+    da = _latest_from_statement(
+        cashflow,
+        [
+            "Depreciation And Amortization",
+            "Depreciation",
+            "Depreciation Amortization Depletion",
+            "DepreciationAndAmortization",
+        ],
+    )
+    if _is_finite_number(da) and da > 0:
+        return float(ebitda) - float(da)
+    return np.nan
+
+
+def _get_real_interest_expense(
+    tk: "yf.Ticker",
+    financials: Optional[pd.DataFrame] = None,
+) -> float:
+    """Fetch real Interest Expense from the income statement.
+
+    yfinance often returns interest expense as a NEGATIVE number (expense
+    convention); we return a POSITIVE value so downstream `EBIT / interest`
+    behaves intuitively. Returns NaN if not available -- never fabricates.
+    """
+    try:
+        if financials is None:
+            financials = tk.financials
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"financials access failed for interest: {exc}")
+        return np.nan
+
+    val = _latest_from_statement(
+        financials,
+        [
+            "Interest Expense",
+            "InterestExpense",
+            "Interest Expense Non Operating",
+            "Net Non Operating Interest Income Expense",
+            "Interest Expense, Net",
+        ],
+    )
+    if not _is_finite_number(val):
+        return np.nan
+    return abs(float(val))
+
+
+def _get_shares_prior_year(tk: "yf.Ticker") -> float:
+    """Get shares outstanding ~1 year ago via `tk.get_shares_full()`.
+
+    Returns NaN if the API returns nothing or fails. The Piotroski no-dilution
+    signal compares this to the latest sharesOutstanding.
+    """
+    try:
+        s = tk.get_shares_full()
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"get_shares_full failed: {exc}")
+        return np.nan
+    if s is None or len(s) == 0:
+        return np.nan
+    try:
+        s = s.dropna()
+        if s.empty:
+            return np.nan
+        # Pick a value from approx 365 days before the most recent point.
+        idx = pd.to_datetime(s.index, utc=True, errors="coerce")
+        # `idx` may be a pandas DatetimeIndex (has .isna()) or a plain ndarray
+        # depending on the input. Normalise to DatetimeIndex.
+        idx = pd.DatetimeIndex(idx)
+        if idx.isna().all():
+            return float(s.iloc[0])
+        latest_ts = idx.max()
+        target_ts = latest_ts - pd.Timedelta(days=365)
+        # Find row at or before target_ts (use prev observation = most recent <= target)
+        mask = idx <= target_ts
+        # `mask` is a numpy bool array; index into the Series with it directly.
+        mask_arr = np.asarray(mask)
+        if mask_arr.any():
+            sub = s.iloc[np.flatnonzero(mask_arr)]
+            if not sub.empty:
+                return float(sub.iloc[-1])
+        # Fallback: use the earliest available (still NaN-better than nothing)
+        return float(s.iloc[0])
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"shares prior year extraction failed: {exc}")
+        return np.nan
+
+
+def _get_balance_sheet_items(
+    tk: "yf.Ticker",
+    balance_sheet: Optional[pd.DataFrame] = None,
+) -> Dict[str, float]:
+    """Fetch CurrentAssets, CurrentLiabilities, RetainedEarnings from balance sheet.
+
+    All three are required for the real Altman Z / Z'' computation. Each is NaN
+    if absent -- scoring engine handles NaNs by skipping that signal.
+    """
+    try:
+        if balance_sheet is None:
+            balance_sheet = tk.balance_sheet
+    except Exception as exc:  # noqa: BLE001
+        logger.debug(f"balance_sheet access failed: {exc}")
+        balance_sheet = None
+
+    return {
+        "CurrentAssets": _latest_from_statement(
+            balance_sheet,
+            ["Current Assets", "Total Current Assets", "CurrentAssets"],
+        ),
+        "CurrentLiabilities": _latest_from_statement(
+            balance_sheet,
+            ["Current Liabilities", "Total Current Liabilities", "CurrentLiabilities"],
+        ),
+        "RetainedEarnings": _latest_from_statement(
+            balance_sheet,
+            ["Retained Earnings", "RetainedEarnings"],
+        ),
+        # M1: TotalAssets from balance sheet as backup -- yfinance `info`
+        # frequently lacks `totalAssets` for European tickers and even some
+        # US ones (e.g. AAPL), which kept Altman Z stuck at NaN.
+        "TotalAssets_BS": _latest_from_statement(
+            balance_sheet,
+            ["Total Assets", "TotalAssets"],
+        ),
+        "TotalEquity_BS": _latest_from_statement(
+            balance_sheet,
+            [
+                "Stockholders Equity",
+                "Total Stockholder Equity",
+                "TotalStockholderEquity",
+                "Common Stock Equity",
+            ],
+        ),
+    }
+
+
+def _years_since_first_trade(info: Dict[str, Any]) -> float:
+    """Compute years since first listing from `firstTradeDateEpochUtc`."""
+    epoch = info.get("firstTradeDateEpochUtc")
+    if epoch is None or not _is_finite_number(epoch):
+        return np.nan
+    try:
+        first_trade = datetime.fromtimestamp(float(epoch), tz=timezone.utc)
+        now = datetime.now(tz=timezone.utc)
+        return (now - first_trade).days / 365.25
+    except (OverflowError, OSError, ValueError):
+        return np.nan
+
+
 class DataFetcher:
     """Fetches financial data from yfinance and maps to the scoring schema."""
 
@@ -74,7 +320,7 @@ class DataFetcher:
         Fetch data for a single ticker from yfinance and map to scoring schema.
 
         Returns a dict with keys matching SCORING_COLUMNS plus EXTRA_FIELDS.
-        Missing fields are filled with np.nan.
+        Missing fields are filled with np.nan -- never fabricated proxies.
         """
         # Check cache first
         cache_key = f"ticker_{ticker_symbol}"
@@ -103,6 +349,23 @@ class DataFetcher:
                 self._cache.set(cache_key, result, ttl_seconds=3600)
                 return result
 
+            # Pre-fetch the heavy DataFrames once -- yfinance caches per-ticker.
+            try:
+                financials = tk.financials
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"{ticker_symbol}: financials fetch failed: {exc}")
+                financials = None
+            try:
+                cashflow = tk.cashflow
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"{ticker_symbol}: cashflow fetch failed: {exc}")
+                cashflow = None
+            try:
+                balance_sheet = tk.balance_sheet
+            except Exception as exc:  # noqa: BLE001
+                logger.debug(f"{ticker_symbol}: balance_sheet fetch failed: {exc}")
+                balance_sheet = None
+
             # -- Identification --
             result["Name"] = _safe_get(info, "shortName", _safe_get(info, "longName", ticker_symbol))
             result["Sector"] = _safe_get(info, "sector", "")
@@ -127,9 +390,11 @@ class DataFetcher:
             result["Shares"] = _safe_get(info, "sharesOutstanding", np.nan)
 
             # -- Income Statement --
+            ebitda = _safe_get(info, "ebitda", np.nan)
             result["Revenue"] = _safe_get(info, "totalRevenue", np.nan)
-            result["EBITDA"] = _safe_get(info, "ebitda", np.nan)
-            result["EBIT"] = _safe_get(info, "ebitda", np.nan)  # yfinance often lacks EBIT separately
+            result["EBITDA"] = ebitda
+            # BUG FIX #1 (M1): EBIT from real income statement, never aliased to EBITDA.
+            result["EBIT"] = _get_real_ebit(tk, info, ebitda, cashflow=cashflow, financials=financials)
             result["NetIncome"] = _safe_get(info, "netIncomeToCommon", np.nan)
 
             # -- Cash Flow --
@@ -139,15 +404,36 @@ class DataFetcher:
             result["CapEx"] = capex_val if capex_val != 0 else np.nan
 
             # -- Balance Sheet --
-            result["TotalAssets"] = _safe_get(info, "totalAssets", np.nan)
-            result["TotalEquity"] = _safe_get(
-                info, "totalStockholderEquity",
-                _safe_get(info, "bookValue", np.nan)
-                * _safe_get(info, "sharesOutstanding", 1)
-                if _safe_get(info, "bookValue", None) is not None else np.nan
+            # M1: pull balance-sheet items directly (yfinance `info` frequently
+            # lacks `totalAssets`, which left Altman Z stuck at NaN).
+            bs_items = _get_balance_sheet_items(tk, balance_sheet=balance_sheet)
+
+            ta_info = _safe_get(info, "totalAssets", np.nan)
+            result["TotalAssets"] = (
+                ta_info if _is_finite_number(ta_info) else bs_items["TotalAssets_BS"]
             )
+
+            equity_info = _safe_get(info, "totalStockholderEquity", np.nan)
+            if _is_finite_number(equity_info):
+                result["TotalEquity"] = equity_info
+            elif _is_finite_number(bs_items["TotalEquity_BS"]):
+                result["TotalEquity"] = bs_items["TotalEquity_BS"]
+            else:
+                # Last-ditch: bookValue × shares (legacy behaviour)
+                bv = _safe_get(info, "bookValue", None)
+                if bv is not None and _is_finite_number(bv):
+                    sh = _safe_get(info, "sharesOutstanding", 1)
+                    result["TotalEquity"] = float(bv) * float(sh)
+                else:
+                    result["TotalEquity"] = np.nan
+
             result["TotalDebt"] = _safe_get(info, "totalDebt", np.nan)
             result["Cash"] = _safe_get(info, "totalCash", np.nan)
+
+            # M1: Real Altman Z'' inputs from balance sheet.
+            result["CurrentAssets"] = bs_items["CurrentAssets"]
+            result["CurrentLiabilities"] = bs_items["CurrentLiabilities"]
+            result["RetainedEarnings"] = bs_items["RetainedEarnings"]
 
             # -- Valuation Ratios (prefer yfinance computed, fall back to manual) --
             pe = _safe_get(info, "trailingPE", np.nan)
@@ -172,7 +458,6 @@ class DataFetcher:
 
             # EV/EBITDA
             ev = _safe_get(info, "enterpriseValue", np.nan)
-            ebitda = _safe_get(info, "ebitda", np.nan)
             result["EV_EBITDA"] = _safe_div(ev, ebitda)
 
             # EV/Sales
@@ -192,15 +477,17 @@ class DataFetcher:
             # -- Returns --
             result["ROE"] = _safe_get(info, "returnOnEquity", np.nan)
             result["ROA"] = _safe_get(info, "returnOnAssets", np.nan)
-            # ROIC: approximate as EBIT*(1-tax) / (Equity + Debt - Cash)
-            ebit_val = _safe_get(info, "ebitda", np.nan)  # proxy
+            # ROIC: EBIT*(1-tax) / (Equity + Debt - Cash)
+            # BUG FIX #2 (M1): use the real EBIT from #1, not the EBITDA proxy.
+            ebit_real = result["EBIT"]
             equity = result["TotalEquity"]
             debt = result["TotalDebt"]
             cash = result["Cash"]
-            if not any(np.isnan(x) if isinstance(x, float) else False for x in [ebit_val, equity, debt, cash]):
-                invested_capital = equity + debt - cash
+            if all(_is_finite_number(x) for x in [ebit_real, equity, debt, cash]):
+                invested_capital = float(equity) + float(debt) - float(cash)
                 if invested_capital > 0:
-                    result["ROIC"] = (ebit_val * 0.75) / invested_capital  # 25% tax assumption
+                    # Hardcoded 25% tax for now; M5 will make this country-aware.
+                    result["ROIC"] = (float(ebit_real) * 0.75) / invested_capital
                 else:
                     result["ROIC"] = np.nan
             else:
@@ -216,10 +503,18 @@ class DataFetcher:
             if not np.isnan(result["DebtEquity"]) and result["DebtEquity"] > 10:
                 result["DebtEquity"] = result["DebtEquity"] / 100.0
 
-            # Interest coverage: approximate from ebitda / interest expense
-            interest_expense = _safe_get(info, "totalDebt", 0) * 0.04  # rough 4% rate assumption
-            if ebitda and not np.isnan(ebitda) and interest_expense > 0:
-                result["InterestCoverage"] = ebitda / interest_expense
+            # BUG FIX #3 (M1): Real Interest Expense from financials, never the
+            # `totalDebt * 0.04` fabrication. NaN when not available.
+            interest_expense = _get_real_interest_expense(tk, financials=financials)
+            if (
+                _is_finite_number(ebit_real)
+                and _is_finite_number(interest_expense)
+                and interest_expense > 0
+            ):
+                # Coverage = EBIT / Interest (textbook). EBITDA was the prior
+                # numerator only because EBIT was unavailable; keep EBIT for
+                # consistency now that we have it real.
+                result["InterestCoverage"] = float(ebit_real) / float(interest_expense)
             else:
                 result["InterestCoverage"] = np.nan
 
@@ -229,6 +524,13 @@ class DataFetcher:
 
             # -- Risk --
             result["Beta"] = _safe_get(info, "beta", np.nan)
+
+            # -- Screener wiring fields (M1 bug #8) --
+            result["AvgVolume"] = _safe_get(info, "averageDailyVolume3Month", np.nan)
+            result["YearsListed"] = _years_since_first_trade(info)
+
+            # -- Real shares-outstanding YoY for Piotroski no-dilution check (M1 bug #5) --
+            result["Shares_PriorYear"] = _get_shares_prior_year(tk)
 
             # -- Extra fields (not used by scoring engine) --
             result["ForwardPE"] = _safe_get(info, "forwardPE", np.nan)

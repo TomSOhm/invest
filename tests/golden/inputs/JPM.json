@@ -1,8 +1,11 @@
 {
+  "AvgVolume": 9634945,
   "Beta": 1.023,
   "CapEx": -107704000512,
   "Cash": 1582246002688,
   "Country": "US",
+  "CurrentAssets": "NaN",
+  "CurrentLiabilities": "NaN",
   "CurrentRatio": "NaN",
   "DebtEquity": "NaN",
   "DivYield": 1.96,
@@ -40,12 +43,15 @@
   "ROA": 0.01272,
   "ROE": 0.16465001,
   "ROIC": "NaN",
+  "RetainedEarnings": 416055000000.0,
   "Revenue": 173559005184,
   "RevenueGrowth": 0.127,
   "Sector": "Financial Services",
   "Shares": 2679511418,
+  "Shares_PriorYear": 2779089920.0,
   "ShortPctFloat": 0.0101,
-  "TotalAssets": "NaN",
+  "TotalAssets": 4424900000000.0,
   "TotalDebt": 1321104965632,
-  "TotalEquity": 343992996331.422
+  "TotalEquity": 362438000000.0,
+  "YearsListed": "NaN"
 }

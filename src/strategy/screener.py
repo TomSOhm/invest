@@ -98,6 +98,18 @@ def apply_filters(df: pd.DataFrame, filters: Dict, pea_only: bool = False) -> pd
     if "min_revenue_growth" in f:
         mask &= df["RevenueGrowth"] >= f["min_revenue_growth"]
 
+    # M1 bug fix #8: wire `min_avg_volume` and `min_years_listed` filters that
+    # were loaded from settings.yaml but never applied. NaN-tolerant: rows
+    # missing the column (e.g. older cached fetches) are KEPT, so we don't
+    # silently drop everything when AvgVolume/YearsListed haven't been
+    # populated yet by the data fetcher.
+    if "min_avg_volume" in f and "AvgVolume" in df.columns:
+        av = df["AvgVolume"]
+        mask &= (av >= f["min_avg_volume"]) | av.isna()
+    if "min_years_listed" in f and "YearsListed" in df.columns:
+        yl = df["YearsListed"]
+        mask &= (yl >= f["min_years_listed"]) | yl.isna()
+
     return df[mask].sort_values("Composite_Score", ascending=False)
 
 

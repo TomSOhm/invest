@@ -1,8 +1,11 @@
 {
+  "AvgVolume": "NaN",
   "Beta": "NaN",
   "CapEx": "NaN",
   "Cash": "NaN",
   "Country": "",
+  "CurrentAssets": "NaN",
+  "CurrentLiabilities": "NaN",
   "CurrentRatio": "NaN",
   "DebtEquity": "NaN",
   "DivYield": "NaN",
@@ -40,12 +43,15 @@
   "ROA": "NaN",
   "ROE": "NaN",
   "ROIC": "NaN",
+  "RetainedEarnings": "NaN",
   "Revenue": "NaN",
   "RevenueGrowth": "NaN",
   "Sector": "",
   "Shares": "NaN",
+  "Shares_PriorYear": "NaN",
   "ShortPctFloat": "NaN",
   "TotalAssets": "NaN",
   "TotalDebt": "NaN",
-  "TotalEquity": "NaN"
+  "TotalEquity": "NaN",
+  "YearsListed": "NaN"
 }

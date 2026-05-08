@@ -41,6 +41,7 @@ from backend.app.services.data_fetcher import DataFetcher  # noqa: E402
 from src.analysis.scoring_engine import (  # noqa: E402
     altman_z_score,
     compute_composite_score,
+    data_completeness,
     generate_signal,
     graham_number,
     piotroski_f_score,
@@ -159,6 +160,9 @@ def score_row(row: Dict[str, Any]) -> Dict[str, Any]:
         "Altman_Z": (round(float(az), 2) if not (isinstance(az, float) and math.isnan(az)) else float("nan")),
         "Graham_Number": (round(float(gn), 2) if not (isinstance(gn, float) and math.isnan(gn)) else float("nan")),
         "Graham_MoS": graham_mos,
+        # M1: audit-trail field, kept in golden snapshots so changes are tracked.
+        # Not yet in the public API schema (M10 promotes it).
+        "data_completeness": data_completeness(series),
     }
 
 
