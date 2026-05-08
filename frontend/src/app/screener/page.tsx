@@ -218,26 +218,32 @@ export default function ScreenerPage() {
 
       <div className="flex gap-5">
         {/* Left: Filter Panel */}
-        <aside className="w-60 shrink-0 space-y-5">
+        <aside className="w-72 shrink-0 space-y-5">
           {/* Presets */}
           <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Presets</div>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-2">
               {presets.map((p) => (
                 <button
                   key={p.name}
                   onClick={() => handlePreset(p.name)}
-                  title={p.description}
                   className={clsx(
-                    "px-2 py-1.5 text-xs rounded-md font-medium transition-colors border relative",
+                    "w-full p-3 text-left rounded-md transition-colors border relative",
                     activePreset === p.name
-                      ? "bg-emerald-600 border-emerald-600 text-white"
-                      : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400"
+                      ? "border-emerald-500 bg-emerald-50 dark:bg-emerald-950/30"
+                      : "border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800/50"
                   )}
                 >
-                  {p.description}
+                  <div className="text-xs font-semibold text-slate-900 dark:text-slate-100">
+                    {p.name.replace(/_/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())}
+                  </div>
+                  {p.description && (
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 leading-snug line-clamp-3 mt-0.5">
+                      {p.description}
+                    </div>
+                  )}
                   {p.horizon === "short_term" && (
-                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange-400" title="Short-term preset" />
+                    <span className="absolute top-2 right-2 w-2 h-2 rounded-full bg-orange-400" title="Short-term preset" />
                   )}
                 </button>
               ))}
