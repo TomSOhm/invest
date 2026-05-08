@@ -5,11 +5,11 @@
   "Graham_Number": "NaN",
   "Growth_Score": 28.6,
   "Health_Score": 35.7,
-  "Piotroski_F": 6,
+  "Piotroski_F": 5,
   "Profitability_Score": 16.7,
   "Risk_Score": 28.6,
   "Shareholder_Score": 50.0,
   "Signal": "Hold",
   "Valuation_Score": 85.2,
-  "data_completeness": 0.91
+  "data_completeness": 0.93
 }

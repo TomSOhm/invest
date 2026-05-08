@@ -654,6 +654,12 @@ class FMPDataFetcher:
 
         Returns a partial dict -- only fields FMP can supply. The hybrid
         fetcher fills gaps with yfinance values. All missing values are NaN.
+
+        M4: also extracts prior-year (second-most-recent fiscal column) values
+        for the YoY-delta inputs Piotroski needs (ROA_PriorYear,
+        OperatingCashflow_PriorYear, LongTermDebt(+_PriorYear),
+        CurrentRatio_PriorYear, GrossMargin_PriorYear, Revenue_PriorYear,
+        TotalAssets_PriorYear).
         """
         result: Dict[str, Any] = {}
         try:
@@ -664,22 +670,43 @@ class FMPDataFetcher:
         if ann.empty:
             return result
 
-        # Helper to pull the most-recent value of a FMP field name from the
-        # pivoted DataFrame (rows = field names, cols = date strings).
+        # Helper to pull the n-th most-recent value of a FMP field name from
+        # the pivoted DataFrame (rows = field names, cols = date strings).  The
+        # pivoted layout puts the most recent date first; n=0 -> current, n=1
+        # -> prior fiscal year.
+        def _nth_finite(fmp_name: str, n: int = 0) -> float:
+            if fmp_name not in ann.index:
+                return np.nan
+            row = ann.loc[fmp_name]
+            cols = list(row.index)
+            finite_vals: List[float] = []
+            for col in cols:
+                val = row[col]
+                try:
+                    fval = float(val)
+                    if np.isfinite(fval):
+                        finite_vals.append(fval)
+                except (TypeError, ValueError):
+                    continue
+                if len(finite_vals) > n:
+                    return finite_vals[n]
+            if n < len(finite_vals):
+                return finite_vals[n]
+            return np.nan
+
         def _get_field(fmp_name: str, scoring_name: str) -> None:
-            if fmp_name in ann.index:
-                row = ann.loc[fmp_name]
-                # Columns are date strings; iterate left-to-right (most recent first).
-                for col in row.index:
-                    val = row[col]
-                    try:
-                        fval = float(val)
-                        if np.isfinite(fval):
-                            result[scoring_name] = fval
-                            return
-                    except (TypeError, ValueError):
-                        continue
-            result.setdefault(scoring_name, np.nan)
+            v = _nth_finite(fmp_name, n=0)
+            if np.isfinite(v):
+                result[scoring_name] = v
+            else:
+                result.setdefault(scoring_name, np.nan)
+
+        def _get_field_prior(fmp_name: str, scoring_name: str) -> None:
+            v = _nth_finite(fmp_name, n=1)
+            if np.isfinite(v):
+                result[scoring_name] = v
+            else:
+                result.setdefault(scoring_name, np.nan)
 
         # Income statement
         _get_field("revenue", "Revenue")
@@ -692,6 +719,7 @@ class FMPDataFetcher:
         _get_field("totalAssets", "TotalAssets")
         _get_field("totalStockholdersEquity", "TotalEquity")
         _get_field("totalDebt", "TotalDebt")
+        _get_field("longTermDebt", "LongTermDebt")
         _get_field("cashAndCashEquivalents", "Cash")
         _get_field("totalCurrentAssets", "CurrentAssets")
         _get_field("totalCurrentLiabilities", "CurrentLiabilities")
@@ -726,40 +754,54 @@ class FMPDataFetcher:
         _get_field("returnOnAssets", "ROA")
 
         # ------------------------------------------------------------------
-        # M5: Prior-year scalars for Beneish M-Score
+        # M4: prior-year inputs for Piotroski Year-over-Year deltas.
         # ------------------------------------------------------------------
-        # Pull the SECOND-most-recent (prior-year) value of select FMP fields
-        # so the Beneish formula has its t-1 inputs.
-        def _get_field_prior(fmp_name: str, scoring_name: str) -> None:
-            if fmp_name not in ann.index:
-                result.setdefault(scoring_name, np.nan)
-                return
-            row = ann.loc[fmp_name]
-            cols = list(row.index)
-            # Most-recent first; we want index 1 (prior year)
-            if len(cols) < 2:
-                result.setdefault(scoring_name, np.nan)
-                return
-            for col in cols[1:]:
-                val = row[col]
-                try:
-                    fval = float(val)
-                    if np.isfinite(fval):
-                        result[scoring_name] = fval
-                        return
-                except (TypeError, ValueError):
-                    continue
-            result.setdefault(scoring_name, np.nan)
-
-        # Beneish prior-year inputs
         _get_field_prior("revenue", "Revenue_PriorYear")
-        _get_field_prior("grossProfitRatio", "GrossMargin_PriorYear")
         _get_field_prior("totalAssets", "TotalAssets_PriorYear")
+        _get_field_prior("longTermDebt", "LongTermDebt_PriorYear")
+        _get_field_prior("operatingCashFlow", "OperatingCashflow_PriorYear")
+
+        # ROA_PriorYear: derive from NI_prior / TA_prior so it survives even
+        # when FMP returns no `returnOnAssets` historical row.
+        ni_prior = _nth_finite("netIncome", n=1)
+        ta_prior = result.get("TotalAssets_PriorYear", np.nan)
+        if (
+            np.isfinite(ni_prior)
+            and np.isfinite(ta_prior)
+            and float(ta_prior) > 0
+        ):
+            result["ROA_PriorYear"] = float(ni_prior) / float(ta_prior)
+
+        # GrossMargin_PriorYear: prefer FMP's grossProfitRatio prior year,
+        # else compute from grossProfit_prior / revenue_prior.
+        gm_ratio_prior = _nth_finite("grossProfitRatio", n=1)
+        if np.isfinite(gm_ratio_prior):
+            result["GrossMargin_PriorYear"] = float(gm_ratio_prior)
+        else:
+            gp_prior = _nth_finite("grossProfit", n=1)
+            rev_prior = result.get("Revenue_PriorYear", np.nan)
+            if (
+                np.isfinite(gp_prior)
+                and np.isfinite(rev_prior)
+                and float(rev_prior) > 0
+            ):
+                result["GrossMargin_PriorYear"] = float(gp_prior) / float(rev_prior)
+
+        # CurrentRatio_PriorYear = CA_prior / CL_prior
+        ca_prior = _nth_finite("totalCurrentAssets", n=1)
+        cl_prior = _nth_finite("totalCurrentLiabilities", n=1)
+        if (
+            np.isfinite(ca_prior)
+            and np.isfinite(cl_prior)
+            and float(cl_prior) != 0
+        ):
+            result["CurrentRatio_PriorYear"] = float(ca_prior) / float(cl_prior)
+
+        # ------------------------------------------------------------------
+        # M5: Beneish M-Score prior-year scalars + balance-sheet add-ons.
+        # ------------------------------------------------------------------
         _get_field_prior("totalCurrentAssets", "CurrentAssets_PriorYear")
         _get_field_prior("totalCurrentLiabilities", "CurrentLiabilities_PriorYear")
-        _get_field_prior("longTermDebt", "LongTermDebt_PriorYear")
-
-        # Beneish current-year inputs not already present
         _get_field("netReceivables", "Receivables")
         _get_field_prior("netReceivables", "Receivables_PriorYear")
         _get_field("propertyPlantEquipmentNet", "PPE")
@@ -768,7 +810,6 @@ class FMPDataFetcher:
         _get_field_prior("depreciationAndAmortization", "DepreciationAmortization_PriorYear")
         _get_field("sellingGeneralAndAdministrativeExpenses", "SGA")
         _get_field_prior("sellingGeneralAndAdministrativeExpenses", "SGA_PriorYear")
-        _get_field("longTermDebt", "LongTermDebt")
         _get_field("costOfRevenue", "COGS")
         _get_field("interestExpense", "InterestExpense")
 
@@ -794,7 +835,7 @@ class FMPDataFetcher:
         result["NetIncome_History_5y"] = _get_history("netIncome", 5)
         result["OperatingMargin_History_5y"] = _get_history("operatingIncomeRatio", 5)
 
-        # ROIC history: derive from operatingIncome and (equity + debt - cash) per year
+        # ROIC history: derive from operatingIncome and (equity + debt - cash) per year.
         roic_hist: List[float] = []
         ic_hist: List[float] = []
         ebit_hist: List[float] = []

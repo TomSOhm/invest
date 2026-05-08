@@ -50,15 +50,17 @@ _FMP_SUPPLIED_FIELDS = {
     "CurrentAssets", "CurrentLiabilities", "RetainedEarnings",
     "GrossMargin", "OperatingMargin", "NetMargin", "RevenueGrowth",
     "ROE", "ROA",
-    # M5 Beneish prior-year inputs (scalars)
+    # M4 — Year-over-Year prior-period inputs for Piotroski deltas
+    "LongTermDebt", "LongTermDebt_PriorYear",
+    "ROA_PriorYear", "OperatingCashflow_PriorYear",
+    "CurrentRatio_PriorYear", "GrossMargin_PriorYear",
+    "Revenue_PriorYear", "TotalAssets_PriorYear",
+    # M5 — Beneish prior-year inputs (scalars)
     "Receivables", "Receivables_PriorYear",
-    "Revenue_PriorYear", "GrossMargin_PriorYear",
-    "TotalAssets_PriorYear", "CurrentAssets_PriorYear",
-    "CurrentLiabilities_PriorYear",
+    "CurrentAssets_PriorYear", "CurrentLiabilities_PriorYear",
     "PPE", "PPE_PriorYear",
     "DepreciationAmortization", "DepreciationAmortization_PriorYear",
     "SGA", "SGA_PriorYear",
-    "LongTermDebt", "LongTermDebt_PriorYear",
     "COGS", "InterestExpense",
 }
 

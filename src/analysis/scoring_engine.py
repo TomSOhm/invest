@@ -2,17 +2,17 @@
 Invest Solo — Composite Scoring Engine
 Implements the 0-100 scoring system from METHODOLOGY.md.
 
-M3 (sector-relative percentile): the legacy ``_percentile_score`` linear
-map (hardcoded per-metric breakpoints, mislabelled as a percentile) is
-removed. Sub-score builders now operate on full DataFrames and rank each
-metric within sector groups via ``score_sector_relative``. The per-row
-API (``valuation_score``, ``financial_health_score``, …,
-``compute_composite_score``) is preserved as a thin shim that builds a
-1-row DataFrame on the fly — useful for snapshot tests that score a
-single frozen input row, but it cannot compute meaningful peer
-percentiles in isolation. Pass an explicit peer DataFrame via
-``compute_composite_score_with_peers`` for sector-aware single-ticker
-scoring.
+M3: sector-relative percentile sub-scores (replaced the linear
+``_percentile_score`` mapping). Sub-score builders now operate on full
+DataFrames via ``score_sector_relative`` (sectors with < 5 peers fall
+through to global rank).
+
+M4: Piotroski / Altman / Graham primitives now live in
+``src/analysis/quality_signals.py``; this module re-exports them so
+existing callers keep working unchanged.
+
+M5: informational sector-relative aggregators (Earnings Quality, Moat,
+Risk_v2) re-exported here.
 """
 from __future__ import annotations
 
@@ -22,11 +22,46 @@ from typing import Any, Dict, List, Optional, Set, Tuple
 
 from src.analysis.sector_percentile import score_sector_relative
 
+# M4: real Piotroski / Altman / Graham primitives delegated to quality_signals.
+from src.analysis.quality_signals import (
+    altman_z_classic,        # re-exported for callers that want classic Z directly
+    altman_z_double_prime,   # re-exported for callers that want Z'' directly
+    altman_z_select,         # re-exported (returns score + variant tuple)
+    altman_z_score as _altman_z_score_impl,
+    graham_number as _graham_number_impl,
+    piotroski_f_score as _piotroski_f_score_impl,
+)
+
 # M5 informational aggregators (sector-relative). Composite weighting unchanged
 # in M5 (M7 owns reshuffling); these are exposed as new columns only.
 from src.analysis.earnings_quality import earnings_quality_score  # noqa: F401
 from src.analysis.quality_moat import moat_score  # noqa: F401
 from src.analysis.risk_metrics import risk_score_real  # noqa: F401
+
+__all__ = [
+    "SCORING_WEIGHTS",
+    "SIGNAL_THRESHOLDS",
+    "valuation_score",
+    "financial_health_score",
+    "profitability_score",
+    "growth_score",
+    "shareholder_return_score",
+    "risk_score",
+    "compute_composite_score",
+    "generate_signal",
+    "piotroski_f_score",
+    "altman_z_score",
+    "altman_z_classic",
+    "altman_z_double_prime",
+    "altman_z_select",
+    "graham_number",
+    "data_completeness",
+    "score_universe",
+    "score_dataframe",
+    "earnings_quality_score",
+    "moat_score",
+    "risk_score_real",
+]
 
 # ══════════════════════════════════════════════════════════════
 # SCORING THRESHOLDS (from settings.yaml)
@@ -50,17 +85,6 @@ SIGNAL_THRESHOLDS = {
 }
 
 
-# Sectors classified as "manufacturers" for the classic Altman Z model.
-# Everything else uses Altman Z'' (4 factors, no asset turnover X5).
-_ALTMAN_MANUFACTURER_SECTORS: Set[str] = {
-    "Industrials",
-    "Materials",
-    "Energy",
-    "Consumer Cyclical",
-    "Consumer Defensive",
-}
-
-
 # Negative-PE penalty (legacy semantics preserved): unprofitable companies
 # receive a fixed low score on the PE component, regardless of where they
 # would rank within their sector. Applied as a post-rank override in
@@ -72,6 +96,7 @@ _NEGATIVE_PE_PENALTY: float = 10.0
 # the global universe. Below this threshold, the sector falls through to
 # the global rank — see sector_percentile.score_sector_relative.
 _DEFAULT_MIN_PEERS: int = 5
+
 
 
 def _is_finite(val: Any) -> bool:
@@ -449,179 +474,36 @@ def generate_signal(composite_score: float) -> str:
 
 
 def piotroski_f_score(row: pd.Series) -> int:
-    """Compute simplified Piotroski F-Score (0-9), NaN-safe.
+    """Compute the Piotroski F-Score (0-9) using YoY deltas (M4 implementation).
 
-    Each of the 9 signals contributes +1 when satisfied, 0 when violated, and
-    is SKIPPED entirely when the inputs are missing (NaN). Skipping a signal
-    means the score has fewer than 9 possible points -- the value returned is
-    therefore the SUM of present-and-satisfied signals (0..9). This is more
-    conservative than the prior code, which awarded silent +1 (signal #7) and
-    used `default=2`/`default=inf` which caused missing data to fail tests in
-    inverted ways.
-
-    Returns
-    -------
-    int
-        Sum of present-and-satisfied signals (0..9).
+    Delegates to :func:`src.analysis.quality_signals.piotroski_f_score`, which
+    treats each of the 9 signals individually and skips any whose
+    current-year or prior-year inputs are NaN.  The aggregate is therefore
+    the SUM of present-and-satisfied signals (0..9).
     """
-    signals: List[Optional[int]] = []
-
-    # 1. ROA > 0
-    roa = row.get("ROA", np.nan)
-    signals.append(1 if (_is_finite(roa) and roa > 0) else (0 if _is_finite(roa) else None))
-
-    # 2. Operating cashflow > 0
-    cfo = row.get("OperatingCashflow", np.nan)
-    signals.append(1 if (_is_finite(cfo) and cfo > 0) else (0 if _is_finite(cfo) else None))
-
-    # 3. Delta ROA > 0 (proxy: ROA > 5%) — skipped if ROA absent.
-    if _is_finite(roa):
-        signals.append(1 if roa > 0.05 else 0)
-    else:
-        signals.append(None)
-
-    # 4. CFO > Net Income (accruals quality). NaN-safe: skip if either is NaN.
-    # BUG FIX (M1 #6): prior code used `default=float('inf')` for NetIncome, which
-    # made the test FAIL when NI was missing -- inverted. Now we skip on NaN.
-    ni = row.get("NetIncome", np.nan)
-    if _is_finite(cfo) and _is_finite(ni):
-        signals.append(1 if cfo > ni else 0)
-    else:
-        signals.append(None)
-
-    # 5. Long-term debt decreased (proxy: D/E < 1.0).
-    # BUG FIX (M1 #4): prior code used `default=2` which made missing data fail.
-    # Now skip on NaN so missing data doesn't punish the ticker.
-    de = row.get("DebtEquity", np.nan)
-    if _is_finite(de):
-        signals.append(1 if de < 1.0 else 0)
-    else:
-        signals.append(None)
-
-    # 6. Current ratio > 1.0
-    cr = row.get("CurrentRatio", np.nan)
-    if _is_finite(cr):
-        signals.append(1 if cr > 1.0 else 0)
-    else:
-        signals.append(None)
-
-    # 7. No dilution: shares_now <= shares_prior * 1.005 (≤+0.5% YoY).
-    # BUG FIX (M1 #5): prior code awarded +1 unconditionally. Now we use the
-    # real `Shares` and `Shares_PriorYear` from the data fetcher. Skip on NaN.
-    shares_now = row.get("Shares", np.nan)
-    shares_prior = row.get("Shares_PriorYear", np.nan)
-    if (
-        _is_finite(shares_now)
-        and _is_finite(shares_prior)
-        and shares_prior > 0
-    ):
-        delta = (float(shares_now) - float(shares_prior)) / float(shares_prior)
-        signals.append(1 if delta <= 0.005 else 0)
-    else:
-        signals.append(None)
-
-    # 8. Gross margin healthy (>20%)
-    gm = row.get("GrossMargin", np.nan)
-    if _is_finite(gm):
-        signals.append(1 if gm > 0.2 else 0)
-    else:
-        signals.append(None)
-
-    # 9. Asset turnover (Revenue/Assets > 0.3)
-    ta = row.get("TotalAssets", np.nan)
-    rev = row.get("Revenue", np.nan)
-    if _is_finite(ta) and _is_finite(rev) and ta > 0:
-        signals.append(1 if rev / ta > 0.3 else 0)
-    else:
-        signals.append(None)
-
-    return int(sum(s for s in signals if s is not None))
+    return _piotroski_f_score_impl(row)
 
 
 def altman_z_score(row: pd.Series) -> float:
     """Compute Altman Z (manufacturers) or Z'' (everything else).
 
-    BUG FIX (M1 #7): prior code fabricated proxies:
-        - Working capital ≈ Cash − 0.3×TotalDebt
-        - Retained earnings ≈ 0.4×Equity
-        - X3 used the EBITDA-aliased EBIT
-    All three are eliminated. We now use:
-        - WC = CurrentAssets − CurrentLiabilities (real)
-        - RE = RetainedEarnings (real)
-        - EBIT = real EBIT from data_fetcher
-    If any required input is NaN, return NaN -- never fabricate.
+    Sector-aware dispatch lives in
+    :func:`src.analysis.quality_signals.altman_z_select`.  This wrapper
+    returns only the numeric score so existing callers (``score_universe``,
+    capture_golden_snapshots) keep their float-only return contract.  M10
+    will surface the variant via the public API.
 
-    Sector dispatch:
-        Manufacturers (Industrials, Materials, Energy, Consumer Cyclical/Defensive)
-            -> Classic 5-factor Altman Z = 1.2 X1 + 1.4 X2 + 3.3 X3 + 0.6 X4 + 1.0 X5
-            -> Zones: Safe > 2.99 / Grey 1.81–2.99 / Distress < 1.81
-        Non-manufacturers (services, tech, utilities, financials, etc.)
-            -> Altman Z'' (4-factor, no X5) = 6.56 X1 + 3.26 X2 + 6.72 X3 + 1.05 X4
-            -> Zones: Safe > 2.6 / Grey 1.1–2.6 / Distress < 1.1
-    Note the Z'' zone thresholds DIFFER from classic Z; downstream interpretation
-    should be sector-aware.
+    Zones (manufacturers, classic Z): Safe > 2.99 / Grey 1.81-2.99 / Distress < 1.81
+    Zones (non-manufacturers, Z''):    Safe > 2.6  / Grey 1.1-2.6   / Distress < 1.1
 
-    Returns
-    -------
-    float
-        Z or Z'' score, or NaN if inputs are insufficient.
+    Returns NaN if required inputs are missing -- never fabricates.
     """
-    ta = row.get("TotalAssets", np.nan)
-    eq = row.get("TotalEquity", np.nan)
-    rev = row.get("Revenue", np.nan)
-    ebit = row.get("EBIT", np.nan)
-    mktcap = row.get("MarketCap", np.nan)
-    current_assets = row.get("CurrentAssets", np.nan)
-    current_liabilities = row.get("CurrentLiabilities", np.nan)
-    retained_earnings = row.get("RetainedEarnings", np.nan)
-    sector = row.get("Sector", "")
-
-    # X1 = Working Capital / Total Assets  -- real now, no fabrication.
-    if not (_is_finite(current_assets) and _is_finite(current_liabilities) and _is_finite(ta) and ta > 0):
-        return np.nan
-    wc = float(current_assets) - float(current_liabilities)
-    x1 = wc / float(ta)
-
-    # X2 = Retained Earnings / TA  -- real now, no fabrication.
-    if not _is_finite(retained_earnings):
-        return np.nan
-    x2 = float(retained_earnings) / float(ta)
-
-    # X3 = EBIT / TA -- real EBIT from M1 #1.
-    if not _is_finite(ebit):
-        return np.nan
-    x3 = float(ebit) / float(ta)
-
-    # X4 = MarketCap / TotalLiabilities (book-value variant uses BV equity, but
-    # the original Altman 1968 used market value of equity / book value of liab).
-    if not (_is_finite(mktcap) and _is_finite(eq)):
-        return np.nan
-    total_liab = float(ta) - float(eq)
-    if total_liab <= 0:
-        # Negative liabilities is undefined; skip rather than fabricate.
-        return np.nan
-    x4 = float(mktcap) / total_liab
-
-    is_manufacturer = bool(sector) and sector in _ALTMAN_MANUFACTURER_SECTORS
-    if is_manufacturer:
-        if not _is_finite(rev):
-            return np.nan
-        x5 = float(rev) / float(ta)
-        return 1.2 * x1 + 1.4 * x2 + 3.3 * x3 + 0.6 * x4 + 1.0 * x5
-    else:
-        return 6.56 * x1 + 3.26 * x2 + 6.72 * x3 + 1.05 * x4
+    return _altman_z_score_impl(row)
 
 
 def graham_number(row: pd.Series) -> float:
-    """Calculate Graham Number intrinsic value."""
-    ni = row.get("NetIncome", 0)
-    shares = row.get("Shares", 0)
-    eq = row.get("TotalEquity", 0)
-    if shares <= 0 or ni <= 0 or eq <= 0:
-        return np.nan
-    eps = ni / shares
-    bvps = eq / shares
-    return np.sqrt(22.5 * eps * bvps)
+    """Calculate Graham Number intrinsic value (sqrt(22.5 * EPS * BVPS))."""
+    return _graham_number_impl(row)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -652,6 +534,11 @@ _SCORING_INPUT_FIELDS: Tuple[str, ...] = (
     "Shares", "Shares_PriorYear",
     "EBIT", "MarketCap",
     "CurrentAssets", "CurrentLiabilities", "RetainedEarnings",
+    # M4 -- YoY inputs for Piotroski 2000 deltas
+    "ROA_PriorYear", "OperatingCashflow_PriorYear",
+    "LongTermDebt", "LongTermDebt_PriorYear",
+    "CurrentRatio_PriorYear", "GrossMargin_PriorYear",
+    "Revenue_PriorYear", "TotalAssets_PriorYear",
 )
 
 

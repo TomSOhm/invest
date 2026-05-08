@@ -1,15 +1,15 @@
 {
   "Altman_Z": 14.93,
-  "Composite_Score": 65.2,
+  "Composite_Score": 64.8,
   "Graham_MoS": -56.6,
   "Graham_Number": 267.48,
   "Growth_Score": 95.7,
-  "Health_Score": 75.5,
-  "Piotroski_F": 9,
+  "Health_Score": 75.4,
+  "Piotroski_F": 5,
   "Profitability_Score": 75.4,
-  "Risk_Score": 59.5,
-  "Shareholder_Score": 40.8,
-  "Signal": "Buy",
+  "Risk_Score": 59.2,
+  "Shareholder_Score": 38.0,
+  "Signal": "Hold",
   "Valuation_Score": 42.5,
   "data_completeness": 1.0
 }

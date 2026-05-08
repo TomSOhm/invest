@@ -45,6 +45,11 @@ SCORING_COLUMNS = [
     # M1 additions (real Altman Z'' inputs, real Piotroski dilution check, screener wiring)
     "CurrentAssets", "CurrentLiabilities", "RetainedEarnings",
     "AvgVolume", "YearsListed", "Shares_PriorYear",
+    # M4 additions (Year-over-Year deltas for Piotroski 2000)
+    "ROA_PriorYear", "OperatingCashflow_PriorYear",
+    "LongTermDebt", "LongTermDebt_PriorYear",
+    "CurrentRatio_PriorYear", "GrossMargin_PriorYear",
+    "Revenue_PriorYear", "TotalAssets_PriorYear",
     "Name", "Sector", "Industry", "Country", "Exchange",
     "PEA", "PEA_PME",
     # M5 additions: history columns for Earnings Quality, Moat, and Risk modules.
