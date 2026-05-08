@@ -1,6 +1,15 @@
 {
   "Altman_Z": "NaN",
   "Composite_Score": 62.5,
+  "DCF_FairValue_High": "NaN",
+  "DCF_FairValue_Low": "NaN",
+  "DCF_FairValue_Mid": "NaN",
+  "DCF_MoS_High": "NaN",
+  "DCF_MoS_Low": "NaN",
+  "DCF_MoS_Mid": "NaN",
+  "DCF_Warnings": [
+    "FCF margin not derivable (need FCFMargin or FCF+Revenue)"
+  ],
   "Graham_MoS": 81.0,
   "Graham_Number": 165.84,
   "Growth_Score": 60.9,
@@ -11,5 +20,6 @@
   "Shareholder_Score": 86.6,
   "Signal": "Hold",
   "Valuation_Score": 85.3,
+  "WACC_Used": "NaN",
   "data_completeness": 0.67
 }

@@ -1,6 +1,13 @@
 {
   "Altman_Z": 5.81,
   "Composite_Score": 52.3,
+  "DCF_FairValue_High": 288.13,
+  "DCF_FairValue_Low": 162.96,
+  "DCF_FairValue_Mid": 207.53,
+  "DCF_MoS_High": -0.2099,
+  "DCF_MoS_Low": -0.5532,
+  "DCF_MoS_Mid": -0.431,
+  "DCF_Warnings": [],
   "Graham_MoS": -64.3,
   "Graham_Number": 130.05,
   "Growth_Score": 30.4,
@@ -9,7 +16,8 @@
   "Profitability_Score": 54.4,
   "Risk_Score": 61.7,
   "Shareholder_Score": 74.2,
-  "Signal": "Hold",
+  "Signal": "Strong Sell",
   "Valuation_Score": 40.5,
+  "WACC_Used": 0.0769,
   "data_completeness": 1.0
 }

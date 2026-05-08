@@ -38,6 +38,10 @@ from src.analysis.earnings_quality import earnings_quality_score  # noqa: F401
 from src.analysis.quality_moat import moat_score  # noqa: F401
 from src.analysis.risk_metrics import risk_score_real  # noqa: F401
 
+# M6: two-stage DCF with sensitivity grid. Activates SIGNAL_THRESHOLDS'
+# previously-dead price-to-intrinsic ratios via generate_signal(composite, mos).
+from src.analysis.dcf import dcf_with_sensitivity
+
 __all__ = [
     "SCORING_WEIGHTS",
     "SIGNAL_THRESHOLDS",
@@ -61,6 +65,7 @@ __all__ = [
     "earnings_quality_score",
     "moat_score",
     "risk_score_real",
+    "dcf_with_sensitivity",
 ]
 
 # ══════════════════════════════════════════════════════════════
@@ -459,18 +464,73 @@ def compute_composite_score_with_peers(
     return compute_composite_score(row, peers=peers)
 
 
-def generate_signal(composite_score: float) -> str:
-    """Convert composite score to investment signal."""
+def generate_signal(composite_score: float, mos: float = float("nan")) -> str:
+    """Convert composite score + DCF margin-of-safety to investment signal.
+
+    M6 activation: SIGNAL_THRESHOLDS' price-to-intrinsic ratios now bite.
+
+    The margin-of-safety (``mos``) convention is::
+
+        mos = (intrinsic_value - price) / price
+
+    so positive ``mos`` means the stock trades below intrinsic (undervalued)
+    and negative ``mos`` means above (overvalued).
+
+    Decision table (top-down, first match wins)::
+
+        Strong Buy : composite >= 80 AND mos >= 0.30   (price < 70% intrinsic)
+        Buy        : composite >= 65 AND mos >= 0.15   (price < 85% intrinsic)
+        Strong Sell: mos <= -0.30                       (price > 130% intrinsic)
+        Sell       : composite <= 40   OR  mos <= -0.15
+        Hold       : otherwise
+
+    Graceful NaN degradation: when ``mos`` is NaN (DCF unavailable for the
+    ticker), the rule collapses to the legacy composite-only thresholds
+    (Strong Buy >=80, Buy >=65, Hold 40-65, Sell 25-40, Strong Sell <25).
+
+    Parameters
+    ----------
+    composite_score : float
+        0-100 composite score from compute_composite_score / score_dataframe.
+    mos : float, default NaN
+        Margin of safety vs. DCF intrinsic value. NaN means "DCF could not
+        be computed" and the function falls back to legacy behaviour.
+
+    Returns
+    -------
+    str
+        One of: "Strong Buy", "Buy", "Hold", "Sell", "Strong Sell".
+    """
+    has_mos = isinstance(mos, (int, float, np.floating)) and not (
+        isinstance(mos, float) and np.isnan(mos)
+    ) and np.isfinite(mos)
+
+    # ---- Two-criterion path (composite + MoS both required to upgrade) ----
+    if has_mos:
+        # Strong Buy: high score AND deep MoS
+        if composite_score >= 80 and mos >= 0.30:
+            return "Strong Buy"
+        # Buy: solid score AND positive MoS
+        if composite_score >= 65 and mos >= 0.15:
+            return "Buy"
+        # Strong Sell: very overvalued regardless of score
+        if mos <= -0.30:
+            return "Strong Sell"
+        # Sell: weak score OR meaningfully overvalued
+        if composite_score <= 40 or mos <= -0.15:
+            return "Sell"
+        return "Hold"
+
+    # ---- Legacy fallback (composite-only) when DCF unavailable ----
     if composite_score >= 80:
         return "Strong Buy"
-    elif composite_score >= 65:
+    if composite_score >= 65:
         return "Buy"
-    elif composite_score >= 40:
+    if composite_score >= 40:
         return "Hold"
-    elif composite_score >= 25:
+    if composite_score >= 25:
         return "Sell"
-    else:
-        return "Strong Sell"
+    return "Strong Sell"
 
 
 def piotroski_f_score(row: pd.Series) -> int:
@@ -555,6 +615,75 @@ def data_completeness(row: pd.Series) -> float:
 
 
 # ══════════════════════════════════════════════════════════════
+# DCF helper (M6) — invoked per row by score_dataframe
+# ══════════════════════════════════════════════════════════════
+
+
+def _compute_dcf_for_row(row: pd.Series) -> Dict[str, Any]:
+    """Run dcf_with_sensitivity on a single Series; never raises.
+
+    Wraps the pure-function DCF in a try/except so a single ticker with
+    pathological data cannot poison ``score_dataframe``. On exception,
+    returns an all-NaN dict with the exception message in ``warnings``.
+
+    Settings come from the lazily-loaded backend AppConfig if importable
+    (preferred — picks up settings.yaml ``valuation.dcf``); otherwise the
+    DCF module's hardcoded defaults are used.
+    """
+    settings_block = _load_dcf_settings_once()
+    try:
+        return dcf_with_sensitivity(row.to_dict(), settings=settings_block)
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "wacc_base": float("nan"),
+            "tgr_base": settings_block.get("terminal_growth_rate", 0.025) if settings_block else 0.025,
+            "intrinsic_low": float("nan"),
+            "intrinsic_mid": float("nan"),
+            "intrinsic_high": float("nan"),
+            "mos_low": float("nan"),
+            "mos_mid": float("nan"),
+            "mos_high": float("nan"),
+            "scenarios": {},
+            "warnings": [f"DCF exception: {type(exc).__name__}: {exc}"],
+        }
+
+
+_DCF_SETTINGS_CACHE: Optional[Dict[str, Any]] = None
+
+
+def _load_dcf_settings_once() -> Optional[Dict[str, Any]]:
+    """Lazily resolve ``valuation.dcf`` settings, with backend AppConfig as the
+    preferred source. Falls back to None (then the DCF module's defaults
+    apply) when import fails — keeps ``src/analysis`` decoupled from the
+    backend at module load.
+    """
+    global _DCF_SETTINGS_CACHE
+    if _DCF_SETTINGS_CACHE is not None:
+        return _DCF_SETTINGS_CACHE
+    try:
+        from backend.app.config import settings as _app_settings  # type: ignore
+
+        block = {
+            "projection_years": _app_settings.dcf_projection_years,
+            "terminal_growth_rate": _app_settings.dcf_terminal_growth_rate,
+            "risk_free_rate": _app_settings.dcf_risk_free_rate,
+            "equity_risk_premium": _app_settings.dcf_equity_risk_premium,
+            # tax_rate_default lives in raw block (not yet promoted to a
+            # property accessor — read it directly).
+            "tax_rate_default": float(
+                _app_settings.raw.get("valuation", {})
+                .get("dcf", {})
+                .get("tax_rate_default", 0.25)
+            ),
+        }
+        _DCF_SETTINGS_CACHE = block
+        return block
+    except Exception:
+        _DCF_SETTINGS_CACHE = {}
+        return None
+
+
+# ══════════════════════════════════════════════════════════════
 # Vectorised universe scorer (M3 + M5 + M9)
 # ══════════════════════════════════════════════════════════════
 
@@ -622,7 +751,25 @@ def score_dataframe(
     graham = df.apply(graham_number, axis=1)
     piotroski = df.apply(piotroski_f_score, axis=1).astype(int)
     completeness = df.apply(data_completeness, axis=1)
-    signals = composite.apply(generate_signal)
+
+    # ------------------------------------------------------------------
+    # M6: per-row DCF with sensitivity grid (best-effort; NaN-safe).
+    # ------------------------------------------------------------------
+    dcf_results = df.apply(_compute_dcf_for_row, axis=1)
+    dcf_mos_mid = dcf_results.apply(lambda d: d.get("mos_mid", float("nan")))
+    dcf_mos_low = dcf_results.apply(lambda d: d.get("mos_low", float("nan")))
+    dcf_mos_high = dcf_results.apply(lambda d: d.get("mos_high", float("nan")))
+    dcf_iv_mid = dcf_results.apply(lambda d: d.get("intrinsic_mid", float("nan")))
+    dcf_iv_low = dcf_results.apply(lambda d: d.get("intrinsic_low", float("nan")))
+    dcf_iv_high = dcf_results.apply(lambda d: d.get("intrinsic_high", float("nan")))
+    wacc_used = dcf_results.apply(lambda d: d.get("wacc_base", float("nan")))
+    dcf_warnings = dcf_results.apply(lambda d: list(d.get("warnings", [])))
+
+    # Signal: feed both composite and DCF mid-MoS to the signal generator.
+    signals = pd.Series(
+        [generate_signal(c, m) for c, m in zip(composite.values, dcf_mos_mid.values)],
+        index=composite.index,
+    )
 
     out = df.copy()
     out["Composite_Score"] = composite
@@ -637,6 +784,17 @@ def score_dataframe(
     out["Altman_Z"] = altman.apply(lambda v: round(v, 2) if pd.notna(v) else np.nan)
     out["Graham_Number"] = graham.apply(lambda v: round(v, 2) if pd.notna(v) else np.nan)
     out["data_completeness"] = completeness
+
+    # M6: DCF columns (additive; never overwrite). Round MoS to 4 decimals and
+    # fair-values to 2 — matches Graham_Number convention.
+    out["DCF_MoS_Mid"] = dcf_mos_mid.apply(lambda v: round(v, 4) if pd.notna(v) else np.nan)
+    out["DCF_MoS_Low"] = dcf_mos_low.apply(lambda v: round(v, 4) if pd.notna(v) else np.nan)
+    out["DCF_MoS_High"] = dcf_mos_high.apply(lambda v: round(v, 4) if pd.notna(v) else np.nan)
+    out["DCF_FairValue_Mid"] = dcf_iv_mid.apply(lambda v: round(v, 2) if pd.notna(v) else np.nan)
+    out["DCF_FairValue_Low"] = dcf_iv_low.apply(lambda v: round(v, 2) if pd.notna(v) else np.nan)
+    out["DCF_FairValue_High"] = dcf_iv_high.apply(lambda v: round(v, 2) if pd.notna(v) else np.nan)
+    out["WACC_Used"] = wacc_used.apply(lambda v: round(v, 4) if pd.notna(v) else np.nan)
+    out["DCF_Warnings"] = dcf_warnings
 
     # Graham margin of safety (vectorised).
     if "Price" in out.columns:

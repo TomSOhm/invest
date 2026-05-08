@@ -1,6 +1,15 @@
 {
   "Altman_Z": "NaN",
   "Composite_Score": 50.0,
+  "DCF_FairValue_High": "NaN",
+  "DCF_FairValue_Low": "NaN",
+  "DCF_FairValue_Mid": "NaN",
+  "DCF_MoS_High": "NaN",
+  "DCF_MoS_Low": "NaN",
+  "DCF_MoS_Mid": "NaN",
+  "DCF_Warnings": [
+    "Insufficient capital-structure data (need Beta, MarketCap > 0)"
+  ],
   "Graham_MoS": "NaN",
   "Graham_Number": "NaN",
   "Growth_Score": 50.0,
@@ -11,5 +20,6 @@
   "Shareholder_Score": 50.0,
   "Signal": "Hold",
   "Valuation_Score": 50.0,
+  "WACC_Used": "NaN",
   "data_completeness": 0.0
 }

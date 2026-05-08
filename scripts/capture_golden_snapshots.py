@@ -45,6 +45,7 @@ from src.analysis.scoring_engine import (  # noqa: E402
     generate_signal,
     graham_number,
     piotroski_f_score,
+    dcf_with_sensitivity,
 )
 from functools import lru_cache
 
@@ -198,6 +199,34 @@ def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
         if (gn is not None and not (isinstance(gn, float) and math.isnan(gn)) and price and not (isinstance(price, float) and math.isnan(price)) and price > 0)
         else float("nan")
     )
+
+    # ------------------------------------------------------------------
+    # M6: DCF with sensitivity grid (NaN-safe). Failures yield NaN columns
+    # plus a warning string — they never abort snapshot capture.
+    # ------------------------------------------------------------------
+    try:
+        dcf_out = dcf_with_sensitivity(series.to_dict())
+    except Exception as exc:  # noqa: BLE001
+        dcf_out = {
+            "wacc_base": float("nan"),
+            "intrinsic_low": float("nan"),
+            "intrinsic_mid": float("nan"),
+            "intrinsic_high": float("nan"),
+            "mos_low": float("nan"),
+            "mos_mid": float("nan"),
+            "mos_high": float("nan"),
+            "warnings": [f"DCF exception: {type(exc).__name__}: {exc}"],
+        }
+
+    def _r(v: Any, n: int) -> Any:
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            return float("nan")
+        if math.isnan(f) or math.isinf(f):
+            return float("nan")
+        return round(f, n)
+
     return {
         "Composite_Score": round(composite, 1),
         "Valuation_Score": round(breakdown["valuation"], 1),
@@ -206,7 +235,7 @@ def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
         "Growth_Score": round(breakdown["growth"], 1),
         "Shareholder_Score": round(breakdown["shareholder_return"], 1),
         "Risk_Score": round(breakdown["risk"], 1),
-        "Signal": generate_signal(composite),
+        "Signal": generate_signal(composite, dcf_out.get("mos_mid", float("nan"))),
         "Piotroski_F": int(piotroski_f_score(series)),
         "Altman_Z": (round(float(az), 2) if not (isinstance(az, float) and math.isnan(az)) else float("nan")),
         "Graham_Number": (round(float(gn), 2) if not (isinstance(gn, float) and math.isnan(gn)) else float("nan")),
@@ -214,6 +243,15 @@ def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
         # M1: audit-trail field, kept in golden snapshots so changes are tracked.
         # Not yet in the public API schema (M10 promotes it).
         "data_completeness": data_completeness(series),
+        # M6: DCF sensitivity outputs.
+        "DCF_FairValue_Low": _r(dcf_out.get("intrinsic_low"), 2),
+        "DCF_FairValue_Mid": _r(dcf_out.get("intrinsic_mid"), 2),
+        "DCF_FairValue_High": _r(dcf_out.get("intrinsic_high"), 2),
+        "DCF_MoS_Low": _r(dcf_out.get("mos_low"), 4),
+        "DCF_MoS_Mid": _r(dcf_out.get("mos_mid"), 4),
+        "DCF_MoS_High": _r(dcf_out.get("mos_high"), 4),
+        "WACC_Used": _r(dcf_out.get("wacc_base"), 4),
+        "DCF_Warnings": list(dcf_out.get("warnings", [])),
     }
 
 
