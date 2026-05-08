@@ -1,7 +1,16 @@
 """
-Invest Solo -- Market & Configuration API Router
-Provides health check, universe listings, and scoring config.
+Invest Solo -- Market & Configuration API Router (M10)
+Provides health check, universe listings, scoring config, and preset metadata.
+
+Endpoint list
+-------------
+GET /api/market/health           — health check
+GET /api/market/universe/pea     — PEA-eligible tickers
+GET /api/market/universe/global  — all tickers
+GET /api/market/config           — scoring weights, signal thresholds, horizons block, presets
 """
+from __future__ import annotations
+
 from typing import Any, Dict, List
 
 from fastapi import APIRouter, Depends
@@ -15,7 +24,7 @@ router = APIRouter(tags=["market"])
 @router.get("/health")
 async def health_check() -> Dict[str, str]:
     """Health check endpoint."""
-    return {"status": "ok", "version": "0.3.0"}
+    return {"status": "ok", "version": "0.4.0"}
 
 
 @router.get("/universe/pea")
@@ -23,7 +32,7 @@ async def get_pea_universe() -> List[Dict[str, Any]]:
     """Return PEA-eligible tickers from the sample universe."""
     from src.data.sample_universe import SAMPLE_UNIVERSE
 
-    pea_stocks = [
+    return [
         {
             "ticker": s["Ticker"],
             "name": s["Name"],
@@ -35,7 +44,6 @@ async def get_pea_universe() -> List[Dict[str, Any]]:
         for s in SAMPLE_UNIVERSE
         if s.get("PEA", False)
     ]
-    return pea_stocks
 
 
 @router.get("/universe/global")
@@ -61,8 +69,20 @@ async def get_global_universe() -> List[Dict[str, Any]]:
 async def get_config(
     scorer: ScoringService = Depends(get_scoring_service),
 ) -> Dict[str, Any]:
-    """Return scoring weights and signal thresholds."""
+    """Return scoring configuration: weights, signal thresholds, horizon
+    definitions from settings.yaml, and the 9 M8 preset metadata dicts."""
+    from src.strategy.horizon_presets import list_presets
+
+    # Load the horizons block from settings.yaml if available
+    try:
+        from backend.app.config import settings as _settings
+        horizons_block = getattr(_settings, "horizons", None)
+    except Exception:
+        horizons_block = None
+
     return {
         "scoring_weights": scorer.get_weights(),
         "signal_thresholds": scorer.get_thresholds(),
+        "horizons": horizons_block,
+        "presets": list_presets(),
     }

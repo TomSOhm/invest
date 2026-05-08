@@ -1,7 +1,13 @@
 """
-Invest Solo -- Watchlist Service
-Enriches stored watchlist items with live data and scoring.
+Invest Solo -- Watchlist Service (M10)
+Enriches stored watchlist items with live data and three-horizon scoring.
+
+Key changes vs M9:
+- composite_score / signal replaced by score_lt/mt/st + signal_lt/mt/st
+- dcf_mos_mid exposed on each item
 """
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -30,7 +36,7 @@ class WatchlistService:
 
     def get_watchlist(self) -> Dict[str, Any]:
         """
-        Load watchlist, enrich with live data and scoring.
+        Load watchlist, enrich with live data and three-horizon scoring.
         Returns a dict matching WatchlistResponse schema.
         """
         raw_items = self._store.get_items()
@@ -68,17 +74,18 @@ class WatchlistService:
 
             current_price = self._num(ld.get("Price"))
 
-            # 52-week high %
             high_52 = self._num(ld.get("FiftyTwoWeekHigh"))
-            fifty_two_pct = None
+            fifty_two_pct: Optional[float] = None
             if current_price and high_52 and high_52 > 0:
                 fifty_two_pct = round((current_price / high_52 - 1) * 100, 1)
 
-            # Analyst summary
-            analyst_rating = None
-            analyst_target = None
+            analyst_rating: Optional[str] = None
+            analyst_target: Optional[float] = None
             if an:
-                total = an.get("buy", 0) + an.get("hold", 0) + an.get("sell", 0) + an.get("strong_buy", 0) + an.get("strong_sell", 0)
+                total = (
+                    an.get("buy", 0) + an.get("hold", 0) + an.get("sell", 0)
+                    + an.get("strong_buy", 0) + an.get("strong_sell", 0)
+                )
                 if total > 0:
                     buys = an.get("strong_buy", 0) + an.get("buy", 0)
                     sells = an.get("sell", 0) + an.get("strong_sell", 0)
@@ -89,6 +96,12 @@ class WatchlistService:
                     else:
                         analyst_rating = "Hold"
                 analyst_target = an.get("target_mean")
+
+            # Extract horizon scores
+            h = sc.get("horizons", {})
+            lt = h.get("long_term", {})
+            mt = h.get("medium_term", {})
+            st = h.get("short_term", {})
 
             enriched.append({
                 "id": item["id"],
@@ -102,14 +115,23 @@ class WatchlistService:
                 "pe": self._num(ld.get("PE")),
                 "pb": self._num(ld.get("PB")),
                 "roe": self._num(ld.get("ROE")),
-                "composite_score": sc.get("composite_score"),
-                "signal": sc.get("signal"),
+                # Three-horizon scoring
+                "score_lt": lt.get("score"),
+                "score_mt": mt.get("score"),
+                "score_st": st.get("score"),
+                "signal_lt": lt.get("signal"),
+                "signal_mt": mt.get("signal"),
+                "signal_st": st.get("signal"),
+                # Quality
                 "piotroski_f": sc.get("piotroski_f"),
                 "altman_z": sc.get("altman_z"),
                 "graham_number": sc.get("graham_number"),
                 "graham_mos": sc.get("graham_mos"),
+                "dcf_mos_mid": sc.get("dcf", {}).get("mos_mid"),
+                # PEA
                 "pea_eligible": bool(ld.get("PEA", False)),
                 "pea_pme_eligible": bool(ld.get("PEA_PME", False)),
+                # Analyst
                 "analyst_rating": analyst_rating,
                 "analyst_target_price": analyst_target,
                 "forward_pe": self._num(ld.get("ForwardPE")),

@@ -24,7 +24,7 @@ from backend.app.api.watchlist import router as watchlist_router
 app = FastAPI(
     title="Invest Solo API",
     description="Quantitative fundamental analysis API for PEA and Global investment strategies.",
-    version="0.3.0",
+    version="0.4.0",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
     openapi_url="/api/openapi.json",
@@ -59,7 +59,7 @@ app.include_router(company_router, prefix="/api/company")
 
 @app.on_event("startup")
 async def on_startup() -> None:
-    logger.info(f"Invest Solo API v0.3.0 starting up")
+    logger.info(f"Invest Solo API v0.4.0 starting up (M10 three-horizon schema)")
     logger.info(f"Project: {settings.project_name} v{settings.project_version}")
     logger.info(f"Data source: {settings.primary_source}")
     logger.info(f"PEA enabled: {settings.pea_enabled} ({len(settings.pea_eligible_countries)} countries)")
@@ -79,6 +79,6 @@ async def root():
     """Redirect root to API docs."""
     return {
         "message": "Invest Solo API",
-        "version": "0.3.0",
+        "version": "0.4.0",
         "docs": "/api/docs",
     }

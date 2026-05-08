@@ -1,7 +1,9 @@
 """
-Invest Solo -- Watchlist API Router
-Add, remove, and view watchlist items with live enrichment.
+Invest Solo -- Watchlist API Router (M10)
+Add, remove, and view watchlist items with three-horizon scoring enrichment.
 """
+from __future__ import annotations
+
 from typing import Any, Dict
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,7 +19,12 @@ router = APIRouter(tags=["watchlist"])
 async def get_watchlist(
     svc: WatchlistService = Depends(get_watchlist_service),
 ) -> Dict[str, Any]:
-    """Return the full watchlist with live data and scoring."""
+    """Return the full watchlist with live data and three-horizon scoring.
+
+    All three horizon scores (score_lt, score_mt, score_st) are present on
+    every item. Use signal_lt / signal_mt / signal_st as appropriate for the
+    investment timeframe.
+    """
     return svc.get_watchlist()
 
 
@@ -48,7 +55,6 @@ async def refresh_watchlist(
     svc: WatchlistService = Depends(get_watchlist_service),
 ) -> Dict[str, Any]:
     """Force-refresh all live data for watchlist items."""
-    # Invalidate caches for all watchlist tickers
     items = svc._store.get_items()
     for item in items:
         svc._fetcher._cache.invalidate(f"ticker_{item['ticker']}")

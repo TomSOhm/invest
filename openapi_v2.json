@@ -1,0 +1,3532 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Invest Solo API",
+    "description": "Quantitative fundamental analysis API for PEA and Global investment strategies.",
+    "version": "0.4.0"
+  },
+  "paths": {
+    "/api/market/health": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Health Check",
+        "description": "Health check endpoint.",
+        "operationId": "health_check_api_market_health_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Health Check Api Market Health Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market/universe/pea": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get Pea Universe",
+        "description": "Return PEA-eligible tickers from the sample universe.",
+        "operationId": "get_pea_universe_api_market_universe_pea_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Pea Universe Api Market Universe Pea Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market/universe/global": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get Global Universe",
+        "description": "Return all tickers from the sample universe.",
+        "operationId": "get_global_universe_api_market_universe_global_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response Get Global Universe Api Market Universe Global Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/market/config": {
+      "get": {
+        "tags": [
+          "market"
+        ],
+        "summary": "Get Config",
+        "description": "Return scoring configuration: weights, signal thresholds, horizon\ndefinitions from settings.yaml, and the 9 M8 preset metadata dicts.",
+        "operationId": "get_config_api_market_config_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Get Config Api Market Config Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/": {
+      "get": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Get Portfolio",
+        "description": "Return the full portfolio with live data, three-horizon scoring, and P&L.\n\nAll three horizon scores (score_lt, score_mt, score_st) are present on\nevery position. The ``horizon`` param only affects which signal column is\nused for the summary's signal_distribution bucket.",
+        "operationId": "get_portfolio_api_portfolio__get",
+        "parameters": [
+          {
+            "name": "horizon",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Horizon for signal_distribution in summary: long_term | medium_term | short_term",
+              "default": "long_term",
+              "title": "Horizon"
+            },
+            "description": "Horizon for signal_distribution in summary: long_term | medium_term | short_term"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/positions": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Add Position",
+        "description": "Add a new position to the portfolio.",
+        "operationId": "add_position_api_portfolio_positions_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddPositionRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Add Position Api Portfolio Positions Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/positions/{position_id}": {
+      "put": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Update Position",
+        "description": "Update an existing position.",
+        "operationId": "update_position_api_portfolio_positions__position_id__put",
+        "parameters": [
+          {
+            "name": "position_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Position Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePositionRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Update Position Api Portfolio Positions  Position Id  Put"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Remove Position",
+        "description": "Remove a position from the portfolio.",
+        "operationId": "remove_position_api_portfolio_positions__position_id__delete",
+        "parameters": [
+          {
+            "name": "position_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Position Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Remove Position Api Portfolio Positions  Position Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/portfolio/refresh": {
+      "post": {
+        "tags": [
+          "portfolio"
+        ],
+        "summary": "Refresh Portfolio",
+        "description": "Force-refresh all live data for the portfolio.",
+        "operationId": "refresh_portfolio_api_portfolio_refresh_post",
+        "parameters": [
+          {
+            "name": "horizon",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "string",
+              "description": "Horizon for summary signal_distribution",
+              "default": "long_term",
+              "title": "Horizon"
+            },
+            "description": "Horizon for summary signal_distribution"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortfolioResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlist/": {
+      "get": {
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Get Watchlist",
+        "description": "Return the full watchlist with live data and three-horizon scoring.\n\nAll three horizon scores (score_lt, score_mt, score_st) are present on\nevery item. Use signal_lt / signal_mt / signal_st as appropriate for the\ninvestment timeframe.",
+        "operationId": "get_watchlist_api_watchlist__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistResponse"
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Add To Watchlist",
+        "description": "Add a ticker to the watchlist.",
+        "operationId": "add_to_watchlist_api_watchlist__post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AddWatchlistRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Add To Watchlist Api Watchlist  Post"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlist/{item_id}": {
+      "delete": {
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Remove From Watchlist",
+        "description": "Remove an item from the watchlist.",
+        "operationId": "remove_from_watchlist_api_watchlist__item_id__delete",
+        "parameters": [
+          {
+            "name": "item_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Item Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Remove From Watchlist Api Watchlist  Item Id  Delete"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/watchlist/refresh": {
+      "post": {
+        "tags": [
+          "watchlist"
+        ],
+        "summary": "Refresh Watchlist",
+        "description": "Force-refresh all live data for watchlist items.",
+        "operationId": "refresh_watchlist_api_watchlist_refresh_post",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchlistResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screener/run": {
+      "post": {
+        "tags": [
+          "screener"
+        ],
+        "summary": "Run Screen",
+        "description": "Run a horizon-aware custom screen.\n\nWhen ``preset`` is set in the request body, it takes precedence over\n``custom_filters``. Otherwise ``custom_filters`` (if provided) are\npassed directly to ``apply_filters``.",
+        "operationId": "run_screen_api_screener_run_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScreenerRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screener/presets": {
+      "get": {
+        "tags": [
+          "screener"
+        ],
+        "summary": "List Presets",
+        "description": "List all 9 M8 preset metadata dicts (name, horizon, description, recommended_account, pea_warning).",
+        "operationId": "list_presets_api_screener_presets_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "type": "array",
+                  "title": "Response List Presets Api Screener Presets Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screener/preset/{preset_name}": {
+      "post": {
+        "tags": [
+          "screener"
+        ],
+        "summary": "Run Preset",
+        "description": "Run a named M8 preset screen.\n\n``preset_name`` must be one of the 9 keys in PRESET_REGISTRY\n(e.g. ``LT_QUALITY_COMPOUNDER``, ``ST_MOMENTUM_QUALITY``).",
+        "operationId": "run_preset_api_screener_preset__preset_name__post",
+        "parameters": [
+          {
+            "name": "preset_name",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Preset Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PresetRunRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/screener/tickers": {
+      "post": {
+        "tags": [
+          "screener"
+        ],
+        "summary": "Score Ticker List",
+        "description": "Fetch and score a custom list of tickers (live data from yfinance).",
+        "operationId": "score_ticker_list_api_screener_tickers_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TickerListRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ScreenerResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/company/{ticker}": {
+      "get": {
+        "tags": [
+          "company"
+        ],
+        "summary": "Get Company Detail",
+        "description": "Full company detail: metrics, three-horizon scoring, DCF, quality,\nrisk, momentum signals, analyst ratings, and PEA eligibility.",
+        "operationId": "get_company_detail_api_company__ticker__get",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyDetail"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/company/{ticker}/metrics": {
+      "get": {
+        "tags": [
+          "company"
+        ],
+        "summary": "Get Company Metrics",
+        "description": "Raw financial metrics only (no scoring).",
+        "operationId": "get_company_metrics_api_company__ticker__metrics_get",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CompanyMetrics"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/company/{ticker}/horizons/{horizon}": {
+      "get": {
+        "tags": [
+          "company"
+        ],
+        "summary": "Get Company Horizon",
+        "description": "Single-horizon scoring view for a company.\n\nReturns the selected horizon's HorizonScoring block together with\nDCFValuation, QualitySignals, RiskSignals, and MomentumSignals so the\ncaller can fetch only the data relevant to a specific investment\ntimeframe without the full payload.\n\n``horizon`` must be one of: ``long_term``, ``medium_term``, ``short_term``.",
+        "operationId": "get_company_horizon_api_company__ticker__horizons__horizon__get",
+        "parameters": [
+          {
+            "name": "ticker",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Ticker"
+            }
+          },
+          {
+            "name": "horizon",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Horizon"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "additionalProperties": true,
+                  "title": "Response Get Company Horizon Api Company  Ticker  Horizons  Horizon  Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/": {
+      "get": {
+        "summary": "Root",
+        "description": "Redirect root to API docs.",
+        "operationId": "root__get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "AddPositionRequest": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ticker",
+            "description": "Stock ticker symbol (e.g. TTE.PA)"
+          },
+          "quantity": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Quantity",
+            "description": "Number of shares"
+          },
+          "buy_price": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "title": "Buy Price",
+            "description": "Average purchase price per share"
+          },
+          "buy_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Date",
+            "description": "Date of purchase (YYYY-MM-DD)"
+          },
+          "account_type": {
+            "type": "string",
+            "pattern": "^(pea|pea_pme|cto)$",
+            "title": "Account Type",
+            "description": "Account type: pea, pea_pme, or cto",
+            "default": "pea"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Free-text notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "quantity",
+          "buy_price"
+        ],
+        "title": "AddPositionRequest",
+        "description": "Request body for adding a new portfolio position."
+      },
+      "AddWatchlistRequest": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "minLength": 1,
+            "title": "Ticker",
+            "description": "Stock ticker symbol"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Free-text notes"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "AddWatchlistRequest",
+        "description": "Request body for adding a stock to the watchlist."
+      },
+      "AnalystRatings": {
+        "properties": {
+          "buy": {
+            "type": "integer",
+            "title": "Buy",
+            "default": 0
+          },
+          "hold": {
+            "type": "integer",
+            "title": "Hold",
+            "default": 0
+          },
+          "sell": {
+            "type": "integer",
+            "title": "Sell",
+            "default": 0
+          },
+          "strong_buy": {
+            "type": "integer",
+            "title": "Strong Buy",
+            "default": 0
+          },
+          "strong_sell": {
+            "type": "integer",
+            "title": "Strong Sell",
+            "default": 0
+          },
+          "target_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Low"
+          },
+          "target_mean": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Mean"
+          },
+          "target_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target High"
+          },
+          "target_median": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Median"
+          }
+        },
+        "type": "object",
+        "title": "AnalystRatings",
+        "description": "Analyst consensus ratings and price targets."
+      },
+      "CompanyDetail": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "pea_eligible": {
+            "type": "boolean",
+            "title": "Pea Eligible",
+            "default": false
+          },
+          "pea_pme_eligible": {
+            "type": "boolean",
+            "title": "Pea Pme Eligible",
+            "default": false
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "horizons": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/HorizonScoring"
+            },
+            "propertyNames": {
+              "enum": [
+                "long_term",
+                "medium_term",
+                "short_term"
+              ]
+            },
+            "type": "object",
+            "title": "Horizons",
+            "description": "Horizon-specific scores, signals, and gate states"
+          },
+          "sub_scores": {
+            "$ref": "#/components/schemas/SubScores",
+            "description": "Six legacy M3 sub-scores"
+          },
+          "valuation": {
+            "$ref": "#/components/schemas/DCFValuation",
+            "description": "M6 three-scenario DCF block"
+          },
+          "quality": {
+            "$ref": "#/components/schemas/QualitySignals",
+            "description": "Piotroski / Altman / Graham / M5 quality"
+          },
+          "risk": {
+            "$ref": "#/components/schemas/RiskSignals",
+            "description": "M5 risk signals + balance-sheet levers"
+          },
+          "momentum": {
+            "$ref": "#/components/schemas/MomentumSignals",
+            "description": "M9 price momentum and revision signals"
+          },
+          "metrics": {
+            "$ref": "#/components/schemas/CompanyMetrics",
+            "description": "Raw financial metrics (ratios, margins)"
+          },
+          "analyst_ratings": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnalystRatings"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "data_completeness": {
+            "type": "number",
+            "title": "Data Completeness",
+            "description": "Fraction of scoring inputs present 0-1",
+            "default": 0.0
+          },
+          "data_source": {
+            "type": "string",
+            "title": "Data Source",
+            "default": "yfinance"
+          },
+          "last_updated": {
+            "type": "string",
+            "title": "Last Updated",
+            "default": ""
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "name",
+          "horizons",
+          "sub_scores",
+          "valuation",
+          "quality",
+          "risk",
+          "momentum",
+          "metrics"
+        ],
+        "title": "CompanyDetail",
+        "description": "Full company detail response (M10 schema).\n\nAll scoring is exposed through the three-horizon block; legacy\ncomposite_score / signal fields have been removed."
+      },
+      "CompanyMetrics": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "default": ""
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "industry": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Industry"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "exchange": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Exchange"
+          },
+          "price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "enterprise_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Enterprise Value"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "forward_pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "ps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ps"
+          },
+          "pfcf": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pfcf"
+          },
+          "ev_ebitda": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ev Ebitda"
+          },
+          "ev_sales": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ev Sales"
+          },
+          "peg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peg"
+          },
+          "gross_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gross Margin"
+          },
+          "operating_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operating Margin"
+          },
+          "net_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Margin"
+          },
+          "fcf_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fcf Margin"
+          },
+          "roe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roe"
+          },
+          "roa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roa"
+          },
+          "roic": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roic"
+          },
+          "revenue_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Growth"
+          },
+          "current_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Ratio"
+          },
+          "debt_equity": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Debt Equity"
+          },
+          "interest_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interest Coverage"
+          },
+          "div_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Div Yield"
+          },
+          "payout_ratio": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Payout Ratio"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta"
+          },
+          "fifty_two_week_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fifty Two Week High"
+          },
+          "fifty_two_week_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fifty Two Week Low"
+          },
+          "fifty_two_week_high_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fifty Two Week High Pct"
+          },
+          "insider_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Insider Pct"
+          },
+          "institutional_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Institutional Pct"
+          },
+          "short_pct_float": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Short Pct Float"
+          },
+          "earnings_surprise_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earnings Surprise Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker"
+        ],
+        "title": "CompanyMetrics",
+        "description": "Raw financial metrics for a single company (no scoring)."
+      },
+      "DCFValuation": {
+        "properties": {
+          "fair_value_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value Low",
+            "description": "Pessimistic DCF intrinsic value"
+          },
+          "fair_value_mid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value Mid",
+            "description": "Base-case DCF intrinsic value"
+          },
+          "fair_value_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fair Value High",
+            "description": "Optimistic DCF intrinsic value"
+          },
+          "mos_low": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mos Low",
+            "description": "Margin of safety vs low case: (FV - price) / price"
+          },
+          "mos_mid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mos Mid",
+            "description": "Margin of safety vs base case: (FV - price) / price"
+          },
+          "mos_high": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mos High",
+            "description": "Margin of safety vs optimistic case: (FV - price) / price"
+          },
+          "wacc_used": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wacc Used",
+            "description": "WACC used in the base-case DCF"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Warnings",
+            "description": "DCF computation warnings (e.g. missing FCF)"
+          }
+        },
+        "type": "object",
+        "title": "DCFValuation",
+        "description": "Three-scenario DCF output (M6)."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "HorizonScoring": {
+        "properties": {
+          "score": {
+            "type": "number",
+            "title": "Score",
+            "description": "Composite score 0-100 for this horizon"
+          },
+          "signal": {
+            "type": "string",
+            "enum": [
+              "Strong Buy",
+              "Buy",
+              "Hold",
+              "Sell",
+              "Strong Sell"
+            ],
+            "title": "Signal",
+            "description": "Investment signal"
+          },
+          "passes_gates": {
+            "type": "boolean",
+            "title": "Passes Gates",
+            "description": "All investability gates satisfied"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blockers",
+            "description": "Names of failing gates when passes_gates is False"
+          },
+          "recommended_account": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "PEA",
+                  "CTO"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Account",
+            "description": "Recommended account type (CTO for ST presets)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "score",
+          "signal",
+          "passes_gates"
+        ],
+        "title": "HorizonScoring",
+        "description": "Score + signal + gate state for a single scoring horizon."
+      },
+      "MomentumSignals": {
+        "properties": {
+          "momentum_12_1": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Momentum 12 1",
+            "description": "12-minus-1 month price momentum (fraction)"
+          },
+          "rs_3m": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rs 3M",
+            "description": "3-month relative strength vs market index"
+          },
+          "above_50dma": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Above 50Dma",
+            "description": "Price above 50-day MA"
+          },
+          "above_200dma": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Above 200Dma",
+            "description": "Price above 200-day MA"
+          },
+          "golden_cross": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Golden Cross",
+            "description": "50dma above 200dma"
+          },
+          "volume_surge": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Volume Surge",
+            "description": "5-day average volume / 90-day average volume"
+          },
+          "eps_revision_30d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eps Revision 30D",
+            "description": "EPS consensus revision over the last 30 days (fraction)"
+          },
+          "eps_revision_90d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Eps Revision 90D",
+            "description": "EPS consensus revision over the last 90 days (fraction)"
+          },
+          "sue_z_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sue Z Score",
+            "description": "Standardised Unexpected Earnings z-score"
+          },
+          "sentiment_30d": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentiment 30D",
+            "description": "News sentiment score over 30 days (-1..+1)"
+          },
+          "sentiment_trend": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sentiment Trend",
+            "description": "Trend in sentiment (positive = improving)"
+          }
+        },
+        "type": "object",
+        "title": "MomentumSignals",
+        "description": "Price momentum and analyst revision signals (M9)."
+      },
+      "PortfolioPosition": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "account_type": {
+            "type": "string",
+            "title": "Account Type"
+          },
+          "quantity": {
+            "type": "number",
+            "title": "Quantity"
+          },
+          "buy_price": {
+            "type": "number",
+            "title": "Buy Price"
+          },
+          "buy_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Date"
+          },
+          "current_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Price"
+          },
+          "market_value": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Value"
+          },
+          "cost_basis": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cost Basis"
+          },
+          "gain_loss": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain Loss"
+          },
+          "gain_loss_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Gain Loss Pct"
+          },
+          "weight_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Weight Pct"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "ps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ps"
+          },
+          "roe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roe"
+          },
+          "roa": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roa"
+          },
+          "roic": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roic"
+          },
+          "operating_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Operating Margin"
+          },
+          "net_margin": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Margin"
+          },
+          "revenue_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Growth"
+          },
+          "div_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Div Yield"
+          },
+          "score_lt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Lt",
+            "description": "Long-term composite score 0-100"
+          },
+          "score_mt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Mt",
+            "description": "Medium-term composite score 0-100"
+          },
+          "score_st": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score St",
+            "description": "Short-term composite score 0-100"
+          },
+          "signal_lt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal Lt",
+            "description": "Long-term investment signal"
+          },
+          "signal_mt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal Mt",
+            "description": "Medium-term investment signal"
+          },
+          "signal_st": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal St",
+            "description": "Short-term investment signal"
+          },
+          "piotroski_f": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Piotroski F"
+          },
+          "altman_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Altman Z"
+          },
+          "graham_number": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graham Number"
+          },
+          "graham_mos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graham Mos"
+          },
+          "dcf_mos_mid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dcf Mos Mid"
+          },
+          "pea_eligible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pea Eligible"
+          },
+          "pea_pme_eligible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pea Pme Eligible"
+          },
+          "analyst_rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Rating"
+          },
+          "analyst_target_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Target Price"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "forward_pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Pe"
+          },
+          "peg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peg"
+          },
+          "fifty_two_week_high_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fifty Two Week High Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker",
+          "account_type",
+          "quantity",
+          "buy_price"
+        ],
+        "title": "PortfolioPosition",
+        "description": "A single enriched portfolio position with live data and three-horizon scoring."
+      },
+      "PortfolioResponse": {
+        "properties": {
+          "positions": {
+            "items": {
+              "$ref": "#/components/schemas/PortfolioPosition"
+            },
+            "type": "array",
+            "title": "Positions"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/PortfolioSummary"
+          },
+          "last_refreshed": {
+            "type": "string",
+            "title": "Last Refreshed"
+          },
+          "horizon": {
+            "type": "string",
+            "title": "Horizon",
+            "description": "Horizon used for signal_distribution",
+            "default": "long_term"
+          }
+        },
+        "type": "object",
+        "required": [
+          "positions",
+          "summary",
+          "last_refreshed"
+        ],
+        "title": "PortfolioResponse",
+        "description": "Full portfolio API response."
+      },
+      "PortfolioSummary": {
+        "properties": {
+          "total_value": {
+            "type": "number",
+            "title": "Total Value",
+            "default": 0.0
+          },
+          "total_cost": {
+            "type": "number",
+            "title": "Total Cost",
+            "default": 0.0
+          },
+          "total_gain_loss": {
+            "type": "number",
+            "title": "Total Gain Loss",
+            "default": 0.0
+          },
+          "total_gain_loss_pct": {
+            "type": "number",
+            "title": "Total Gain Loss Pct",
+            "default": 0.0
+          },
+          "position_count": {
+            "type": "integer",
+            "title": "Position Count",
+            "default": 0
+          },
+          "avg_score_lt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Score Lt",
+            "description": "Portfolio average long-term score"
+          },
+          "sector_allocation": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Sector Allocation"
+          },
+          "country_allocation": {
+            "additionalProperties": {
+              "type": "number"
+            },
+            "type": "object",
+            "title": "Country Allocation"
+          },
+          "signal_distribution": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Signal Distribution",
+            "description": "Signal counts for the long-term horizon"
+          },
+          "pea_value": {
+            "type": "number",
+            "title": "Pea Value",
+            "default": 0.0
+          },
+          "cto_value": {
+            "type": "number",
+            "title": "Cto Value",
+            "default": 0.0
+          }
+        },
+        "type": "object",
+        "title": "PortfolioSummary",
+        "description": "Aggregated summary of the entire portfolio."
+      },
+      "PresetRunRequest": {
+        "properties": {
+          "pea_only": {
+            "type": "boolean",
+            "title": "Pea Only",
+            "description": "Restrict to PEA-eligible stocks only",
+            "default": false
+          },
+          "top_n": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Top N",
+            "description": "Max results to return",
+            "default": 50
+          }
+        },
+        "type": "object",
+        "title": "PresetRunRequest",
+        "description": "Request body for running a preset screen."
+      },
+      "QualitySignals": {
+        "properties": {
+          "piotroski_f": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 9.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Piotroski F",
+            "description": "Piotroski F-Score 0-9"
+          },
+          "altman_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Altman Z",
+            "description": "Altman Z-Score (classic or Z'')"
+          },
+          "altman_zone": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "Safe",
+                  "Grey",
+                  "Distress"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Altman Zone",
+            "description": "Altman Z zone interpretation"
+          },
+          "graham_number": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graham Number",
+            "description": "Graham Number intrinsic value"
+          },
+          "graham_mos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graham Mos",
+            "description": "Graham margin of safety: (Graham_Number / price - 1) * 100"
+          },
+          "earnings_quality_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Earnings Quality Score",
+            "description": "Sector-relative earnings quality score 0-100 (M5)"
+          },
+          "moat_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Moat Score",
+            "description": "Sector-relative economic moat score 0-100 (M5)"
+          },
+          "m_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "M Score",
+            "description": "Beneish M-Score (< -1.78 = low risk)"
+          },
+          "sloan_accruals": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sloan Accruals",
+            "description": "Sloan accruals ratio"
+          },
+          "cash_conversion_ratio_5y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cash Conversion Ratio 5Y",
+            "description": "5-year average FCF / Net Income"
+          }
+        },
+        "type": "object",
+        "title": "QualitySignals",
+        "description": "Quality and earnings-integrity signals (M4/M5)."
+      },
+      "RiskSignals": {
+        "properties": {
+          "risk_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Risk Score",
+            "description": "Sector-relative risk score 0-100 (higher = safer) (M5)"
+          },
+          "realized_vol_1y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Realized Vol 1Y",
+            "description": "1-year annualised realised volatility"
+          },
+          "max_drawdown_3y": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Drawdown 3Y",
+            "description": "3-year maximum drawdown (negative fraction)"
+          },
+          "net_debt_ebitda": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Net Debt Ebitda",
+            "description": "Net Debt / EBITDA"
+          },
+          "interest_coverage": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Interest Coverage",
+            "description": "EBIT / Interest Expense"
+          },
+          "beta": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Beta",
+            "description": "Market beta (52-week)"
+          }
+        },
+        "type": "object",
+        "title": "RiskSignals",
+        "description": "Quantitative risk metrics (M5 Risk_Score_v2 + balance-sheet levers)."
+      },
+      "ScreenerRequest": {
+        "properties": {
+          "horizon": {
+            "type": "string",
+            "enum": [
+              "long_term",
+              "medium_term",
+              "short_term"
+            ],
+            "title": "Horizon",
+            "description": "Scoring horizon that drives sort order and gate filtering",
+            "default": "long_term"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset",
+            "description": "Named preset from PRESET_REGISTRY (overrides custom_filters when set)"
+          },
+          "custom_filters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Custom Filters",
+            "description": "Ad-hoc filter key-value pairs passed directly to apply_filters"
+          },
+          "pea_only": {
+            "type": "boolean",
+            "title": "Pea Only",
+            "description": "Restrict to PEA-eligible stocks only",
+            "default": false
+          },
+          "sort_by": {
+            "type": "string",
+            "title": "Sort By",
+            "description": "Column to sort by. 'score' maps to score_<horizon>. Other accepted values: 'pe', 'roe', 'market_cap', 'div_yield', 'revenue_growth', 'altman_z', 'piotroski_f'.",
+            "default": "score"
+          },
+          "sort_desc": {
+            "type": "boolean",
+            "title": "Sort Desc",
+            "description": "Sort descending",
+            "default": true
+          },
+          "limit": {
+            "type": "integer",
+            "maximum": 500.0,
+            "minimum": 1.0,
+            "title": "Limit",
+            "description": "Max results to return",
+            "default": 50
+          }
+        },
+        "type": "object",
+        "title": "ScreenerRequest",
+        "description": "Request body for running a custom horizon-aware screen."
+      },
+      "ScreenerResponse": {
+        "properties": {
+          "results": {
+            "items": {
+              "$ref": "#/components/schemas/ScreenerResultItem"
+            },
+            "type": "array",
+            "title": "Results"
+          },
+          "summary": {
+            "$ref": "#/components/schemas/ScreenerSummary"
+          }
+        },
+        "type": "object",
+        "required": [
+          "results",
+          "summary"
+        ],
+        "title": "ScreenerResponse",
+        "description": "Full screener API response."
+      },
+      "ScreenerResultItem": {
+        "properties": {
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "pea_eligible": {
+            "type": "boolean",
+            "title": "Pea Eligible",
+            "default": false
+          },
+          "score_lt": {
+            "type": "number",
+            "title": "Score Lt",
+            "description": "Long-term composite score 0-100"
+          },
+          "score_mt": {
+            "type": "number",
+            "title": "Score Mt",
+            "description": "Medium-term composite score 0-100"
+          },
+          "score_st": {
+            "type": "number",
+            "title": "Score St",
+            "description": "Short-term composite score 0-100"
+          },
+          "signal_lt": {
+            "type": "string",
+            "title": "Signal Lt",
+            "description": "Long-term investment signal"
+          },
+          "signal_mt": {
+            "type": "string",
+            "title": "Signal Mt",
+            "description": "Medium-term investment signal"
+          },
+          "signal_st": {
+            "type": "string",
+            "title": "Signal St",
+            "description": "Short-term investment signal"
+          },
+          "passes_gates_lt": {
+            "type": "boolean",
+            "title": "Passes Gates Lt",
+            "description": "All LT investability gates satisfied"
+          },
+          "passes_gates_mt": {
+            "type": "boolean",
+            "title": "Passes Gates Mt",
+            "description": "All MT investability gates satisfied"
+          },
+          "passes_gates_st": {
+            "type": "boolean",
+            "title": "Passes Gates St",
+            "description": "All ST investability gates satisfied"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "roe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roe"
+          },
+          "div_yield": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Div Yield"
+          },
+          "revenue_growth": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Revenue Growth"
+          },
+          "market_cap": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Market Cap"
+          },
+          "altman_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Altman Z"
+          },
+          "piotroski_f": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Piotroski F"
+          },
+          "dcf_mos_mid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dcf Mos Mid",
+            "description": "DCF mid-case margin of safety"
+          },
+          "recommended_account": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommended Account",
+            "description": "'CTO' for short-term presets; 'PEA' when preset is PEA-strict"
+          },
+          "blockers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Blockers",
+            "description": "Failing gate keys for the requested horizon"
+          }
+        },
+        "type": "object",
+        "required": [
+          "ticker",
+          "score_lt",
+          "score_mt",
+          "score_st",
+          "signal_lt",
+          "signal_mt",
+          "signal_st",
+          "passes_gates_lt",
+          "passes_gates_mt",
+          "passes_gates_st"
+        ],
+        "title": "ScreenerResultItem",
+        "description": "A single row returned by the screener."
+      },
+      "ScreenerSummary": {
+        "properties": {
+          "total_passed": {
+            "type": "integer",
+            "title": "Total Passed",
+            "description": "Rows that passed all filters",
+            "default": 0
+          },
+          "total_universe": {
+            "type": "integer",
+            "title": "Total Universe",
+            "description": "Rows in the input universe",
+            "default": 0
+          },
+          "avg_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Avg Score",
+            "description": "Mean score for the requested horizon"
+          },
+          "signal_distribution": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "type": "object",
+            "title": "Signal Distribution",
+            "description": "Count of each signal value for the requested horizon"
+          },
+          "horizon": {
+            "type": "string",
+            "title": "Horizon",
+            "description": "Horizon used for this run",
+            "default": "long_term"
+          }
+        },
+        "type": "object",
+        "title": "ScreenerSummary",
+        "description": "Aggregate statistics for the screener run."
+      },
+      "SubScores": {
+        "properties": {
+          "valuation": {
+            "type": "number",
+            "title": "Valuation",
+            "description": "Valuation sub-score 0-100"
+          },
+          "health": {
+            "type": "number",
+            "title": "Health",
+            "description": "Financial health sub-score 0-100"
+          },
+          "profitability": {
+            "type": "number",
+            "title": "Profitability",
+            "description": "Profitability sub-score 0-100"
+          },
+          "growth": {
+            "type": "number",
+            "title": "Growth",
+            "description": "Growth sub-score 0-100"
+          },
+          "shareholder": {
+            "type": "number",
+            "title": "Shareholder",
+            "description": "Shareholder return sub-score 0-100 (legacy Shareholder_Score)"
+          },
+          "risk_legacy": {
+            "type": "number",
+            "title": "Risk Legacy",
+            "description": "Legacy risk sub-score 0-100 (Risk_Score from M3, not Risk_Score_v2)"
+          }
+        },
+        "type": "object",
+        "required": [
+          "valuation",
+          "health",
+          "profitability",
+          "growth",
+          "shareholder",
+          "risk_legacy"
+        ],
+        "title": "SubScores",
+        "description": "Six legacy sub-scores produced by the M3 scoring engine."
+      },
+      "TickerListRequest": {
+        "properties": {
+          "tickers": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Tickers"
+          },
+          "horizon": {
+            "type": "string",
+            "title": "Horizon",
+            "description": "Horizon for sort order",
+            "default": "long_term"
+          }
+        },
+        "type": "object",
+        "required": [
+          "tickers"
+        ],
+        "title": "TickerListRequest",
+        "description": "Request body for scoring a custom list of tickers."
+      },
+      "UpdatePositionRequest": {
+        "properties": {
+          "quantity": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quantity",
+            "description": "Updated number of shares"
+          },
+          "buy_price": {
+            "anyOf": [
+              {
+                "type": "number",
+                "exclusiveMinimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Price",
+            "description": "Updated average purchase price"
+          },
+          "buy_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Buy Date",
+            "description": "Updated purchase date (YYYY-MM-DD)"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes",
+            "description": "Updated notes"
+          }
+        },
+        "type": "object",
+        "title": "UpdatePositionRequest",
+        "description": "Request body for updating an existing portfolio position."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": [
+          "loc",
+          "msg",
+          "type"
+        ],
+        "title": "ValidationError"
+      },
+      "WatchlistItem": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "ticker": {
+            "type": "string",
+            "title": "Ticker"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "sector": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sector"
+          },
+          "country": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Country"
+          },
+          "added_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added Date"
+          },
+          "notes": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notes"
+          },
+          "current_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Price"
+          },
+          "pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pe"
+          },
+          "pb": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pb"
+          },
+          "roe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Roe"
+          },
+          "score_lt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Lt",
+            "description": "Long-term composite score 0-100"
+          },
+          "score_mt": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Mt",
+            "description": "Medium-term composite score 0-100"
+          },
+          "score_st": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score St",
+            "description": "Short-term composite score 0-100"
+          },
+          "signal_lt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal Lt",
+            "description": "Long-term investment signal"
+          },
+          "signal_mt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal Mt",
+            "description": "Medium-term investment signal"
+          },
+          "signal_st": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Signal St",
+            "description": "Short-term investment signal"
+          },
+          "piotroski_f": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Piotroski F"
+          },
+          "altman_z": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Altman Z"
+          },
+          "graham_number": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graham Number"
+          },
+          "graham_mos": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Graham Mos"
+          },
+          "dcf_mos_mid": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dcf Mos Mid"
+          },
+          "pea_eligible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pea Eligible"
+          },
+          "pea_pme_eligible": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pea Pme Eligible"
+          },
+          "analyst_rating": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Rating"
+          },
+          "analyst_target_price": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Analyst Target Price"
+          },
+          "forward_pe": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Forward Pe"
+          },
+          "peg": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Peg"
+          },
+          "fifty_two_week_high_pct": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fifty Two Week High Pct"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "ticker"
+        ],
+        "title": "WatchlistItem",
+        "description": "A single enriched watchlist entry with live data and three-horizon scoring."
+      },
+      "WatchlistResponse": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/WatchlistItem"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "last_refreshed": {
+            "type": "string",
+            "title": "Last Refreshed"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "last_refreshed"
+        ],
+        "title": "WatchlistResponse",
+        "description": "Full watchlist API response."
+      }
+    }
+  }
+}

@@ -1,7 +1,14 @@
 """
-Invest Solo -- Company Service
-Fetches, scores, and enriches data for individual companies.
+Invest Solo -- Company Service (M10)
+Fetches, scores, and assembles the CompanyDetail response.
+
+Key changes vs M9:
+- Returns three-horizon block + DCF + quality + risk + momentum sub-models
+- Legacy composite_score / signal removed from response
+- Uses 1-row DataFrame through score_universe to get M7 horizon columns
 """
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
@@ -22,7 +29,9 @@ class CompanyService:
 
     def get_detail(self, ticker: str) -> Dict[str, Any]:
         """
-        Full company detail: metrics + scoring + analyst ratings + PEA status.
+        Full company detail: metrics + three-horizon scoring + DCF + quality
+        + risk + momentum blocks + analyst ratings + PEA status.
+
         Returns a dict matching CompanyDetail schema.
         """
         data = self._fetcher.fetch_single(ticker)
@@ -32,10 +41,11 @@ class CompanyService:
 
         current_price = self._num(data.get("Price"))
         high_52 = self._num(data.get("FiftyTwoWeekHigh"))
-        fifty_two_pct = None
+        fifty_two_pct: Optional[float] = None
         if current_price and high_52 and high_52 > 0:
             fifty_two_pct = round((current_price / high_52 - 1) * 100, 1)
 
+        # --- Raw metrics ---
         metrics = {
             "ticker": ticker,
             "name": data.get("Name") or ticker,
@@ -74,44 +84,84 @@ class CompanyService:
             "insider_pct": self._num(data.get("InsiderPct")),
             "institutional_pct": self._num(data.get("InstitutionalPct")),
             "short_pct_float": self._num(data.get("ShortPctFloat")),
-            "earnings_surprise_pct": None,  # Not directly available from yfinance .info
+            "earnings_surprise_pct": None,
         }
 
-        scoring_breakdown = {
-            "composite_score": scoring.get("composite_score"),
-            "signal": scoring.get("signal"),
-            "valuation_score": scoring.get("valuation_score"),
-            "health_score": scoring.get("health_score"),
-            "profitability_score": scoring.get("profitability_score"),
-            "growth_score": scoring.get("growth_score"),
-            "shareholder_score": scoring.get("shareholder_score"),
-            "risk_score": scoring.get("risk_score"),
+        # --- Sub-scores ---
+        sub_scores = {
+            "valuation": scoring.get("valuation_score") or 50.0,
+            "health": scoring.get("health_score") or 50.0,
+            "profitability": scoring.get("profitability_score") or 50.0,
+            "growth": scoring.get("growth_score") or 50.0,
+            "shareholder": scoring.get("shareholder_score") or 50.0,
+            "risk_legacy": scoring.get("risk_score") or 50.0,
+        }
+
+        # --- Quality signals ---
+        quality = {
             "piotroski_f": scoring.get("piotroski_f"),
             "altman_z": scoring.get("altman_z"),
+            "altman_zone": scoring.get("altman_zone"),
             "graham_number": scoring.get("graham_number"),
             "graham_mos": scoring.get("graham_mos"),
-            "scoring_weights": self._scorer.get_weights(),
+            "earnings_quality_score": scoring.get("earnings_quality_score"),
+            "moat_score": scoring.get("moat_score"),
+            "m_score": scoring.get("m_score"),
+            "sloan_accruals": scoring.get("sloan_accruals"),
+            "cash_conversion_ratio_5y": scoring.get("cash_conversion_ratio_5y"),
         }
 
         return {
-            "metrics": metrics,
-            "scoring": scoring_breakdown,
-            "analyst": analyst,
+            "ticker": ticker,
+            "name": data.get("Name") or ticker,
+            "sector": data.get("Sector") or None,
+            "industry": data.get("Industry") or None,
+            "country": data.get("Country") or None,
+            "exchange": data.get("Exchange") or None,
             "pea_eligible": bool(data.get("PEA", False)),
             "pea_pme_eligible": bool(data.get("PEA_PME", False)),
+            "price": current_price,
+            "market_cap": self._num(data.get("MarketCap")),
+            "horizons": scoring.get("horizons", {}),
+            "sub_scores": sub_scores,
+            "valuation": scoring.get("dcf", {}),
+            "quality": quality,
+            "risk": scoring.get("risk", {}),
+            "momentum": scoring.get("momentum", {}),
+            "metrics": metrics,
+            "analyst_ratings": analyst,
+            "data_completeness": scoring.get("data_completeness", 0.0),
             "data_source": "yfinance",
             "last_updated": datetime.now(timezone.utc).isoformat(),
         }
 
     def get_metrics(self, ticker: str) -> Dict[str, Any]:
-        """Return only the metrics portion of company detail."""
+        """Return only the raw metrics portion of company detail."""
         detail = self.get_detail(ticker)
         return detail["metrics"]
 
-    def get_scoring(self, ticker: str) -> Dict[str, Any]:
-        """Return only the scoring breakdown for a ticker."""
+    def get_horizon(self, ticker: str, horizon: str) -> Dict[str, Any]:
+        """
+        Return the selected horizon's scoring block plus DCF valuation.
+
+        Parameters
+        ----------
+        ticker : str
+        horizon : str
+            "long_term" | "medium_term" | "short_term"
+        """
         detail = self.get_detail(ticker)
-        return detail["scoring"]
+        horizons_block = detail.get("horizons", {})
+        horizon_data = horizons_block.get(horizon, {})
+        return {
+            "ticker": ticker,
+            "horizon": horizon,
+            "scoring": horizon_data,
+            "valuation": detail.get("valuation", {}),
+            "quality": detail.get("quality", {}),
+            "risk": detail.get("risk", {}),
+            "momentum": detail.get("momentum", {}),
+        }
 
     @staticmethod
     def _num(value: Any) -> Optional[float]:

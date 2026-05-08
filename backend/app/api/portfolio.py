@@ -1,10 +1,16 @@
 """
-Invest Solo -- Portfolio API Router
+Invest Solo -- Portfolio API Router (M10)
 CRUD operations and live-data refresh for portfolio positions.
+
+?horizon= query param selects which scoring horizon drives signal_distribution
+in the summary (default: long_term). All three horizon scores are always
+present on every PortfolioPosition regardless of the horizon param.
 """
+from __future__ import annotations
+
 from typing import Any, Dict
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.app.dependencies import get_portfolio_service
 from backend.app.models.portfolio import (
@@ -16,13 +22,30 @@ from backend.app.services.portfolio_service import PortfolioService
 
 router = APIRouter(tags=["portfolio"])
 
+_VALID_HORIZONS = {"long_term", "medium_term", "short_term"}
+
 
 @router.get("/", response_model=PortfolioResponse)
 async def get_portfolio(
+    horizon: str = Query(
+        "long_term",
+        description="Horizon for signal_distribution in summary: long_term | medium_term | short_term",
+    ),
     svc: PortfolioService = Depends(get_portfolio_service),
 ) -> Dict[str, Any]:
-    """Return the full portfolio with live data and scoring."""
-    return svc.get_portfolio()
+    """Return the full portfolio with live data, three-horizon scoring, and P&L.
+
+    All three horizon scores (score_lt, score_mt, score_st) are present on
+    every position. The ``horizon`` param only affects which signal column is
+    used for the summary's signal_distribution bucket.
+    """
+    if horizon not in _VALID_HORIZONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid horizon '{horizon}'. "
+                   f"Must be one of: {sorted(_VALID_HORIZONS)}",
+        )
+    return svc.get_portfolio(horizon=horizon)
 
 
 @router.post("/positions")
@@ -62,7 +85,14 @@ async def remove_position(
 
 @router.post("/refresh", response_model=PortfolioResponse)
 async def refresh_portfolio(
+    horizon: str = Query("long_term", description="Horizon for summary signal_distribution"),
     svc: PortfolioService = Depends(get_portfolio_service),
 ) -> Dict[str, Any]:
     """Force-refresh all live data for the portfolio."""
-    return svc.refresh()
+    if horizon not in _VALID_HORIZONS:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid horizon '{horizon}'. "
+                   f"Must be one of: {sorted(_VALID_HORIZONS)}",
+        )
+    return svc.refresh(horizon=horizon)

@@ -1,9 +1,21 @@
 """
-Invest Solo -- Portfolio Pydantic models.
+Invest Solo -- Portfolio Pydantic models (M10 schema).
+
+Breaking change: composite_score / signal removed.
+Replaced by score_lt / signal_lt (LT default). Use ?horizon= query param
+on the endpoint to select a different view (served via enriched dict, not
+model field rename — the model always exposes the full trio).
 """
+from __future__ import annotations
+
 from typing import Dict, List, Optional
 
 from pydantic import BaseModel, Field
+
+
+# ---------------------------------------------------------------------------
+# CRUD request models (unchanged from M9)
+# ---------------------------------------------------------------------------
 
 
 class AddPositionRequest(BaseModel):
@@ -30,8 +42,13 @@ class UpdatePositionRequest(BaseModel):
     notes: Optional[str] = Field(None, description="Updated notes")
 
 
+# ---------------------------------------------------------------------------
+# Position
+# ---------------------------------------------------------------------------
+
+
 class PortfolioPosition(BaseModel):
-    """A single enriched portfolio position with live data and scoring."""
+    """A single enriched portfolio position with live data and three-horizon scoring."""
 
     id: str
     ticker: str
@@ -49,7 +66,7 @@ class PortfolioPosition(BaseModel):
     gain_loss_pct: Optional[float] = None
     weight_pct: Optional[float] = None
 
-    # Valuation ratios
+    # Key valuation ratios
     pe: Optional[float] = None
     pb: Optional[float] = None
     ps: Optional[float] = None
@@ -61,31 +78,39 @@ class PortfolioPosition(BaseModel):
     revenue_growth: Optional[float] = None
     div_yield: Optional[float] = None
 
-    # Scoring
-    composite_score: Optional[float] = None
-    signal: Optional[str] = None
+    # Three-horizon scoring (LT is the default portfolio view)
+    score_lt: Optional[float] = Field(None, description="Long-term composite score 0-100")
+    score_mt: Optional[float] = Field(None, description="Medium-term composite score 0-100")
+    score_st: Optional[float] = Field(None, description="Short-term composite score 0-100")
+    signal_lt: Optional[str] = Field(None, description="Long-term investment signal")
+    signal_mt: Optional[str] = Field(None, description="Medium-term investment signal")
+    signal_st: Optional[str] = Field(None, description="Short-term investment signal")
+
+    # Quality indicators
     piotroski_f: Optional[int] = None
     altman_z: Optional[float] = None
     graham_number: Optional[float] = None
     graham_mos: Optional[float] = None
-    valuation_score: Optional[float] = None
-    health_score: Optional[float] = None
-    profitability_score: Optional[float] = None
-    growth_score: Optional[float] = None
-    shareholder_score: Optional[float] = None
-    risk_score: Optional[float] = None
+    dcf_mos_mid: Optional[float] = None
 
     # PEA
     pea_eligible: Optional[bool] = None
     pea_pme_eligible: Optional[bool] = None
 
+    # Analyst
+    analyst_rating: Optional[str] = None
+    analyst_target_price: Optional[float] = None
+
     # Extra
     notes: Optional[str] = None
     forward_pe: Optional[float] = None
     peg: Optional[float] = None
-    analyst_rating: Optional[str] = None
-    analyst_target_price: Optional[float] = None
     fifty_two_week_high_pct: Optional[float] = None
+
+
+# ---------------------------------------------------------------------------
+# Summary
+# ---------------------------------------------------------------------------
 
 
 class PortfolioSummary(BaseModel):
@@ -96,12 +121,22 @@ class PortfolioSummary(BaseModel):
     total_gain_loss: float = 0.0
     total_gain_loss_pct: float = 0.0
     position_count: int = 0
-    avg_composite_score: Optional[float] = None
+    avg_score_lt: Optional[float] = Field(
+        None, description="Portfolio average long-term score"
+    )
     sector_allocation: Dict[str, float] = Field(default_factory=dict)
     country_allocation: Dict[str, float] = Field(default_factory=dict)
-    signal_distribution: Dict[str, int] = Field(default_factory=dict)
+    signal_distribution: Dict[str, int] = Field(
+        default_factory=dict,
+        description="Signal counts for the long-term horizon",
+    )
     pea_value: float = 0.0
     cto_value: float = 0.0
+
+
+# ---------------------------------------------------------------------------
+# Response
+# ---------------------------------------------------------------------------
 
 
 class PortfolioResponse(BaseModel):
@@ -110,3 +145,4 @@ class PortfolioResponse(BaseModel):
     positions: List[PortfolioPosition]
     summary: PortfolioSummary
     last_refreshed: str
+    horizon: str = Field("long_term", description="Horizon used for signal_distribution")

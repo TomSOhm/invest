@@ -1,15 +1,33 @@
 """
-Invest Solo -- Company detail Pydantic models.
+Invest Solo -- Company detail Pydantic models (M10 schema).
+
+Breaking change: legacy composite_score / signal / ScoringBreakdown fields
+are removed. Replaced by the three-horizon block + quality/risk/momentum
+sub-models from horizons.py.
 """
-from typing import Optional
+from __future__ import annotations
+
+from typing import Dict, Literal, Optional
 
 from pydantic import BaseModel, Field
 
-from backend.app.models.common import ScoringBreakdown
+from backend.app.models.horizons import (
+    DCFValuation,
+    HorizonScoring,
+    MomentumSignals,
+    QualitySignals,
+    RiskSignals,
+    SubScores,
+)
+
+
+# ---------------------------------------------------------------------------
+# Analyst ratings
+# ---------------------------------------------------------------------------
 
 
 class AnalystRatings(BaseModel):
-    """Analyst consensus data."""
+    """Analyst consensus ratings and price targets."""
 
     buy: int = 0
     hold: int = 0
@@ -22,8 +40,13 @@ class AnalystRatings(BaseModel):
     target_median: Optional[float] = None
 
 
+# ---------------------------------------------------------------------------
+# Raw financial metrics
+# ---------------------------------------------------------------------------
+
+
 class CompanyMetrics(BaseModel):
-    """Comprehensive financial metrics for a single company."""
+    """Raw financial metrics for a single company (no scoring)."""
 
     ticker: str
     name: str = ""
@@ -81,13 +104,45 @@ class CompanyMetrics(BaseModel):
     earnings_surprise_pct: Optional[float] = None
 
 
-class CompanyDetail(BaseModel):
-    """Full company detail response."""
+# ---------------------------------------------------------------------------
+# Full company detail
+# ---------------------------------------------------------------------------
 
-    metrics: CompanyMetrics
-    scoring: ScoringBreakdown
-    analyst: Optional[AnalystRatings] = None
+
+class CompanyDetail(BaseModel):
+    """Full company detail response (M10 schema).
+
+    All scoring is exposed through the three-horizon block; legacy
+    composite_score / signal fields have been removed.
+    """
+
+    ticker: str
+    name: str
+    sector: Optional[str] = None
+    industry: Optional[str] = None
+    country: Optional[str] = None
+    exchange: Optional[str] = None
     pea_eligible: bool = False
     pea_pme_eligible: bool = False
+
+    price: Optional[float] = None
+    market_cap: Optional[float] = None
+
+    # Three-horizon scoring (long_term / medium_term / short_term)
+    horizons: Dict[
+        Literal["long_term", "medium_term", "short_term"],
+        HorizonScoring,
+    ] = Field(..., description="Horizon-specific scores, signals, and gate states")
+
+    sub_scores: SubScores = Field(..., description="Six legacy M3 sub-scores")
+    valuation: DCFValuation = Field(..., description="M6 three-scenario DCF block")
+    quality: QualitySignals = Field(..., description="Piotroski / Altman / Graham / M5 quality")
+    risk: RiskSignals = Field(..., description="M5 risk signals + balance-sheet levers")
+    momentum: MomentumSignals = Field(..., description="M9 price momentum and revision signals")
+
+    metrics: CompanyMetrics = Field(..., description="Raw financial metrics (ratios, margins)")
+    analyst_ratings: Optional[AnalystRatings] = None
+    data_completeness: float = Field(0.0, description="Fraction of scoring inputs present 0-1")
+
     data_source: str = "yfinance"
     last_updated: str = ""

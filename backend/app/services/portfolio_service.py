@@ -1,7 +1,15 @@
 """
-Invest Solo -- Portfolio Service
-Enriches stored positions with live data, scoring, and P&L calculations.
+Invest Solo -- Portfolio Service (M10)
+Enriches stored positions with live data, three-horizon scoring, and P&L.
+
+Key changes vs M9:
+- composite_score / signal replaced by score_lt/mt/st + signal_lt/mt/st
+- avg_composite_score in summary replaced by avg_score_lt
+- signal_distribution uses LT signals by default
+- horizon param passed through get_portfolio for optional view selection
 """
+from __future__ import annotations
+
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
@@ -31,9 +39,16 @@ class PortfolioService:
         self._fetcher = fetcher
         self._scorer = scorer
 
-    def get_portfolio(self) -> Dict[str, Any]:
+    def get_portfolio(self, horizon: str = "long_term") -> Dict[str, Any]:
         """
         Load all positions, enrich with live data and scoring, compute P&L.
+
+        Parameters
+        ----------
+        horizon : str
+            "long_term" | "medium_term" | "short_term". Determines which
+            signal column drives signal_distribution in the summary.
+
         Returns a dict matching PortfolioResponse schema.
         """
         raw_positions = self._store.get_positions()
@@ -42,6 +57,7 @@ class PortfolioService:
                 "positions": [],
                 "summary": self._empty_summary(),
                 "last_refreshed": datetime.now(timezone.utc).isoformat(),
+                "horizon": horizon,
             }
 
         tickers = list({p["ticker"] for p in raw_positions})
@@ -77,19 +93,22 @@ class PortfolioService:
             cost_basis = quantity * buy_price
             market_value = quantity * current_price if current_price else None
             gain_loss = (market_value - cost_basis) if market_value is not None else None
-            gain_loss_pct = (gain_loss / cost_basis * 100) if gain_loss is not None and cost_basis > 0 else None
+            gain_loss_pct = (
+                (gain_loss / cost_basis * 100) if gain_loss is not None and cost_basis > 0 else None
+            )
 
-            # 52-week high %
             high_52 = self._num(ld.get("FiftyTwoWeekHigh"))
-            fifty_two_pct = None
+            fifty_two_pct: Optional[float] = None
             if current_price and high_52 and high_52 > 0:
                 fifty_two_pct = round((current_price / high_52 - 1) * 100, 1)
 
-            # Analyst summary
-            analyst_rating = None
-            analyst_target = None
+            analyst_rating: Optional[str] = None
+            analyst_target: Optional[float] = None
             if an:
-                total = an.get("buy", 0) + an.get("hold", 0) + an.get("sell", 0) + an.get("strong_buy", 0) + an.get("strong_sell", 0)
+                total = (
+                    an.get("buy", 0) + an.get("hold", 0) + an.get("sell", 0)
+                    + an.get("strong_buy", 0) + an.get("strong_sell", 0)
+                )
                 if total > 0:
                     buys = an.get("strong_buy", 0) + an.get("buy", 0)
                     sells = an.get("sell", 0) + an.get("strong_sell", 0)
@@ -100,6 +119,12 @@ class PortfolioService:
                     else:
                         analyst_rating = "Hold"
                 analyst_target = an.get("target_mean")
+
+            # Extract horizon scores
+            h = sc.get("horizons", {})
+            lt = h.get("long_term", {})
+            mt = h.get("medium_term", {})
+            st = h.get("short_term", {})
 
             enriched.append({
                 "id": pos["id"],
@@ -127,20 +152,23 @@ class PortfolioService:
                 "net_margin": self._num(ld.get("NetMargin")),
                 "revenue_growth": self._num(ld.get("RevenueGrowth")),
                 "div_yield": self._num(ld.get("DivYield")),
-                "composite_score": sc.get("composite_score"),
-                "signal": sc.get("signal"),
+                # Three-horizon scoring
+                "score_lt": lt.get("score"),
+                "score_mt": mt.get("score"),
+                "score_st": st.get("score"),
+                "signal_lt": lt.get("signal"),
+                "signal_mt": mt.get("signal"),
+                "signal_st": st.get("signal"),
+                # Quality
                 "piotroski_f": sc.get("piotroski_f"),
                 "altman_z": sc.get("altman_z"),
                 "graham_number": sc.get("graham_number"),
                 "graham_mos": sc.get("graham_mos"),
-                "valuation_score": sc.get("valuation_score"),
-                "health_score": sc.get("health_score"),
-                "profitability_score": sc.get("profitability_score"),
-                "growth_score": sc.get("growth_score"),
-                "shareholder_score": sc.get("shareholder_score"),
-                "risk_score": sc.get("risk_score"),
+                "dcf_mos_mid": sc.get("dcf", {}).get("mos_mid"),
+                # PEA
                 "pea_eligible": bool(ld.get("PEA", False)),
                 "pea_pme_eligible": bool(ld.get("PEA_PME", False)),
+                # Extra
                 "notes": pos.get("notes"),
                 "forward_pe": self._num(ld.get("ForwardPE")),
                 "peg": self._num(ld.get("PEG")),
@@ -156,12 +184,13 @@ class PortfolioService:
                 if p["market_value"] is not None:
                     p["weight_pct"] = round(p["market_value"] / total_value * 100, 2)
 
-        summary = self._compute_summary(enriched)
+        summary = self._compute_summary(enriched, horizon=horizon)
 
         return {
             "positions": enriched,
             "summary": summary,
             "last_refreshed": datetime.now(timezone.utc).isoformat(),
+            "horizon": horizon,
         }
 
     def add_position(self, req: AddPositionRequest) -> Dict[str, Any]:
@@ -175,7 +204,9 @@ class PortfolioService:
             notes=req.notes,
         )
 
-    def update_position(self, position_id: str, req: UpdatePositionRequest) -> Optional[Dict[str, Any]]:
+    def update_position(
+        self, position_id: str, req: UpdatePositionRequest
+    ) -> Optional[Dict[str, Any]]:
         """Update a position in the store."""
         updates = req.model_dump(exclude_none=True)
         return self._store.update_position(position_id, updates)
@@ -184,18 +215,19 @@ class PortfolioService:
         """Remove a position by id."""
         return self._store.remove_position(position_id)
 
-    def refresh(self) -> Dict[str, Any]:
+    def refresh(self, horizon: str = "long_term") -> Dict[str, Any]:
         """Force-refresh by invalidating caches and re-fetching."""
-        # Invalidate cache for all tickers in the portfolio
         positions = self._store.get_positions()
         tickers = {p["ticker"] for p in positions}
         for ticker in tickers:
             self._fetcher._cache.invalidate(f"ticker_{ticker}")
-        return self.get_portfolio()
+        return self.get_portfolio(horizon=horizon)
 
     # -- private helpers --
 
-    def _compute_summary(self, positions: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def _compute_summary(
+        self, positions: List[Dict[str, Any]], horizon: str = "long_term"
+    ) -> Dict[str, Any]:
         """Aggregate portfolio statistics."""
         if not positions:
             return self._empty_summary()
@@ -205,11 +237,17 @@ class PortfolioService:
         total_gl = total_value - total_cost
         total_gl_pct = (total_gl / total_cost * 100) if total_cost > 0 else 0.0
 
-        # Scores
-        scores = [p["composite_score"] for p in positions if p["composite_score"] is not None]
-        avg_score = round(np.mean(scores), 1) if scores else None
+        # LT scores for portfolio average
+        scores_lt = [p["score_lt"] for p in positions if p.get("score_lt") is not None]
+        avg_score_lt = round(np.mean(scores_lt), 1) if scores_lt else None
 
-        # Sector allocation
+        # Signal distribution uses the selected horizon
+        signal_key = {
+            "long_term": "signal_lt",
+            "medium_term": "signal_mt",
+            "short_term": "signal_st",
+        }.get(horizon, "signal_lt")
+
         sector_alloc: Dict[str, float] = {}
         country_alloc: Dict[str, float] = {}
         signal_dist: Dict[str, int] = {}
@@ -220,7 +258,7 @@ class PortfolioService:
             mv = p["market_value"] or 0
             sector = p.get("sector") or "Unknown"
             country = p.get("country") or "Unknown"
-            signal = p.get("signal") or "N/A"
+            signal = p.get(signal_key) or "N/A"
             account = p.get("account_type", "pea")
 
             sector_alloc[sector] = sector_alloc.get(sector, 0) + mv
@@ -232,7 +270,6 @@ class PortfolioService:
             else:
                 cto_value += mv
 
-        # Convert allocations to percentages
         if total_value > 0:
             sector_alloc = {k: round(v / total_value * 100, 1) for k, v in sector_alloc.items()}
             country_alloc = {k: round(v / total_value * 100, 1) for k, v in country_alloc.items()}
@@ -243,7 +280,7 @@ class PortfolioService:
             "total_gain_loss": round(total_gl, 2),
             "total_gain_loss_pct": round(total_gl_pct, 2),
             "position_count": len(positions),
-            "avg_composite_score": avg_score,
+            "avg_score_lt": avg_score_lt,
             "sector_allocation": sector_alloc,
             "country_allocation": country_alloc,
             "signal_distribution": signal_dist,
@@ -259,7 +296,7 @@ class PortfolioService:
             "total_gain_loss": 0.0,
             "total_gain_loss_pct": 0.0,
             "position_count": 0,
-            "avg_composite_score": None,
+            "avg_score_lt": None,
             "sector_allocation": {},
             "country_allocation": {},
             "signal_distribution": {},
