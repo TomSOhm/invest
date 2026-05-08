@@ -4,6 +4,10 @@
 
 # Claude Code configuration (personal tooling)
 .claude/
+.claire/
+
+# Stray root-level npm lockfile (project uses bun in frontend/)
+/package-lock.json
 
 # Environment & secrets
 .env
