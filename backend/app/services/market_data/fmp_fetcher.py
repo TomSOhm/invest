@@ -589,7 +589,11 @@ class FMPDataFetcher:
         result = [
             {
                 "title": item.get("title", ""),
+                # M9: sentiment module reads `text` first; fall back to title content.
+                "text": item.get("text", "") or item.get("title", ""),
+                # Keep both `publishedAt` (M2 contract) and `published_date` (M9 spec).
                 "publishedAt": item.get("publishedDate", ""),
+                "published_date": item.get("publishedDate", ""),
                 "source": item.get("site", ""),
                 "url": item.get("url", ""),
             }

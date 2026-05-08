@@ -436,8 +436,27 @@ def data_completeness(row: pd.Series) -> float:
     return round(present / len(_SCORING_INPUT_FIELDS), 2)
 
 
-def score_universe(df: pd.DataFrame) -> pd.DataFrame:
-    """Score entire universe and add all analytical columns."""
+def score_universe(
+    df: pd.DataFrame,
+    price_history_map: Optional[Dict[str, pd.DataFrame]] = None,
+    market_history: Optional[pd.DataFrame] = None,
+    news_map: Optional[Dict[str, List[Dict[str, Any]]]] = None,
+    estimates_map: Optional[Dict[str, pd.DataFrame]] = None,
+    surprises_map: Optional[Dict[str, Dict[str, Any]]] = None,
+) -> pd.DataFrame:
+    """Score entire universe and add all analytical columns.
+
+    Optional M9 inputs (default None -> module behaves exactly like pre-M9):
+        price_history_map: {ticker: OHLCV DataFrame} for momentum signals
+        market_history:    benchmark OHLCV (^FCHI for PEA, ^GSPC for global)
+        news_map:          {ticker: [{title, publishedAt, ...}, ...]}
+        estimates_map:     {ticker: FMP analyst-estimates DataFrame}
+        surprises_map:     {ticker: {reported_eps, expected_eps, prior_surprises_std}}
+
+    The composite score IS NOT modified by M9 -- M7 owns that integration
+    once the three-horizon composite lands. M9 only attaches the new column
+    blocks so M8 can read them.
+    """
     results = []
     for ticker, row in df.iterrows():
         scores = compute_composite_score(row)
@@ -469,4 +488,19 @@ def score_universe(df: pd.DataFrame) -> pd.DataFrame:
         np.nan
     )
     merged["Graham_MoS"] = merged["Graham_MoS"].round(1)
+
+    # ---- M9: optional momentum / revisions / sentiment column blocks ----
+    if price_history_map:
+        from src.analysis.momentum import momentum_signals_df
+        mom_df = momentum_signals_df(price_history_map, market_history)
+        merged = merged.join(mom_df, how="left")
+    if estimates_map:
+        from src.analysis.revisions import revisions_signals_df
+        rev_df = revisions_signals_df(estimates_map, surprises_map)
+        merged = merged.join(rev_df, how="left")
+    if news_map:
+        from src.analysis.sentiment import sentiment_signals_df
+        sent_df = sentiment_signals_df(news_map)
+        merged = merged.join(sent_df, how="left")
+
     return merged.sort_values("Composite_Score", ascending=False)
