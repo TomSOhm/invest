@@ -1,0 +1,14 @@
+{
+  "Altman_Z": "NaN",
+  "Composite_Score": 50.0,
+  "Graham_MoS": "NaN",
+  "Graham_Number": "NaN",
+  "Growth_Score": 50.0,
+  "Health_Score": 50.0,
+  "Piotroski_F": 1,
+  "Profitability_Score": 50.0,
+  "Risk_Score": 50.0,
+  "Shareholder_Score": 50.0,
+  "Signal": "Hold",
+  "Valuation_Score": 50.0
+}

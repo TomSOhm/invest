@@ -1,0 +1,29 @@
+# Golden-file tickers for scoring engine regression tests.
+# 10 PEA blue chips — cover quality compounders, megacaps, semis, dividend payers.
+MC.PA
+OR.PA
+AIR.PA
+SAN.PA
+BNP.PA
+ASML.AS
+SAP.DE
+NESN.SW
+ULVR.L
+SIE.DE
+# 10 US large caps — cover all S&P 500 sectors.
+AAPL
+MSFT
+GOOGL
+AMZN
+META
+NVDA
+BRK-B
+JPM
+V
+WMT
+# 5 stress cases — distressed (Atos), cyclical (Continental), mid-cap PEA-PME.
+ATO.PA
+ATOS.PA
+CON.DE
+SOI.PA
+ALO.PA
