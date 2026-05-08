@@ -1,371 +1,413 @@
-# 📊 Invest Solo — Quantitative Fundamental Investment Platform
+# Invest Solo — Project Brief (v2)
 
-## Project Overview
+**Owner:** Tom S (`Ohm-T`).
+**Status:** v2 release (M0–M12 complete; M13 documents the engine).
+**Last updated:** 2026-05-08.
 
-**Owner:** Ohm-T (Hugging Face: `Ohm-T`)  
-**Local Drive:** `E:\Projet_Solo\invest`  
-**Future Git Repo:** To be linked  
-**Primary Focus:** Scientific, rigorous stock valuation and portfolio strategy  
-**Date Created:** 2026-02-16
+This brief is the architectural map. For methodology details see [`METHODOLOGY.md`](METHODOLOGY.md); for data layer detail see [`DATA_SOURCES.md`](DATA_SOURCES.md); for the design rationale of structural choices see [`adr/`](adr/).
 
 ---
 
-## 🎯 Mission Statement
+## 1. Mission
 
-Build and maintain a **day-to-day investing strategy engine** powered by quantitative fundamental analysis:
+A quantitative fundamental investment platform for a French investor running both a **PEA** (Plan d'Épargne en Actions, EU/EEA-only, tax-advantaged) and a **CTO** (compte-titres ordinaire, unconstrained). The engine evaluates stocks on three independent horizons (long, medium, short) and surfaces buy/sell signals with the data provenance and DCF margin of safety needed to act with confidence.
 
-1. **PEA Strategy** — French PEA-eligible values (EU/EEA headquartered companies, Euronext-listed, ETFs with ≥75% eligible equities)
-2. **Global Strategy** — Unrestricted universe of any publicly traded companies worldwide
-3. **Valuation Engine** — Scientific, rigorous metrics to characterize **undervalued** and **overvalued** potential of companies
-4. **Daily Operations** — Actionable signals, watchlists, portfolio tracking, rebalancing alerts
+v2 (M0–M12) rebuilt every component identified as broken or missing in the 2026-05-08 audit. v1's single composite, fabricated EBIT, and absent DCF are gone; the engine now uses sector-relative percentile ranks, real Piotroski deltas, real Altman Z'' inputs, and a two-stage DCF with a 3×3 sensitivity grid.
 
 ---
 
-## 🏗️ Project Architecture
+## 2. Architecture overview
 
 ```
-E:\Projet_Solo\invest\
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          DATA SOURCES (M2)                               │
+│                                                                          │
+│   FMP (250 calls/day, US-strong)  ←─┐                                    │
+│                                      │  HybridDataFetcher                │
+│   yfinance (free, EU-strong)     ←─┴─→ per-field fallback chain          │
+│                                                                          │
+│   Cache: data/cache/ (24h fundamentals, 1h news, 5min quotes)            │
+└─────────────────────────────┬───────────────────────────────────────────┘
+                              │
+                              v
+┌─────────────────────────────────────────────────────────────────────────┐
+│                       SCORING ENGINE (src/analysis)                      │
+│                                                                          │
+│   M3  sector-relative percentiles → Valuation/Profitability/Health/...   │
+│   M4  real Piotroski + Altman Z''                                        │
+│   M5  EarningsQuality, Moat, Risk_Score_v2                               │
+│   M6  two-stage DCF + sensitivity grid                                   │
+│   M7  three-horizon composites (LT/MT/ST) + gates                        │
+│   M9  momentum + EPS revisions + FinBERT sentiment                       │
+└─────────────────────────────┬───────────────────────────────────────────┘
+                              │
+                              v
+┌─────────────────────────────────────────────────────────────────────────┐
+│                    SCREENER + STRATEGY (src/strategy)                    │
+│                                                                          │
+│   apply_filters() — universal pre-filters + horizon gates                │
+│   PRESET_REGISTRY (M8) — 9 named presets across 3 horizons               │
+│   screen_horizon_preset() — apply preset, sort by horizon score          │
+└─────────────────────────────┬───────────────────────────────────────────┘
+                              │
+                              v
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      BACKEND API (backend/app)                           │
+│                                                                          │
+│   FastAPI + Pydantic v2; M10 atomically replaced legacy schema           │
+│   Routes: /api/company, /api/screener, /api/portfolio, /api/watchlist    │
+│   Backtest: /api/backtest (M12, walk-forward against benchmark)          │
+│   Storage: JSON files (data/portfolio.json, data/watchlist.json)         │
+└─────────────────────────────┬───────────────────────────────────────────┘
+                              │
+                              v
+┌─────────────────────────────────────────────────────────────────────────┐
+│                     FRONTEND (frontend/, Next.js 16)                     │
+│                                                                          │
+│   Pages: dashboard, screener, company/[ticker], portfolio, watchlist     │
+│   M11 components: HorizonSelector, DCFFairValueRange, MoSBar,            │
+│                  EarningsQualityPanel, MomentumPanel, CTOWarningBanner   │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+Two key structural patterns:
+
+- **`MarketDataSource` Protocol** (`backend/app/services/market_data/protocol.py`) — every backend (FMP, yfinance, future EODHD) implements the same eight `fetch_*` methods. The hybrid composer doesn't know or care which backend produced a given field.
+- **Pure-function scoring modules** — every `src/analysis/` module is I/O-free. Inputs are DataFrames the data layer already filled in; outputs are columns or per-ticker scalars. Easy to unit-test, easy to backtest, easy to reason about.
+
+---
+
+## 3. Three-horizon scoring (M7)
+
+Every ticker gets three independent composites and gate states:
+
+| Output column | Long-Term | Medium-Term | Short-Term |
+|---|---|---|---|
+| `score_lt` / `score_mt` / `score_st` | composite 0–100 | composite 0–100 | composite 0–100 |
+| `signal_lt` / `signal_mt` / `signal_st` | Strong Buy / Buy / Hold / Sell / Strong Sell | (same set) | (same set) |
+| `passes_gates_lt` / `_mt` / `_st` | bool — every gate satisfied | bool | bool |
+| `blockers_lt` / `_mt` / `_st` | list of failing gate keys | list | list |
+| `recommended_account` | (none) | (none) | "CTO" when ST passes (PEA caveat) |
+
+Per-horizon weights and gates live in `settings.yaml` `horizons:` block; `src/analysis/horizon_scoring.py` consumes them directly. The audit's "single signal regardless of horizon" critique drove this split — see [ADR-0001](adr/0001-three-horizon-scoring.md).
+
+---
+
+## 4. The 9 horizon presets (M8)
+
+`src/strategy/horizon_presets.py` registers 9 named filter dicts, one per (horizon × style) combination. Each extends a shared `_UNIVERSAL_PREFILTERS` block.
+
+### Long-Term (5y+)
+
+- **`LT_QUALITY_COMPOUNDER`** — Default LT preset. Buy great businesses at fair prices and hold for compounding. Combines a ROIC ≥ 12% floor, Piotroski ≥ 7 (real, not proxy), Altman Z'' ≥ 2.6, ND/EBITDA ≤ 2.5, sector-relative valuation cap, DCF MoS ≥ 15%, multi-period revenue and EPS CAGRs. Tax-optimal in PEA.
+- **`LT_PEA_DEFENSIVE`** — PEA-strict, lower-volatility tilt. Adds Beta ≤ 1.0, Div Yield ≥ 2%, payout ≤ 65%, market cap ≥ €1B, ESG sector exclusions including Energy_Producers. Designed for the income-leaning core of a PEA.
+- **`LT_DEEP_VALUE`** — Contrarian. Targets the cheapest sector tier (P/B ≤ 1.5, EV/EBIT ≤ 9, DCF MoS ≥ 30%) but layers anti-value-trap gates on top: Piotroski ≥ 6, Altman Z ≥ 1.8, ROIC 5y avg ≥ 6%, positive FCF in ≥ 3 of last 5 years.
+
+### Medium-Term (1–3y)
+
+- **`MT_GARP`** — Growth at reasonable price. Forward P/E ≤ 18, PEG ≤ 1.3, EPS revisions positive over 6m, op margin trend +50bp/y, price > 200dma, 3m relative strength positive. Looks for re-rating catalysts within a 1–3y window. Holding period straddles PEA's 5y threshold; preferred-account is PEA when holding through.
+- **`MT_TURNAROUND`** — Higher-risk operational improvement. Target companies that were bad and are getting better: op margin improvement ≥ 300bp YoY, FCF positive latest year, Altman Z ≥ 1.5. Recommended max position size 3% of portfolio.
+- **`MT_INCOME`** — Dividend-focused. Yield ≥ 3.5%, payout ≤ 75%, 5y dividend growth ≥ 3%, FCF coverage of dividends ≥ 1.4×, ≥ 10 consecutive dividend years. Suited for the PEA dividend-compounder bucket.
+
+### Short-Term (<6mo)
+
+All ST presets carry `recommended_account: "CTO"` and `pea_warning: True`.
+
+- **`ST_MOMENTUM_QUALITY`** — Quantitative momentum + quality floor. 12-1 momentum top quartile, golden cross, volume surge ≥ 1.3, SUE ≥ 1, max realised vol 50%. Quality floor (Altman Z ≥ 1.5, Piotroski ≥ 5) prevents chasing pump-and-dump names.
+- **`ST_EARNINGS_DRIFT`** — Post-Earnings Announcement Drift. Trigger: earnings within 5 days, SUE ≥ 1.5, volume surge ≥ 2.0, gap up ≥ 3%. Hold 30–60 days. Exit on 50dma break, negative relative strength, or new negative news.
+- **`ST_OVERSOLD_BOUNCE`** — Mean reversion. Connors RSI(2) < 10 in a long-term uptrend (price > 200dma), no recent negative news, no earnings within 3 days. Hold 3–10 days, target 50dma, stop loss 1 ATR below entry.
+
+Each preset is documented inline in the source file. Sample backtest output for two presets is committed at:
+- `docs/backtests/LT_QUALITY_COMPOUNDER_2022-01-01_to_2024-12-31.md`
+- `docs/backtests/MT_TURNAROUND_2022-01-01_to_2024-12-31.md`
+
+Read those alongside [`docs/backtests/methodology.md`](backtests/methodology.md) for assumptions and known biases.
+
+---
+
+## 5. Folder layout
+
+```
+invest/
+├── backend/                         # FastAPI REST API
+│   └── app/
+│       ├── api/                     # Route handlers (company, market, screener, portfolio, watchlist)
+│       ├── models/                  # Pydantic models (M10 schema)
+│       │   ├── company.py           # CompanyDetail (three-horizon)
+│       │   ├── horizons.py          # HorizonScoring, DCFValuation, QualitySignals,
+│       │   │                        # RiskSignals, MomentumSignals, SubScores
+│       │   ├── screener.py          # ScreenerRequest/Response (horizon-aware)
+│       │   └── portfolio.py, watchlist.py
+│       ├── services/                # Business logic
+│       │   ├── data_fetcher.py      # Thin facade — delegates to HybridDataFetcher
+│       │   ├── market_data/         # M2 data layer
+│       │   │   ├── protocol.py             # MarketDataSource Protocol
+│       │   │   ├── fmp_fetcher.py          # FMP backend
+│       │   │   ├── yfinance_fetcher.py     # yfinance backend
+│       │   │   ├── hybrid_fetcher.py       # Orchestrator
+│       │   │   └── coverage_matrix.md      # Live FMP/yfinance coverage
+│       │   ├── scoring_service.py   # Wraps src/analysis/scoring_engine
+│       │   ├── screener_service.py  # Wraps src/strategy/screener
+│       │   ├── company_service.py   # Builds CompanyDetail from raw row + scores
+│       │   ├── portfolio_service.py # JSON-backed portfolio CRUD
+│       │   ├── watchlist_service.py # JSON-backed watchlist CRUD
+│       │   ├── cache_service.py     # File-based JSON cache
+│       │   ├── config_service.py    # Loads settings.yaml
+│       │   └── backtest/            # M12 backtest framework
+│       │       ├── walk_forward.py  # WalkForwardBacktester
+│       │       ├── metrics.py       # Sharpe, alpha/beta, drawdown, hit rate, IR
+│       │       └── cli.py           # Command-line entry point
+│       ├── storage/                 # JSON persistence helpers
+│       ├── config.py                # Settings, sys.path bootstrap
+│       ├── dependencies.py          # FastAPI dependency injection
+│       └── main.py                  # FastAPI app factory
 │
-├── docs/                          # Documentation & research notes
-│   ├── PROJECT_BRIEF.md           # This file — master reference
-│   ├── METHODOLOGY.md             # Valuation methodology deep-dive
-│   ├── PEA_RULES.md               # French PEA eligibility rules & constraints
-│   ├── DATA_SOURCES.md            # All data providers, APIs, keys management
-│   ├── METRICS_GLOSSARY.md        # Every metric used, formula, interpretation
-│   └── CHANGELOG.md               # Project evolution log
+├── frontend/                        # Next.js 16 + React 19 + Tailwind 4
+│   └── src/
+│       ├── app/                     # App Router pages
+│       │   ├── page.tsx             # Dashboard
+│       │   ├── screener/page.tsx
+│       │   ├── company/[ticker]/    # Company detail page
+│       │   ├── portfolio/
+│       │   └── watchlist/
+│       ├── components/
+│       │   ├── ui/                  # M11 visual primitives
+│       │   │   ├── HorizonSelector.tsx       # LT / MT / ST segmented control
+│       │   │   ├── HorizonScoreCard.tsx       # Per-horizon score + signal + gate state
+│       │   │   ├── DCFFairValueRange.tsx      # Low/mid/high range bar
+│       │   │   ├── MoSBar.tsx                 # Margin-of-safety progress bar
+│       │   │   ├── EarningsQualityPanel.tsx   # M-Score / Sloan / CCR
+│       │   │   ├── MomentumPanel.tsx          # 12-1, RS_3m, MAs, volume, sentiment
+│       │   │   ├── CTOWarningBanner.tsx       # PEA-caveat banner for ST signals
+│       │   │   ├── PeaBadge.tsx, SignalBadge.tsx, ScoreGauge.tsx
+│       │   │   └── Card.tsx, Modal.tsx, Spinner.tsx, MetricCard.tsx, Badge.tsx
+│       │   └── layout/                        # Header, Footer, Sidebar
+│       ├── hooks/                             # useCompany, useScreener, useHorizon
+│       └── lib/                               # api.ts, types.ts, formatters.ts
 │
-├── config/                        # Configuration & environment
-│   ├── .env.example               # Template for API keys (never commit real keys)
-│   ├── settings.yaml              # Global settings (thresholds, weights, params)
-│   ├── pea_universe.yaml          # PEA-eligible ticker universe
-│   └── global_universe.yaml       # Global watchlist tickers
+├── src/                             # Pure-function analysis engine
+│   ├── analysis/
+│   │   ├── scoring_engine.py        # Orchestrator: M3 sub-scores + composite
+│   │   ├── sector_percentile.py     # M3 sector-relative percentile rank
+│   │   ├── quality_signals.py       # M4 real Piotroski + Altman Z/Z''
+│   │   ├── earnings_quality.py      # M5 Beneish, Sloan, CCR
+│   │   ├── quality_moat.py          # M5 GP/TA, ROIC stability, moat
+│   │   ├── risk_metrics.py          # M5 vol, drawdown, real risk
+│   │   ├── dcf.py                   # M6 two-stage DCF + sensitivity
+│   │   ├── horizon_scoring.py       # M7 three-horizon composites
+│   │   ├── momentum.py              # M9 12-1, MAs, volume surge
+│   │   ├── revisions.py             # M9 EPS revisions, SUE
+│   │   └── sentiment.py             # M9 FinBERT (optional)
+│   ├── strategy/
+│   │   ├── screener.py              # apply_filters + filter helpers
+│   │   └── horizon_presets.py       # M8 PRESET_REGISTRY (9 presets)
+│   ├── data/
+│   │   ├── sample_universe.py       # 31 PEA-eligible companies sample
+│   │   └── (raw CSVs)
+│   ├── reporting/                   # Charts, dashboards, exports
+│   ├── portfolio/                   # Tracker, allocation, rebalancer (legacy)
+│   ├── main.py                      # Standalone screener entry point
+│   └── daily_run.py                 # Daily analysis pipeline
 │
-├── src/                           # Core Python source code
-│   ├── __init__.py
-│   ├── data/                      # Data acquisition layer
-│   │   ├── __init__.py
-│   │   ├── fetcher.py             # Unified data fetcher (yfinance, FMP, etc.)
-│   │   ├── pea_eligibility.py     # PEA eligibility checker & universe builder
-│   │   └── cache.py               # Local caching to avoid rate limits
-│   │
-│   ├── analysis/                  # Fundamental analysis engine
-│   │   ├── __init__.py
-│   │   ├── financial_health.py    # Liquidity, solvency, Altman Z-Score, Piotroski
-│   │   ├── profitability.py       # ROE, ROA, ROIC, margins, DuPont decomposition
-│   │   ├── growth.py              # Revenue/earnings growth, CAGR, trends
-│   │   ├── valuation.py           # P/E, P/B, P/S, EV/EBITDA, PEG, DCF
-│   │   ├── dcf_model.py           # Discounted Cash Flow implementation
-│   │   ├── graham_model.py        # Benjamin Graham intrinsic value formula
-│   │   ├── quality_score.py       # Composite quality scoring system
-│   │   └── sector_comparison.py   # Relative valuation vs sector peers
-│   │
-│   ├── strategy/                  # Strategy & signal generation
-│   │   ├── __init__.py
-│   │   ├── screener.py            # Multi-criteria stock screener
-│   │   ├── scoring.py             # Weighted composite scoring engine
-│   │   ├── signals.py             # Buy/Hold/Sell signal generation
-│   │   ├── pea_strategy.py        # PEA-specific strategy (tax optimization)
-│   │   └── global_strategy.py     # Global unconstrained strategy
-│   │
-│   ├── portfolio/                 # Portfolio management
-│   │   ├── __init__.py
-│   │   ├── tracker.py             # Position tracking & P&L
-│   │   ├── allocation.py          # Allocation optimizer (risk parity, etc.)
-│   │   ├── rebalancer.py          # Rebalancing signals & scheduling
-│   │   └── risk.py                # Risk metrics (VaR, Sharpe, drawdown)
-│   │
-│   └── reporting/                 # Output & visualization
-│       ├── __init__.py
-│       ├── daily_report.py        # Daily market summary & signals
-│       ├── company_report.py      # Deep-dive single company analysis
-│       ├── dashboard.py           # Interactive dashboard (Streamlit/React)
-│       └── export.py              # Export to XLSX, PDF, DOCX
-│
-├── notebooks/                     # Jupyter notebooks for research
-│   ├── 01_data_exploration.ipynb
-│   ├── 02_valuation_backtesting.ipynb
-│   ├── 03_pea_universe_analysis.ipynb
-│   └── 04_strategy_development.ipynb
-│
-├── data/                          # Local data storage (gitignored)
-│   ├── raw/                       # Raw API responses
-│   ├── processed/                 # Cleaned & transformed data
-│   ├── cache/                     # Temporary cache
-│   └── exports/                   # Generated reports
-│
-├── tests/                         # Unit & integration tests
-│   ├── test_fetcher.py
-│   ├── test_valuation.py
+├── tests/                           # 400+ pytest tests
+│   ├── test_scoring_engine_vectorised.py
+│   ├── test_scoring_snapshot.py     # M0 golden-file regression harness
+│   ├── test_sector_percentile.py
+│   ├── test_quality_signals.py
+│   ├── test_earnings_quality.py
+│   ├── test_quality_moat.py
+│   ├── test_risk_metrics.py
 │   ├── test_dcf.py
-│   └── test_screener.py
+│   ├── test_horizon_scoring.py
+│   ├── test_horizon_presets.py
+│   ├── test_momentum.py, test_revisions.py, test_sentiment.py
+│   ├── test_hybrid_fetcher.py, test_yfinance_fetcher.py
+│   ├── test_api_contract.py         # Pydantic schema regression
+│   ├── backtest/                    # Backtest framework tests
+│   ├── golden/                      # Snapshot data
+│   └── conftest.py
 │
-├── scripts/                       # Utility scripts
-│   ├── daily_run.py               # Daily analysis pipeline
-│   ├── update_universe.py         # Refresh PEA/global universe
-│   └── backtest.py                # Historical strategy backtesting
+├── scripts/
+│   ├── capture_golden_snapshots.py  # Regenerate golden snapshots
+│   ├── coverage_report.py           # Populate coverage_matrix.md per ticker
+│   └── m5_score_golden.py
 │
-├── .gitignore
-├── requirements.txt
+├── docs/
+│   ├── PROJECT_BRIEF.md             # This file
+│   ├── METHODOLOGY.md               # v2 methodology
+│   ├── DATA_SOURCES.md              # FMP+yfinance hybrid
+│   ├── PEA_RULES.md                 # PEA eligibility + tax (unchanged)
+│   ├── PYTHON_FUNCTIONS.md          # Function-by-function reference
+│   ├── adr/                         # Architectural Decision Records (v2)
+│   ├── backtests/                   # Backtest methodology + sample outputs
+│   └── assets/                      # Banner SVGs
+│
+├── data/                            # Local storage (gitignored except samples)
+│   ├── cache/                       # JSON cache (fundamentals, prices, quota)
+│   ├── exports/                     # Generated reports
+│   ├── portfolio.json               # User portfolio
+│   └── watchlist.json               # User watchlist
+│
+├── settings.yaml                    # All config: weights, thresholds, horizons, screener, FMP
+├── openapi_v2.json                  # OpenAPI spec for the v2 API
 ├── pyproject.toml
+├── Makefile                         # Common commands (backend, frontend, tests)
 ├── README.md
-└── Makefile                       # Common commands shortcuts
+├── CHANGELOG.md                     # Milestone-by-milestone (M0–M12)
+├── CONTRIBUTING.md
+├── LICENSE                          # Apache 2.0
+└── .env.example                     # API key template
 ```
 
 ---
 
-## 📐 Valuation Methodology
+## 6. Frontend pages and key components (M11)
 
-### Core Valuation Models
+### Pages
 
-| Model | Purpose | Key Inputs |
-|-------|---------|------------|
-| **DCF (Discounted Cash Flow)** | Intrinsic value from projected FCFs | FCF, WACC, Terminal Growth Rate |
-| **Graham Number** | Conservative intrinsic value floor | EPS, BVPS |
-| **Graham Growth Formula** | Growth-adjusted intrinsic value | EPS, Expected Growth Rate |
-| **Relative Valuation** | Sector/peer comparison | P/E, P/B, EV/EBITDA vs peers |
-| **DuPont Decomposition** | Profitability quality analysis | Margin × Turnover × Leverage |
-| **Piotroski F-Score** | Financial strength (0-9) | 9 binary fundamental signals |
-| **Altman Z-Score** | Bankruptcy risk assessment | 5 weighted financial ratios |
+- **`/` (dashboard)** — Universe summary: signal distribution per horizon, top picks per preset, FMP quota status.
+- **`/screener`** — Horizon selector + preset dropdown + custom-filter form. Renders results sorted by `score_<horizon>`. Shows blockers per row.
+- **`/company/[ticker]`** — Full CompanyDetail view. Hero shows three-horizon scores side-by-side; below: DCF range bar, sub-score gauges, earnings quality panel, momentum panel, raw metrics table.
+- **`/portfolio`** — Holdings table, P&L, weights, sector concentration, drift alerts.
+- **`/watchlist`** — Tickers tagged with notes; sortable by any horizon score.
 
-### Key Metrics Tracked
+### Key components (`frontend/src/components/ui/`)
 
-**Valuation Ratios:** P/E, Forward P/E, P/B, P/S, P/FCF, EV/EBITDA, EV/Sales, PEG  
-**Profitability:** ROE, ROA, ROIC, Gross Margin, Operating Margin, Net Margin, FCF Margin  
-**Growth:** Revenue CAGR (3Y, 5Y), EPS CAGR, FCF Growth, Dividend Growth  
-**Financial Health:** Current Ratio, Quick Ratio, D/E Ratio, Interest Coverage, FCF/Debt  
-**Efficiency:** Asset Turnover, Inventory Turnover, Receivables Turnover  
-**Shareholder Return:** Dividend Yield, Payout Ratio, Buyback Yield, Total Shareholder Yield  
-**Quality Composite:** Custom weighted score combining all above categories
+- **`HorizonSelector`** — Segmented control (LT / MT / ST) with `aria-selected` for accessibility. Drives the `useHorizon()` hook that filters every horizon-aware view.
+- **`HorizonScoreCard`** — Card showing one horizon's score (gauge), signal (badge), pass/fail gates, and blocker chips when failing.
+- **`DCFFairValueRange`** — Horizontal range bar showing low/mid/high intrinsic values relative to current price; price marker on top. Surfaces `wacc_used` and warnings.
+- **`MoSBar`** — Single-axis bar rendering MoS as a percentage; colour-coded against the `generate_signal` thresholds (≥ 30% green, 15–30% light green, ±15% grey, ≤ -15% red, ≤ -30% deep red).
+- **`EarningsQualityPanel`** — M-Score, Sloan accruals, CCR_5y in a compact grid with threshold chips ("aggressive accruals", "potential manipulator").
+- **`MomentumPanel`** — 12-1 momentum, RS_3m, MA crossings, volume surge, EPS revisions, SUE, sentiment. Used on company detail page; collapses on screener page.
+- **`CTOWarningBanner`** — Red banner that renders whenever a PEA-eligible name has a passing ST signal. Explains the PEA tax-wrapper risk for short-term trading.
+- **`PeaBadge`**, **`SignalBadge`**, **`ScoreGauge`** — primitives reused across pages.
 
-### Scoring System
-
-Each company receives a **Composite Score (0-100)** based on weighted categories:
-
-| Category | Weight | Description |
-|----------|--------|-------------|
-| Valuation Attractiveness | 25% | How cheap vs intrinsic value & peers |
-| Financial Health | 20% | Balance sheet strength, solvency |
-| Profitability Quality | 20% | Margins, returns on capital, consistency |
-| Growth Trajectory | 15% | Revenue & earnings momentum |
-| Shareholder Return | 10% | Dividends, buybacks, yield |
-| Risk Assessment | 10% | Volatility, beta, Z-Score |
-
-### Signal Generation
-
-- **Strong Buy:** Score ≥ 80 AND Price < 70% of DCF intrinsic value
-- **Buy:** Score ≥ 65 AND Price < 85% of DCF intrinsic value
-- **Hold:** Score 40-65 OR Price within ±15% of intrinsic value
-- **Sell:** Score < 40 OR Price > 130% of intrinsic value
-- **Strong Sell:** Score < 25 OR Price > 150% of intrinsic value
+API proxy: `frontend/next.config.ts` rewrites `/api/*` to `http://localhost:8000/api/*` so the frontend runs against a local backend without CORS gymnastics.
 
 ---
 
-## 🇫🇷 PEA-Specific Rules
+## 7. Backtest framework (M12)
 
-### Eligibility Criteria
-- Company **headquartered in EU or EEA** (European Economic Area)
-- Listed on European exchanges (Euronext Paris, Amsterdam, Brussels, Lisbon, Dublin, Oslo, Milan)
-- **ETFs eligible** if composed of ≥75% eligible equities
-- REITs (SIICs) excluded since 2012 (but existing positions grandfathered)
+`backend/app/services/backtest/walk_forward.py`. Walk-forward rebalanced portfolios applied to the 9 horizon presets, validated against an appropriate benchmark (CAC 40 for PEA presets, S&P 500 for global).
 
-### PEA Constraints
-- **Maximum deposit:** €150,000 (PEA classique) + €225,000 (PEA-PME)
-- **Tax advantage:** No capital gains tax after 5 years (only social charges 17.2%)
-- **No short selling** within PEA
-- **No leverage** (no margin)
-- **Withdrawals before 5 years** → account closure + taxation
+### Mechanics
 
-### PEA-PME Sub-Universe
-- Companies with < 5,000 employees AND (Revenue < €1.5B OR Total Assets < €2B)
-- Listed on Euronext Growth, Euronext Access, or meeting size criteria on main market
-- Official list: [Euronext PEA-PME List](https://connect2.euronext.com/en/media/169)
+1. At each rebalance date (default = quarter-end), score the universe via `score_dataframe`.
+2. Apply the named preset's filters via `screen_horizon_preset`.
+3. Equal-weight the surviving names; cap at `max_position_size` (default 10% → max 10 names).
+4. Hold until next rebalance.
+5. Debit a flat 10bp transaction cost per rebalance turnover.
+
+### Acknowledged biases (v0)
+
+- **Look-ahead bias** — current-snapshot fundamentals proxy historical inputs; mitigation in `docs/backtests/methodology.md` is point-in-time fundamentals at M14+.
+- **Survivorship bias** — fixed universe at construction; delisted/acquired names absent from earlier rebalances.
+- **Transaction cost** — flat 10bp; understates costs for micro-cap-heavy presets.
+- **Cash bucket** — earns 0% (conservative when rates were low; generous when rates were high).
+- **Benchmark** — price-only (no dividends reinvested). Slightly biased against high-yielding strategies.
+- **Statistical sample size** — 5 years × quarterly rebalance = ~20 observations. Reported alphas are descriptive, not inferential.
+
+Full discussion in [`docs/backtests/methodology.md`](backtests/methodology.md).
+
+CLI: `python -m backend.app.services.backtest.cli --preset LT_QUALITY_COMPOUNDER --start 2022-01-01 --end 2024-12-31`.
 
 ---
 
-## 🔧 Recommended Tools & Infrastructure
+## 8. PEA-specific rules (unchanged from v1)
 
-### Data Sources (Priority Order)
+- Company **headquartered in EU/EEA**: see `pea.eligible_countries` in `settings.yaml` (FR, DE, NL, BE, IT, ES, PT, IE, AT, FI, SE, DK, NO, PL, LU, GR).
+- Listed on European exchanges (Euronext, Frankfurt, Milan, etc.).
+- ETFs eligible if composed of ≥ 75% eligible equities.
+- REITs (SIICs) excluded since 2012.
+- **Long-only, no leverage, no shorts.**
+- **5y tax lock-in** — withdrawals before 5 years close the account and trigger PFU (30%). After 5y, 17.2% social charges only on gains.
+- **PEA-PME**: official criterion is < 5,000 employees AND (Revenue < €1.5B OR Total Assets < €2B). v1 used a market-cap proxy that was wrong; v2 still uses the proxy until FMP's profile endpoint exposes employees + revenue + assets reliably (tracked).
 
-| Source | Type | Cost | Best For |
-|--------|------|------|----------|
-| **yfinance** | Python lib | Free | Quick data, price history, basic fundamentals |
-| **Financial Modeling Prep (FMP)** | API | Freemium ($14/mo starter) | Full fundamentals, DCF, screener, global coverage |
-| **Alpha Vantage** | API | Free (25 req/day) | Technical indicators, forex, crypto |
-| **Finnhub** | API | Free tier | Real-time quotes, news, sentiment |
-| **EODHD** | API | Freemium | EU coverage, fundamentals, dividends |
-| **Euronext Web Services** | API | Paid | Official PEA eligibility, EU-specific data |
-| **OpenBB** | Platform | Free/Open | Terminal alternative, integrates multiple sources |
-| **FinanceToolkit** | Python lib | Free (needs FMP key) | Comprehensive ratios, DCF, DuPont analysis |
+Full discussion in [`docs/PEA_RULES.md`](PEA_RULES.md).
 
-### MCP Servers (for Claude/AI integration)
+---
 
-| MCP Server | URL/Setup | Purpose |
-|------------|-----------|---------|
-| **Alpha Vantage MCP** | `https://mcp.alphavantage.co/mcp?apikey=KEY` | Real-time data, indicators |
-| **Financial Datasets MCP** | `https://mcp.financialdatasets.ai/mcp` | Fundamentals, balance sheets |
-| **Finance MCP (Yahoo)** | Local install via pip | Price data, basic analysis |
-| **Daloopa MCP** | Already connected (`https://mcp.daloopa.com/server/mcp`) | Financial data extraction |
+## 9. Architectural Decision Records
 
-### Python Libraries
+The structural choices in v2 are documented in `docs/adr/`. Each ADR is dated, has a status, and links the audit + implementation files that justified the decision.
 
-```
-# Core
-yfinance>=0.2.30
-pandas>=2.0
-numpy>=1.24
-scipy>=1.11
+| ADR | Title | Status |
+|---|---|---|
+| [0001](adr/0001-three-horizon-scoring.md) | Three-horizon scoring (replaces single composite) | Accepted (M7) |
+| [0002](adr/0002-fmp-yfinance-hybrid.md) | FMP + yfinance hybrid via Protocol pattern | Accepted (M2) |
+| [0003](adr/0003-sector-relative-percentile.md) | Sector-relative percentile rank (replaces linear map) | Accepted (M3) |
+| [0004](adr/0004-no-fabricated-values.md) | NaN over fabricated proxies (no 4% interest, no 30% WC) | Accepted (M1) |
+| [0005](adr/0005-atomic-frontend-backend-schema-replacement.md) | Atomic v1→v2 schema replacement (M10+M11 ship together) | Accepted (M10/M11) |
 
-# Financial Analysis
-financetoolkit>=1.9
-PyValuation>=0.1
-openbb>=4.0
-ta-lib  # Technical analysis (requires C library)
+---
 
-# Visualization
-plotly>=5.18
-streamlit>=1.30
-matplotlib>=3.8
+## 10. Tech stack
 
-# Data & ML
-scikit-learn>=1.3
-statsmodels>=0.14
-requests>=2.31
-beautifulsoup4>=4.12
+| Layer | Tech |
+|---|---|
+| Backend | Python 3.11+, FastAPI, Pydantic v2, pandas, numpy, loguru |
+| Data | yfinance, Financial Modeling Prep (free tier), httpx (or requests fallback) |
+| Analysis | Pure pandas/numpy. No FinanceToolkit dependency in the scoring path. FinBERT (transformers) optional for sentiment. |
+| Frontend | Next.js 16, React 19, TypeScript, Tailwind CSS 4, Recharts, lucide-react |
+| Storage | JSON files for portfolio/watchlist (V1); cache via JSON-on-disk |
+| Tooling | bun (frontend package mgr), pytest (~400 tests), Make (`make backend`, `make frontend`, `make test`) |
 
-# Reports
-python-docx>=1.0
-openpyxl>=3.1
-fpdf2>=2.7
+---
 
-# Utilities
-pyyaml>=6.0
-python-dotenv>=1.0
-schedule>=1.2
-loguru>=0.7
+## 11. Quick start
+
+### Prerequisites
+
+- Python 3.11+ (3.10 works but untested in CI).
+- Node 18+ and `bun` (`npm install -g bun`).
+- Optional: an FMP free-tier key at `https://financialmodelingprep.com/developer`.
+
+### Setup
+
+```bash
+git clone https://github.com/TomSOhm/invest.git
+cd invest
+
+# API keys (optional — yfinance works without keys)
+cp .env.example .env
+# edit .env: set FMP_TOKEN if you have one
+
+# Python deps
+pip install -e backend
+
+# Frontend deps
+cd frontend && bun install && cd ..
 ```
 
-### Recommended MCP Connections (Claude.ai)
+### Run
 
-To maximize this project's potential, connect these MCPs in Claude settings:
+```bash
+# Backend on :8000
+make backend          # python -m uvicorn backend.app.main:app --reload
 
-1. **Alpha Vantage MCP** — Real-time financial data with 50+ endpoints
-2. **Financial Datasets MCP** — SEC filings, balance sheets, income statements
-3. **Daloopa MCP** ✅ Already connected — Financial data extraction
-4. **Hugging Face MCP** ✅ Already connected — ML models for sentiment, NLP
+# Frontend on :3000 (separate terminal)
+make frontend         # cd frontend && bun run dev
 
----
+# Standalone screener (CLI)
+python src/main.py
 
-## 📋 Agent Instructions (For Claude / AI Assistants)
+# Run tests
+make test             # pytest
+```
 
-### Context for Every Session
-
-When working on this project, the AI assistant should:
-
-1. **Always reference** `PROJECT_BRIEF.md` for architecture, methodology, and conventions
-2. **Follow the folder structure** exactly as defined above
-3. **Use the scoring system** (0-100 composite) for all stock evaluations
-4. **Distinguish PEA vs Global** strategies — never suggest non-eligible stocks for PEA
-5. **Cite data sources** — always mention which API/source was used for data
-6. **Be quantitative** — include numbers, ratios, formulas in all analysis
-7. **Flag limitations** — when data is stale, unavailable, or from free-tier sources
-8. **Use French tax context** — PEA tax optimization, social charges, 5-year rule
-
-### Standard Analysis Workflow
-
-For any company analysis request:
-1. Fetch latest financial data (income statement, balance sheet, cash flow)
-2. Calculate all key metrics (valuation, profitability, growth, health)
-3. Run DCF model with sensitivity analysis
-4. Compare to sector peers (relative valuation)
-5. Calculate Piotroski F-Score and Altman Z-Score
-6. Generate composite score (0-100)
-7. Determine signal (Strong Buy → Strong Sell)
-8. Check PEA eligibility if relevant
-9. Present findings with clear recommendation
-
-### File Naming Conventions
-
-- Analysis reports: `analysis_{TICKER}_{YYYY-MM-DD}.md`
-- Screener results: `screener_{strategy}_{YYYY-MM-DD}.xlsx`
-- Daily reports: `daily_report_{YYYY-MM-DD}.md`
-- Backtest results: `backtest_{strategy}_{period}.md`
+Open `http://localhost:3000` for the dashboard, `http://localhost:8000/docs` for the OpenAPI explorer.
 
 ---
 
-## 🚀 Implementation Phases
+## 12. References
 
-### Phase 1: Foundation (Week 1-2)
-- [ ] Set up project structure on `E:\Projet_Solo\invest`
-- [ ] Initialize git repo
-- [ ] Configure API keys (.env)
-- [ ] Build data fetcher (yfinance + FMP)
-- [ ] Implement basic financial metrics calculator
-- [ ] Build PEA eligibility checker
-
-### Phase 2: Analysis Engine (Week 3-4)
-- [ ] Implement DCF model
-- [ ] Implement Graham valuation models
-- [ ] Build Piotroski F-Score calculator
-- [ ] Build Altman Z-Score calculator
-- [ ] Create DuPont decomposition
-- [ ] Build composite scoring system
-- [ ] Create relative valuation module
-
-### Phase 3: Strategy & Screening (Week 5-6)
-- [ ] Build multi-criteria screener
-- [ ] Implement PEA-specific strategy
-- [ ] Implement Global strategy
-- [ ] Create signal generation logic
-- [ ] Build daily screening pipeline
-
-### Phase 4: Portfolio & Reporting (Week 7-8)
-- [ ] Build portfolio tracker
-- [ ] Implement risk metrics (VaR, Sharpe)
-- [ ] Create allocation optimizer
-- [ ] Build daily report generator
-- [ ] Create company deep-dive report template
-- [ ] Build interactive dashboard (Streamlit)
-
-### Phase 5: Automation & ML (Month 3+)
-- [ ] Schedule daily automated runs
-- [ ] Add sentiment analysis (news, earnings calls)
-- [ ] ML-based pattern recognition for quality scoring refinement
-- [ ] Backtesting framework
-- [ ] Connect MCP servers for real-time Claude analysis
-
----
-
-## 📊 Key Decision Framework
-
-### When to Buy (All must be true)
-1. Composite Score ≥ 65
-2. Price below estimated intrinsic value (DCF) by ≥15%
-3. Piotroski F-Score ≥ 6
-4. No significant red flags (fraud, accounting issues)
-5. Positive or stable FCF trend
-
-### When to Sell
-1. Composite Score drops below 40
-2. Price exceeds intrinsic value by >30%
-3. Fundamental deterioration (declining margins, rising debt)
-4. Better opportunity identified with same risk profile
-
-### Position Sizing
-- Max single position: 10% of portfolio
-- Max sector exposure: 25% of portfolio
-- Min positions for diversification: 15
-- Cash reserve target: 5-15%
-
----
-
-## 📎 Quick Reference Links
-
-- [Euronext PEA-PME Eligible List](https://connect2.euronext.com/en/media/169)
-- [PEA-eligible EEA Stocks (ProRealTime)](https://www.prorealtime.com/en/financial-instruments/pea-eligible-eee-stocks)
-- [FinanceToolkit GitHub](https://github.com/JerBouma/FinanceToolkit)
-- [Financial Modeling Prep API](https://financialmodelingprep.com/developer/docs)
-- [Alpha Vantage API](https://www.alphavantage.co/documentation/)
-- [Finnhub API](https://finnhub.io/docs/api)
-- [yfinance docs](https://pypi.org/project/yfinance/)
-- [Tidy Finance Python DCF](https://www.tidy-finance.org/python/discounted-cash-flow-analysis.html)
-- [MCP Financial Datasets](https://docs.financialdatasets.ai/mcp-server)
+- v2 documentation:
+  - [`METHODOLOGY.md`](METHODOLOGY.md) — three-horizon methodology, sub-scores, DCF, gates.
+  - [`DATA_SOURCES.md`](DATA_SOURCES.md) — FMP + yfinance hybrid, coverage matrix.
+  - [`PEA_RULES.md`](PEA_RULES.md) — PEA eligibility and tax rules.
+  - [`adr/`](adr/) — ADRs 0001–0005.
+  - [`backtests/methodology.md`](backtests/methodology.md) — backtest assumptions and biases.
+- v2 entry points:
+  - [`CHANGELOG.md`](../CHANGELOG.md) — milestone-by-milestone (M0–M12).
+  - [`openapi_v2.json`](../openapi_v2.json) — full API surface.
+  - [`README.md`](../README.md) — top-level overview.

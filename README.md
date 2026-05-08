@@ -22,49 +22,72 @@
 
 ---
 
+## What's new in v2 (M0–M12)
+
+The v2 release rebuilt the scoring engine from the data layer up. Headline changes:
+
+- **Three-horizon scoring** — every ticker gets independent Long-Term, Medium-Term, and Short-Term composites with their own weights, gates, and signals. No more single-number conflation. ([ADR-0001](docs/adr/0001-three-horizon-scoring.md))
+- **Sector-relative percentile ranks** — replaces the v1 linear map that systematically penalised software and flattered utilities. ([ADR-0003](docs/adr/0003-sector-relative-percentile.md))
+- **Real Piotroski + Altman Z''** — actual year-over-year deltas, real working capital and retained earnings. No more fabricated proxies. ([ADR-0004](docs/adr/0004-no-fabricated-values.md))
+- **Two-stage DCF with 3×3 sensitivity grid** — the Strong Buy gate (composite ≥ 80 AND MoS ≥ 30%) finally bites.
+- **FMP + yfinance hybrid** — per-field fallback through a `MarketDataSource` Protocol, with a `field_sources` audit trail and 24h fundamentals cache. ([ADR-0002](docs/adr/0002-fmp-yfinance-hybrid.md))
+- **Earnings Quality, Moat, Real Risk** — Beneish M-Score, Sloan accruals, CCR, gross profitability, ROIC stability, realised vol, max drawdown.
+- **9 horizon presets** — `LT_QUALITY_COMPOUNDER`, `LT_PEA_DEFENSIVE`, `LT_DEEP_VALUE`, `MT_GARP`, `MT_TURNAROUND`, `MT_INCOME`, `ST_MOMENTUM_QUALITY`, `ST_EARNINGS_DRIFT`, `ST_OVERSOLD_BOUNCE`.
+- **Walk-forward backtest framework** — alpha tests per preset against CAC 40 / S&P 500.
+- **Three-horizon UI** — `HorizonSelector`, `DCFFairValueRange`, `EarningsQualityPanel`, `MomentumPanel`, `CTOWarningBanner`.
+
+Start at [`docs/PROJECT_BRIEF.md`](docs/PROJECT_BRIEF.md) for the architectural map, [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md) for the methodology, [`docs/DATA_SOURCES.md`](docs/DATA_SOURCES.md) for the data layer, and [`CHANGELOG.md`](CHANGELOG.md) for the milestone-by-milestone history.
+
+---
+
 ## What This Does
 
 Invest Solo is a full-stack quantitative analysis platform that helps individual investors make data-driven decisions using academic valuation models.
 
-- **Screen** thousands of stocks using scientific valuation criteria
-- **Score** companies on a 0-100 composite scale across 6 dimensions
-- **Value** companies using DCF, Graham Number, and relative valuation models
-- **Generate** Buy / Hold / Sell signals based on rigorous thresholds
-- **Track** portfolios with risk metrics (Sharpe ratio, VaR, max drawdown)
+- **Screen** stocks across 9 horizon-aware presets (3 long-term, 3 medium-term, 3 short-term)
+- **Score** companies on three independent 0–100 composites (LT / MT / ST), each with sector-relative sub-scores
+- **Value** with a two-stage DCF (sensitivity grid), Graham Number, and sector-relative multiples
+- **Generate** Strong Buy / Buy / Hold / Sell / Strong Sell signals per horizon, each gated by data completeness, distress, and liquidity
+- **Track** portfolios with risk metrics (Sharpe, VaR, max drawdown)
 - **Report** daily market summaries and deep-dive company analyses
-- **Comply** with French PEA tax-advantaged account rules (EU/EEA stocks)
+- **Comply** with French PEA tax-advantaged account rules (EU/EEA stocks); short-term signals on PEA-eligible names trigger an explicit CTO recommendation
 
 ## Architecture
 
 ```mermaid
 graph LR
-    subgraph Data Sources
+    subgraph "Data Sources (M2)"
+        FMP[FMP free tier]
         YF[yfinance]
-        FMP[Financial Modeling Prep]
-        AV[Alpha Vantage]
     end
 
-    subgraph Backend - Python
-        ENGINE[Scoring Engine]
-        SCREENER[Stock Screener]
-        DCF[DCF & Graham Models]
-        API[FastAPI REST API]
+    subgraph "Backend - Python"
+        HYBRID[HybridDataFetcher<br/>per-field fallback]
+        ENGINE[Scoring Engine<br/>M3 sub-scores + M5 EQ/Moat/Risk]
+        DCF[DCF + Sensitivity<br/>M6]
+        HORIZONS[Three-horizon scoring<br/>M7]
+        SCREENER[9 horizon presets<br/>M8]
+        BACKTEST[Walk-forward backtest<br/>M12]
+        API[FastAPI<br/>M10 v2 schema]
     end
 
-    subgraph Frontend - Next.js
+    subgraph "Frontend - Next.js (M11)"
         DASH[Dashboard]
-        COMPANY[Company Analysis]
-        PORT[Portfolio Tracker]
+        COMPANY[Company Detail<br/>3-horizon, DCF range, EQ, momentum]
+        PORT[Portfolio]
         WATCH[Watchlist]
     end
 
-    YF --> ENGINE
-    FMP --> ENGINE
-    AV --> ENGINE
-    ENGINE --> SCREENER
+    FMP --> HYBRID
+    YF --> HYBRID
+    HYBRID --> ENGINE
     ENGINE --> DCF
+    ENGINE --> HORIZONS
+    DCF --> HORIZONS
+    HORIZONS --> SCREENER
+    HORIZONS --> API
     SCREENER --> API
-    DCF --> API
+    BACKTEST --> API
     API --> DASH
     API --> COMPANY
     API --> PORT
@@ -155,28 +178,34 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 
 ## Scoring Methodology
 
-Each company receives a composite score from 0 to 100, weighted across six dimensions:
+Every ticker gets **three independent composite scores** (0–100) — one per horizon — plus per-horizon signals and gate states. Default category weights (set in `settings.yaml` `horizons:`):
 
-| Dimension | Weight | What It Measures |
-|-----------|--------|-----------------|
-| Valuation | 25% | Price vs. intrinsic value (DCF, Graham) |
-| Financial Health | 20% | Debt ratios, Altman Z-Score, Piotroski F-Score |
-| Profitability | 20% | ROE, ROA, operating margins |
-| Growth | 15% | Revenue & earnings growth trends |
-| Shareholder Return | 10% | Dividends, buybacks |
-| Risk | 10% | Beta, volatility, max drawdown |
+| Category | Long-Term | Medium-Term | Short-Term |
+|---|---|---|---|
+| Valuation | 20% | 20% | 5% |
+| Profitability | 25% | 15% | 5% |
+| Health | 15% | 15% | 10% |
+| Earnings Quality | 10% | 10% | 5% |
+| Growth | 10% | 15% | 5% |
+| Capital Allocation | 10% | 5% | 5% |
+| Risk | 10% | 10% | 10% |
+| Momentum | — | 10% | 55% |
 
-Signals are generated based on score thresholds and price-to-intrinsic-value ratios:
+Each sub-score is a **sector-relative percentile rank** (0–100) computed via `df.groupby(Sector)[metric].rank(pct=True) * 100`. Sectors with fewer than 5 peers fall back to global rank.
 
-| Signal | Score | Price vs. Intrinsic |
-|--------|-------|-------------------|
-| Strong Buy | 80+ | < 70% |
-| Buy | 65+ | < 85% |
-| Hold | 40-65 | — |
-| Sell | < 40 | > 130% |
-| Strong Sell | < 25 | > 150% |
+Signals combine the composite score with the **DCF margin of safety** (`MoS = (intrinsic − price) / price`):
 
-See [docs/METHODOLOGY.md](docs/METHODOLOGY.md) for detailed formulas.
+| Signal | Composite | MoS |
+|---|---|---|
+| Strong Buy | ≥ 80 | ≥ 30% (price < 70% intrinsic) |
+| Buy | ≥ 65 | ≥ 15% (price < 85% intrinsic) |
+| Hold | 40–80 | -15%–15% |
+| Sell | ≤ 40 | OR ≤ -15% |
+| Strong Sell | — | ≤ -30% (price > 130% intrinsic) |
+
+When DCF can't be computed (e.g. for financials or names with missing FCF), the rule degrades gracefully to legacy composite-only thresholds.
+
+See [docs/METHODOLOGY.md](docs/METHODOLOGY.md) for the full methodology, and [CHANGELOG.md](CHANGELOG.md) for the milestone-by-milestone history.
 
 ## Tech Stack
 
@@ -205,10 +234,14 @@ API keys are managed through `.env` (see [`.env.example`](.env.example) for setu
 
 | Document | Description |
 |----------|-------------|
-| [PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md) | Full architecture, design decisions, and roadmap |
-| [METHODOLOGY.md](docs/METHODOLOGY.md) | Every valuation formula and model explained |
+| [PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md) | Architecture, folder layout, three-horizon scoring overview |
+| [METHODOLOGY.md](docs/METHODOLOGY.md) | v2 methodology: sub-scores, DCF, gates, output schema |
+| [DATA_SOURCES.md](docs/DATA_SOURCES.md) | FMP + yfinance hybrid, coverage matrix, caching |
 | [PEA_RULES.md](docs/PEA_RULES.md) | French PEA eligibility criteria and tax rules |
-| [DATA_SOURCES.md](docs/DATA_SOURCES.md) | All APIs, libraries, and data providers |
+| [docs/adr/](docs/adr/) | Architectural Decision Records (5 ADRs documenting the v2 rewrite) |
+| [docs/backtests/methodology.md](docs/backtests/methodology.md) | Backtest framework: assumptions, biases, statistical caveats |
+| [CHANGELOG.md](CHANGELOG.md) | Milestone-by-milestone (M0–M12) version history |
+| [openapi_v2.json](openapi_v2.json) | Frozen v2 OpenAPI spec |
 
 ## Contributing
 
