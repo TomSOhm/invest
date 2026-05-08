@@ -14,6 +14,12 @@ data:
   max_retries: 3
   request_delay_seconds: 0.5        # Avoid rate limits
 
+# ── FMP (Financial Modeling Prep) Settings ──
+fmp:
+  enabled: true                     # Kill-switch: set false to bypass FMP entirely
+  daily_limit: 240                  # Conservative cap below 250 free-tier limit
+  # token is loaded from FMP_TOKEN env variable (see .env)
+
 # ── PEA Universe ──
 pea:
   enabled: true

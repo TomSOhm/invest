@@ -2,11 +2,19 @@
 Invest Solo -- Backend Configuration
 Loads settings.yaml and ensures src modules are importable.
 """
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 import yaml
+from dotenv import load_dotenv
+
+# Load .env from the project root early so FMP_TOKEN and other env vars are
+# available before any service module is imported.
+_env_file = Path(__file__).resolve().parent.parent.parent / ".env"
+if _env_file.exists():
+    load_dotenv(str(_env_file))
 
 # ---------------------------------------------------------------------------
 # Resolve project root (two levels up from this file: backend/app/config.py)
@@ -160,6 +168,22 @@ class AppConfig:
     @property
     def screener_exclude_sectors(self) -> List[str]:
         return self._raw["screener"].get("exclude_sectors", [])
+
+    # -- fmp --
+    @property
+    def fmp_enabled(self) -> bool:
+        """Kill-switch for FMP fetcher. When False, HybridDataFetcher uses yfinance only."""
+        return bool(self._raw.get("fmp", {}).get("enabled", True))
+
+    @property
+    def fmp_daily_limit(self) -> int:
+        """Maximum FMP API calls per day (free tier = 250; we cap at 240)."""
+        return int(self._raw.get("fmp", {}).get("daily_limit", 240))
+
+    @property
+    def fmp_token(self) -> Optional[str]:
+        """FMP API token loaded from the FMP_TOKEN environment variable."""
+        return os.getenv("FMP_TOKEN") or None
 
     # -- logging --
     @property
