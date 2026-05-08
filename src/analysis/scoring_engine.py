@@ -6,6 +6,14 @@ import pandas as pd
 import numpy as np
 from typing import Any, Dict, List, Optional, Set, Tuple
 
+# M5 additions: Earnings Quality, Quality/Moat, real Risk metric aggregators.
+# These are exported as top-level names so callers can do:
+#     from src.analysis.scoring_engine import earnings_quality_score, moat_score, risk_score_real
+# The composite score / weights remain UNCHANGED in M5 (M7 owns reshuffling).
+from src.analysis.earnings_quality import earnings_quality_score  # noqa: E402,F401
+from src.analysis.quality_moat import moat_score  # noqa: E402,F401
+from src.analysis.risk_metrics import risk_score_real  # noqa: E402,F401
+
 # ══════════════════════════════════════════════════════════════
 # SCORING THRESHOLDS (from settings.yaml)
 # ══════════════════════════════════════════════════════════════
@@ -436,8 +444,27 @@ def data_completeness(row: pd.Series) -> float:
     return round(present / len(_SCORING_INPUT_FIELDS), 2)
 
 
-def score_universe(df: pd.DataFrame) -> pd.DataFrame:
-    """Score entire universe and add all analytical columns."""
+def score_universe(
+    df: pd.DataFrame,
+    price_history_map: Optional[Dict[str, Any]] = None,
+) -> pd.DataFrame:
+    """Score entire universe and add all analytical columns.
+
+    M5 addition: also computes ``EarningsQuality_Score``, ``Moat_Score`` and
+    ``Risk_Score_v2`` columns. The legacy ``Risk_Score`` is preserved
+    (unchanged) so the public schema is stable; ``Risk_Score_v2`` is the new
+    informational column. The composite calculation is NOT touched -- M7 owns
+    the reshuffling of weights to incorporate the new categories.
+
+    Parameters
+    ----------
+    df:
+        Input universe DataFrame.
+    price_history_map:
+        Optional ``{ticker: pd.DataFrame}`` map plumbed through to
+        ``risk_score_real`` for vol / drawdown / beta. When absent, the
+        risk-v2 score falls back to row-only signals.
+    """
     results = []
     for ticker, row in df.iterrows():
         scores = compute_composite_score(row)
@@ -469,4 +496,21 @@ def score_universe(df: pd.DataFrame) -> pd.DataFrame:
         np.nan
     )
     merged["Graham_MoS"] = merged["Graham_MoS"].round(1)
+
+    # ------------------------------------------------------------------
+    # M5: Informational scores (do NOT participate in Composite_Score yet)
+    # ------------------------------------------------------------------
+    try:
+        merged["EarningsQuality_Score"] = earnings_quality_score(merged)
+    except Exception:
+        merged["EarningsQuality_Score"] = 50.0
+    try:
+        merged["Moat_Score"] = moat_score(merged)
+    except Exception:
+        merged["Moat_Score"] = 50.0
+    try:
+        merged["Risk_Score_v2"] = risk_score_real(merged, price_history_map=price_history_map)
+    except Exception:
+        merged["Risk_Score_v2"] = 50.0
+
     return merged.sort_values("Composite_Score", ascending=False)

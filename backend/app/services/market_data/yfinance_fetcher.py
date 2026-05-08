@@ -759,7 +759,153 @@ class YFinanceDataFetcher:
             result["FiftyTwoWeekHigh"] = _safe_get(info, "fiftyTwoWeekHigh", np.nan)
             result["FiftyTwoWeekLow"] = _safe_get(info, "fiftyTwoWeekLow", np.nan)
 
+            # ------------------------------------------------------------------
+            # M5 additions: history arrays + Beneish prior-year inputs
+            # ------------------------------------------------------------------
+            history_fields = self._extract_history_and_prior(
+                financials=financials,
+                balance_sheet=balance_sheet,
+                cashflow=cashflow,
+                current_ebit=result.get("EBIT"),
+                current_equity=result.get("TotalEquity"),
+                current_debt=result.get("TotalDebt"),
+                current_cash=result.get("Cash"),
+            )
+            result.update(history_fields)
+            # WACC placeholder (M6 fills the real value)
+            result["WACC"] = np.nan
+
         except Exception as exc:
             logger.error(f"yfinance fetch_full_row failed for {ticker}: {exc}")
 
         return result
+
+    # ------------------------------------------------------------------
+    # M5: history + Beneish prior-year extraction (yfinance variant)
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _extract_history_and_prior(
+        financials: Optional[pd.DataFrame],
+        balance_sheet: Optional[pd.DataFrame],
+        cashflow: Optional[pd.DataFrame],
+        current_ebit: Optional[float] = None,
+        current_equity: Optional[float] = None,
+        current_debt: Optional[float] = None,
+        current_cash: Optional[float] = None,
+    ) -> Dict[str, Any]:
+        """Pull 5y / 3y history arrays + Beneish prior-year scalars from yfinance.
+
+        Tolerant of gaps: every field defaults to NaN or [] when yfinance does
+        not return the underlying line item.
+        """
+        out: Dict[str, Any] = {}
+
+        def _series_at(stmt: Optional[pd.DataFrame], keys: Sequence[str]) -> List[float]:
+            """Return finite numeric values from row matching any key, ordered most-recent first."""
+            if stmt is None or not isinstance(stmt, pd.DataFrame) or stmt.empty:
+                return []
+            for k in keys:
+                if k in stmt.index:
+                    row = stmt.loc[k]
+                    if isinstance(row, pd.DataFrame):
+                        if row.empty:
+                            continue
+                        row = row.iloc[0]
+                    vals: List[float] = []
+                    for c in row.index:
+                        v = row[c]
+                        if _is_finite_number(v):
+                            vals.append(float(v))
+                    if vals:
+                        return vals
+            return []
+
+        # Income-statement series
+        revenue_hist = _series_at(financials, ["Total Revenue", "TotalRevenue", "Revenue"])
+        ni_hist = _series_at(financials, ["Net Income", "NetIncome", "Net Income Common Stockholders"])
+        ebit_hist = _series_at(financials, ["EBIT", "Operating Income", "OperatingIncome"])
+        op_inc_hist = ebit_hist
+        cogs_hist = _series_at(financials, ["Cost Of Revenue", "Cost Of Goods Sold", "CostOfRevenue"])
+        sga_hist = _series_at(financials, ["Selling General And Administration", "SellingGeneralAndAdministrative", "SG&A Expense"])
+        gross_profit_hist = _series_at(financials, ["Gross Profit", "GrossProfit"])
+        interest_hist = _series_at(financials, ["Interest Expense", "InterestExpense"])
+
+        # Balance-sheet series
+        ta_hist = _series_at(balance_sheet, ["Total Assets", "TotalAssets"])
+        ca_hist = _series_at(balance_sheet, ["Current Assets", "Total Current Assets", "CurrentAssets"])
+        cl_hist = _series_at(balance_sheet, ["Current Liabilities", "Total Current Liabilities", "CurrentLiabilities"])
+        recv_hist = _series_at(balance_sheet, ["Net Receivables", "Receivables", "AccountsReceivable", "Accounts Receivable"])
+        ppe_hist = _series_at(balance_sheet, ["Net PPE", "Property Plant Equipment Net", "Net Property Plant And Equipment"])
+        ltd_hist = _series_at(balance_sheet, ["Long Term Debt", "LongTermDebt"])
+        equity_hist = _series_at(balance_sheet, ["Stockholders Equity", "Total Stockholder Equity", "Common Stock Equity"])
+        debt_hist = _series_at(balance_sheet, ["Total Debt", "TotalDebt"])
+        cash_hist = _series_at(balance_sheet, ["Cash And Cash Equivalents", "CashAndCashEquivalents", "Cash"])
+
+        # Cash-flow series
+        fcf_hist = _series_at(cashflow, ["Free Cash Flow", "FreeCashFlow"])
+        op_cf_hist = _series_at(cashflow, ["Operating Cash Flow", "OperatingCashFlow", "Cash Flow From Continuing Operating Activities"])
+        capex_hist = _series_at(cashflow, ["Capital Expenditure", "CapitalExpenditure", "Capital Expenditures"])
+        da_hist = _series_at(cashflow, ["Depreciation And Amortization", "DepreciationAndAmortization", "Depreciation Amortization Depletion"])
+
+        # FCF fallback: OCF - |CapEx|
+        if not fcf_hist and op_cf_hist and capex_hist:
+            n = min(len(op_cf_hist), len(capex_hist))
+            fcf_hist = [op_cf_hist[i] - abs(capex_hist[i]) for i in range(n)]
+
+        # Operating-margin history (op_income / revenue)
+        op_margin_hist: List[float] = []
+        if op_inc_hist and revenue_hist:
+            n = min(len(op_inc_hist), len(revenue_hist))
+            for i in range(n):
+                if revenue_hist[i] != 0:
+                    op_margin_hist.append(op_inc_hist[i] / revenue_hist[i])
+
+        # ROIC + invested-capital history
+        roic_hist: List[float] = []
+        ic_hist: List[float] = []
+        if ebit_hist and equity_hist and debt_hist and cash_hist:
+            n = min(len(ebit_hist), len(equity_hist), len(debt_hist), len(cash_hist))
+            for i in range(n):
+                invested = equity_hist[i] + debt_hist[i] - cash_hist[i]
+                if invested > 0:
+                    roic_hist.append((ebit_hist[i] * 0.75) / invested)
+                    ic_hist.append(invested)
+
+        # Most-recent-first conventions
+        out["FCF_History_5y"] = fcf_hist[:5]
+        out["NetIncome_History_5y"] = ni_hist[:5]
+        out["ROIC_History_5y"] = roic_hist[:5]
+        out["OperatingMargin_History_5y"] = op_margin_hist[:5]
+        out["EBIT_History_3y"] = ebit_hist[:3]
+        out["InvestedCapital_History_3y"] = ic_hist[:3]
+
+        # Beneish prior-year scalars
+        def _idx(seq: List[float], i: int) -> float:
+            return seq[i] if 0 <= i < len(seq) else float("nan")
+
+        out.setdefault("Receivables", _idx(recv_hist, 0))
+        out["Receivables_PriorYear"] = _idx(recv_hist, 1)
+        out["Revenue_PriorYear"] = _idx(revenue_hist, 1)
+        if gross_profit_hist and revenue_hist:
+            n = min(len(gross_profit_hist), len(revenue_hist))
+            gm_hist = [gross_profit_hist[i] / revenue_hist[i] for i in range(n) if revenue_hist[i] != 0]
+            out["GrossMargin_PriorYear"] = _idx(gm_hist, 1)
+        else:
+            out["GrossMargin_PriorYear"] = float("nan")
+        out["TotalAssets_PriorYear"] = _idx(ta_hist, 1)
+        out["CurrentAssets_PriorYear"] = _idx(ca_hist, 1)
+        out["CurrentLiabilities_PriorYear"] = _idx(cl_hist, 1)
+        out["PPE"] = _idx(ppe_hist, 0)
+        out["PPE_PriorYear"] = _idx(ppe_hist, 1)
+        out["DepreciationAmortization"] = _idx(da_hist, 0)
+        out["DepreciationAmortization_PriorYear"] = _idx(da_hist, 1)
+        out["SGA"] = _idx(sga_hist, 0)
+        out["SGA_PriorYear"] = _idx(sga_hist, 1)
+        out["LongTermDebt"] = _idx(ltd_hist, 0)
+        out["LongTermDebt_PriorYear"] = _idx(ltd_hist, 1)
+        out["COGS"] = _idx(cogs_hist, 0)
+        # Real interest expense scalar (positive convention)
+        out["InterestExpense"] = abs(_idx(interest_hist, 0)) if np.isfinite(_idx(interest_hist, 0)) else float("nan")
+
+        return out

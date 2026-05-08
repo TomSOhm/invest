@@ -50,6 +50,23 @@ _FMP_SUPPLIED_FIELDS = {
     "CurrentAssets", "CurrentLiabilities", "RetainedEarnings",
     "GrossMargin", "OperatingMargin", "NetMargin", "RevenueGrowth",
     "ROE", "ROA",
+    # M5 Beneish prior-year inputs (scalars)
+    "Receivables", "Receivables_PriorYear",
+    "Revenue_PriorYear", "GrossMargin_PriorYear",
+    "TotalAssets_PriorYear", "CurrentAssets_PriorYear",
+    "CurrentLiabilities_PriorYear",
+    "PPE", "PPE_PriorYear",
+    "DepreciationAmortization", "DepreciationAmortization_PriorYear",
+    "SGA", "SGA_PriorYear",
+    "LongTermDebt", "LongTermDebt_PriorYear",
+    "COGS", "InterestExpense",
+}
+
+# M5: list-valued history columns that override scalars-only `_is_valid` checks.
+_FMP_SUPPLIED_HISTORY_FIELDS = {
+    "FCF_History_5y", "NetIncome_History_5y",
+    "ROIC_History_5y", "OperatingMargin_History_5y",
+    "EBIT_History_3y", "InvestedCapital_History_3y",
 }
 
 
@@ -157,6 +174,18 @@ class HybridDataFetcher:
                 result[scoring_col] = float(fmp_val)
                 field_sources[scoring_col] = "fmp"
 
+        # M5: overlay list-valued history fields. Treated as "valid" when
+        # non-empty, regardless of element-wise finiteness (the consumers
+        # filter for finiteness internally).
+        for hist_col in _FMP_SUPPLIED_HISTORY_FIELDS:
+            fmp_seq = fmp_fields.get(hist_col)
+            if isinstance(fmp_seq, list) and len(fmp_seq) >= 1:
+                result[hist_col] = list(fmp_seq)
+                field_sources[hist_col] = "fmp"
+
+        # M5: WACC placeholder. M6 will fill with the real value.
+        result.setdefault("WACC", np.nan)
+
         # FMP supplies EBIT as operatingIncome which is the right value.
         # If we got a valid FMP EBIT and the yfinance one was NaN, we've improved.
         # InterestExpense_FMP: use to compute InterestCoverage if FMP has EBIT
@@ -215,11 +244,29 @@ class HybridDataFetcher:
         # ------------------------------------------------------------------
         # Step 6: data_completeness
         # ------------------------------------------------------------------
-        numeric_cols = [
-            c for c in SCORING_COLUMNS
-            if c not in ("Name", "Sector", "Industry", "Country", "Exchange",
-                         "PEA", "PEA_PME")
-        ]
+        # We exclude:
+        #   - identification fields (Name, Sector, ...): never numeric
+        #   - all M5-added fields: keep the M2 denominator stable so the
+        #     `data_completeness` ratio stays comparable across milestones.
+        #     M7 will redefine completeness with the new categories included.
+        _COMPLETENESS_EXCLUDE = {
+            "Name", "Sector", "Industry", "Country", "Exchange",
+            "PEA", "PEA_PME",
+            # M5 additions (excluded to keep completeness stable across milestones)
+            "FCF_History_5y", "NetIncome_History_5y",
+            "ROIC_History_5y", "OperatingMargin_History_5y",
+            "EBIT_History_3y", "InvestedCapital_History_3y",
+            "Receivables", "Receivables_PriorYear",
+            "Revenue_PriorYear", "GrossMargin_PriorYear",
+            "TotalAssets_PriorYear", "CurrentAssets_PriorYear",
+            "PPE", "PPE_PriorYear",
+            "DepreciationAmortization", "DepreciationAmortization_PriorYear",
+            "SGA", "SGA_PriorYear",
+            "LongTermDebt", "LongTermDebt_PriorYear",
+            "CurrentLiabilities_PriorYear",
+            "COGS", "InterestExpense", "WACC",
+        }
+        numeric_cols = [c for c in SCORING_COLUMNS if c not in _COMPLETENESS_EXCLUDE]
         n_present = sum(1 for c in numeric_cols if self._is_valid(result.get(c)))
         result["data_completeness"] = n_present / len(numeric_cols) if numeric_cols else 0.0
         result["field_sources"] = field_sources
