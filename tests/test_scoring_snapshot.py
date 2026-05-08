@@ -51,7 +51,7 @@ def _approx_equal(a, b, rel: float = 1e-6, abs_: float = 1e-6) -> bool:
 def test_scoring_snapshot_matches(ticker: str) -> None:
     row = load_input_row(ticker)
     expected = load_snapshot(ticker)
-    actual = score_row(row)
+    actual = score_row(row, ticker=ticker)
 
     mismatches = []
     for key, exp_val in expected.items():

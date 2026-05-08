@@ -1,10 +1,27 @@
 """
 Invest Solo — Composite Scoring Engine
-Implements the 0-100 scoring system from METHODOLOGY.md
+Implements the 0-100 scoring system from METHODOLOGY.md.
+
+M3 (sector-relative percentile): the legacy ``_percentile_score`` linear
+map (hardcoded per-metric breakpoints, mislabelled as a percentile) is
+removed. Sub-score builders now operate on full DataFrames and rank each
+metric within sector groups via ``score_sector_relative``. The per-row
+API (``valuation_score``, ``financial_health_score``, …,
+``compute_composite_score``) is preserved as a thin shim that builds a
+1-row DataFrame on the fly — useful for snapshot tests that score a
+single frozen input row, but it cannot compute meaningful peer
+percentiles in isolation. Pass an explicit peer DataFrame via
+``compute_composite_score_with_peers`` for sector-aware single-ticker
+scoring.
 """
+from __future__ import annotations
+
 import pandas as pd
 import numpy as np
 from typing import Any, Dict, List, Optional, Set, Tuple
+
+from src.analysis.sector_percentile import score_sector_relative
+
 
 # ══════════════════════════════════════════════════════════════
 # SCORING THRESHOLDS (from settings.yaml)
@@ -39,6 +56,19 @@ _ALTMAN_MANUFACTURER_SECTORS: Set[str] = {
 }
 
 
+# Negative-PE penalty (legacy semantics preserved): unprofitable companies
+# receive a fixed low score on the PE component, regardless of where they
+# would rank within their sector. Applied as a post-rank override in
+# ``valuation_score_df``.
+_NEGATIVE_PE_PENALTY: float = 10.0
+
+
+# Minimum peers per sector before sector-relative ranking is preferred over
+# the global universe. Below this threshold, the sector falls through to
+# the global rank — see sector_percentile.score_sector_relative.
+_DEFAULT_MIN_PEERS: int = 5
+
+
 def _is_finite(val: Any) -> bool:
     """True iff val is a finite numeric (rejects None, NaN, Inf, non-numeric)."""
     try:
@@ -48,159 +78,355 @@ def _is_finite(val: Any) -> bool:
     return np.isfinite(f)
 
 
-# DEPRECATED: replaced by sector_relative_percentile in M3.
-def _percentile_score(value: float, low_bad: float, high_good: float, inverse: bool = False) -> float:
-    """Map a value to 0-100 score. If inverse=True, lower is better.
+# ══════════════════════════════════════════════════════════════
+# Vectorised sub-score builders (M3)
+# Each takes the full DataFrame and returns a Series indexed identically
+# to df. Components are aggregated via mean(axis=1, skipna=True) so that
+# missing metrics simply drop out instead of being imputed at 50.
+# ══════════════════════════════════════════════════════════════
 
-    Hardcoded linear mapping; kept verbatim through M2 to preserve the public
-    schema, then replaced by `sector_relative_percentile` in M3.
+
+def _ensure_columns(df: pd.DataFrame, names: List[str]) -> pd.DataFrame:
+    """Return a DataFrame guaranteed to contain ``names``; missing become NaN."""
+    out = df.copy()
+    for n in names:
+        if n not in out.columns:
+            out[n] = np.nan
+    return out
+
+
+def valuation_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS) -> pd.Series:
+    """Sector-relative valuation score (0-100).
+
+    Components: PE, PB, PS, PFCF, EV_EBITDA, EV_Sales — all inverse
+    (lower is cheaper). Negative PE rows receive the legacy penalty
+    (``_NEGATIVE_PE_PENALTY``) as a post-rank override.
     """
-    if pd.isna(value) or np.isinf(value):
-        return 50.0  # neutral for missing data
-    if inverse:
-        if value <= low_bad:
-            return 100.0
-        elif value >= high_good:
-            return 0.0
-        else:
-            return 100.0 * (high_good - value) / (high_good - low_bad)
-    else:
-        if value >= high_good:
-            return 100.0
-        elif value <= low_bad:
-            return 0.0
-        else:
-            return 100.0 * (value - low_bad) / (high_good - low_bad)
+    df = _ensure_columns(df, ["PE", "PB", "PS", "PFCF", "EV_EBITDA", "EV_Sales", "Sector"])
+
+    parts = pd.concat(
+        [
+            score_sector_relative(df, "PE", inverse=True, min_n=min_n).rename("PE"),
+            score_sector_relative(df, "PB", inverse=True, min_n=min_n).rename("PB"),
+            score_sector_relative(df, "PS", inverse=True, min_n=min_n).rename("PS"),
+            score_sector_relative(df, "PFCF", inverse=True, min_n=min_n).rename("PFCF"),
+            score_sector_relative(df, "EV_EBITDA", inverse=True, min_n=min_n).rename("EV_EBITDA"),
+            score_sector_relative(df, "EV_Sales", inverse=True, min_n=min_n).rename("EV_Sales"),
+        ],
+        axis=1,
+    )
+
+    # Negative-PE penalty: override the PE component on rows where PE < 0.
+    pe_numeric = pd.to_numeric(df["PE"], errors="coerce")
+    neg_pe_mask = pe_numeric < 0
+    if neg_pe_mask.any():
+        parts.loc[neg_pe_mask, "PE"] = _NEGATIVE_PE_PENALTY
+
+    # Drop PFCF column for rows where PFCF <= 0: legacy rule — only score
+    # PFCF when it is positive (otherwise the metric is meaningless).
+    pfcf_numeric = pd.to_numeric(df["PFCF"], errors="coerce")
+    bad_pfcf = pfcf_numeric.notna() & (pfcf_numeric <= 0)
+    if bad_pfcf.any():
+        parts.loc[bad_pfcf, "PFCF"] = np.nan
+
+    return parts.mean(axis=1, skipna=True)
 
 
-def valuation_score(row: pd.Series) -> float:
-    """Score 0-100: how undervalued is this stock?"""
-    scores = []
-    # P/E: lower is cheaper (inverse), but negative P/E = unprofitable = bad
-    pe = row.get("PE", np.nan)
-    if pd.notna(pe) and pe > 0:
-        scores.append(_percentile_score(pe, 5.0, 30.0, inverse=True))
-    elif pd.notna(pe) and pe < 0:
-        scores.append(10.0)  # Unprofitable penalty
-    # P/B: lower is cheaper
-    scores.append(_percentile_score(row.get("PB", np.nan), 0.3, 5.0, inverse=True))
-    # P/S: lower is cheaper
-    scores.append(_percentile_score(row.get("PS", np.nan), 0.2, 8.0, inverse=True))
-    # P/FCF: lower is cheaper
-    pfcf = row.get("PFCF", np.nan)
-    if pd.notna(pfcf) and pfcf > 0:
-        scores.append(_percentile_score(pfcf, 5.0, 35.0, inverse=True))
-    # EV/EBITDA: lower is cheaper
-    scores.append(_percentile_score(row.get("EV_EBITDA", np.nan), 3.0, 20.0, inverse=True))
-    # EV/Sales: lower is cheaper
-    scores.append(_percentile_score(row.get("EV_Sales", np.nan), 0.3, 8.0, inverse=True))
-    return np.mean(scores) if scores else 50.0
+def financial_health_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS) -> pd.Series:
+    """Sector-relative financial-health score (0-100).
+
+    Components:
+        - CurrentRatio (higher better)
+        - DebtEquity (lower better)
+        - InterestCoverage (higher better)
+        - Net Debt / EBITDA, derived = (TotalDebt - Cash) / EBITDA (lower better)
+    Each is sector-percentile-ranked; missing components drop out.
+    """
+    df = _ensure_columns(
+        df,
+        [
+            "CurrentRatio",
+            "DebtEquity",
+            "InterestCoverage",
+            "EBITDA",
+            "TotalDebt",
+            "Cash",
+            "Sector",
+        ],
+    )
+
+    # Build derived ND/EBITDA column (legacy-equivalent definition).
+    ebitda = pd.to_numeric(df["EBITDA"], errors="coerce")
+    debt = pd.to_numeric(df["TotalDebt"], errors="coerce")
+    cash = pd.to_numeric(df["Cash"], errors="coerce")
+    nd_ebitda = (debt - cash) / ebitda.where(ebitda > 0)
+    df = df.copy()
+    df["_ND_EBITDA"] = nd_ebitda
+
+    # Skip CurrentRatio rows where it is non-positive (meaningless).
+    cr = pd.to_numeric(df["CurrentRatio"], errors="coerce")
+    df["CurrentRatio"] = cr.where(cr > 0)
+
+    # Skip DebtEquity rows where it is negative (data quirk — neg equity).
+    de = pd.to_numeric(df["DebtEquity"], errors="coerce")
+    df["DebtEquity"] = de.where(de >= 0)
+
+    # Skip InterestCoverage rows where it is non-positive.
+    ic = pd.to_numeric(df["InterestCoverage"], errors="coerce")
+    df["InterestCoverage"] = ic.where(ic > 0)
+
+    parts = pd.concat(
+        [
+            score_sector_relative(df, "CurrentRatio", inverse=False, min_n=min_n).rename(
+                "CurrentRatio"
+            ),
+            score_sector_relative(df, "DebtEquity", inverse=True, min_n=min_n).rename(
+                "DebtEquity"
+            ),
+            score_sector_relative(df, "InterestCoverage", inverse=False, min_n=min_n).rename(
+                "InterestCoverage"
+            ),
+            score_sector_relative(df, "_ND_EBITDA", inverse=True, min_n=min_n).rename(
+                "ND_EBITDA"
+            ),
+        ],
+        axis=1,
+    )
+    return parts.mean(axis=1, skipna=True)
 
 
-def financial_health_score(row: pd.Series) -> float:
-    """Score 0-100: how financially solid is this company?"""
-    scores = []
-    # Current ratio: higher is better (but >3 is excess)
-    cr = row.get("CurrentRatio", np.nan)
-    if pd.notna(cr) and cr > 0:
-        scores.append(_percentile_score(cr, 0.5, 2.5))
-    # Debt/Equity: lower is better
-    de = row.get("DebtEquity", np.nan)
-    if pd.notna(de) and de >= 0:
-        scores.append(_percentile_score(de, 0.0, 3.0, inverse=True))
-    # Interest Coverage: higher is better
-    ic = row.get("InterestCoverage", np.nan)
-    if pd.notna(ic) and ic > 0:
-        scores.append(_percentile_score(ic, 1.5, 15.0))
-    # Net Debt / EBITDA: lower is better
-    ebitda = row.get("EBITDA", 0)
-    debt = row.get("TotalDebt", 0)
-    cash = row.get("Cash", 0)
-    if ebitda and ebitda > 0:
-        nd_ebitda = (debt - cash) / ebitda
-        scores.append(_percentile_score(nd_ebitda, -1.0, 5.0, inverse=True))
-    return np.mean(scores) if scores else 50.0
+def profitability_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS) -> pd.Series:
+    """Sector-relative profitability score (0-100).
+
+    Components: ROE, ROA, ROIC, OperatingMargin, NetMargin, FCFMargin —
+    all higher-is-better.
+    """
+    df = _ensure_columns(
+        df,
+        [
+            "ROE", "ROA", "ROIC",
+            "OperatingMargin", "NetMargin", "FCFMargin",
+            "Sector",
+        ],
+    )
+    parts = pd.concat(
+        [
+            score_sector_relative(df, "ROE", inverse=False, min_n=min_n).rename("ROE"),
+            score_sector_relative(df, "ROA", inverse=False, min_n=min_n).rename("ROA"),
+            score_sector_relative(df, "ROIC", inverse=False, min_n=min_n).rename("ROIC"),
+            score_sector_relative(df, "OperatingMargin", inverse=False, min_n=min_n).rename(
+                "OperatingMargin"
+            ),
+            score_sector_relative(df, "NetMargin", inverse=False, min_n=min_n).rename("NetMargin"),
+            score_sector_relative(df, "FCFMargin", inverse=False, min_n=min_n).rename("FCFMargin"),
+        ],
+        axis=1,
+    )
+    return parts.mean(axis=1, skipna=True)
 
 
-def profitability_score(row: pd.Series) -> float:
-    """Score 0-100: how profitable is this company?"""
-    scores = []
-    # ROE
-    roe = row.get("ROE", np.nan)
-    if pd.notna(roe):
-        scores.append(_percentile_score(roe, 0.0, 0.25))
-    # ROA
-    scores.append(_percentile_score(row.get("ROA", np.nan), 0.0, 0.12))
-    # ROIC
-    roic = row.get("ROIC", np.nan)
-    if pd.notna(roic):
-        scores.append(_percentile_score(roic, 0.0, 0.20))
-    # Operating Margin
-    scores.append(_percentile_score(row.get("OperatingMargin", np.nan), 0.0, 0.25))
-    # Net Margin
-    scores.append(_percentile_score(row.get("NetMargin", np.nan), 0.0, 0.20))
-    # FCF Margin
-    scores.append(_percentile_score(row.get("FCFMargin", np.nan), 0.0, 0.15))
-    return np.mean(scores) if scores else 50.0
+def growth_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS) -> pd.Series:
+    """Sector-relative growth score (0-100). Single component: RevenueGrowth."""
+    df = _ensure_columns(df, ["RevenueGrowth", "Sector"])
+    return score_sector_relative(df, "RevenueGrowth", inverse=False, min_n=min_n)
 
 
-def growth_score(row: pd.Series) -> float:
-    """Score 0-100: how fast is this company growing?"""
-    scores = []
-    rg = row.get("RevenueGrowth", np.nan)
-    if pd.notna(rg):
-        scores.append(_percentile_score(rg, -0.10, 0.25))
-    return np.mean(scores) if scores else 50.0
+def shareholder_return_score_df(
+    df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS
+) -> pd.Series:
+    """Sector-relative shareholder-return score (0-100).
+
+    Components:
+        - DivYield: higher is better, sector-percentile rank.
+        - PayoutRatio: legacy non-monotonic curve preserved (peak at
+          30-60%, low at extremes). Implemented as a deterministic
+          function of the raw PayoutRatio rather than a rank, because
+          the "ideal range" semantics don't translate to percentile.
+    """
+    df = _ensure_columns(df, ["DivYield", "PayoutRatio", "Sector"])
+
+    div_score = score_sector_relative(df, "DivYield", inverse=False, min_n=min_n)
+
+    pr = pd.to_numeric(df["PayoutRatio"], errors="coerce")
+    payout_score = pr.apply(_payout_curve)
+
+    return pd.concat([div_score.rename("DivYield"), payout_score.rename("PayoutRatio")], axis=1).mean(
+        axis=1, skipna=True
+    )
 
 
-def shareholder_return_score(row: pd.Series) -> float:
-    """Score 0-100: how well does this company reward shareholders?"""
-    scores = []
-    # Dividend yield
-    dy = row.get("DivYield", np.nan)
-    if pd.notna(dy):
-        scores.append(_percentile_score(dy, 0.0, 0.06))
-    # Payout ratio: moderate is best (30-60% ideal)
-    pr = row.get("PayoutRatio", np.nan)
-    if pd.notna(pr):
-        if 0.30 <= pr <= 0.60:
-            scores.append(90.0)
-        elif pr < 0.30:
-            scores.append(50.0 + pr / 0.30 * 40)
-        elif pr <= 1.0:
-            scores.append(max(20, 90 - (pr - 0.60) / 0.40 * 70))
-        else:
-            scores.append(10.0)  # >100% payout = unsustainable
-    return np.mean(scores) if scores else 50.0
+def _payout_curve(pr: float) -> float:
+    """Legacy non-monotonic payout-ratio curve (M2 semantics preserved)."""
+    if pd.isna(pr):
+        return np.nan
+    if 0.30 <= pr <= 0.60:
+        return 90.0
+    if pr < 0.30:
+        return 50.0 + pr / 0.30 * 40.0
+    if pr <= 1.0:
+        return max(20.0, 90.0 - (pr - 0.60) / 0.40 * 70.0)
+    return 10.0  # > 100% payout = unsustainable
 
 
-def risk_score(row: pd.Series) -> float:
-    """Score 0-100: how safe is this stock? (higher = safer)"""
-    scores = []
-    # Beta: closer to 1 is moderate, low beta = safer
-    beta = row.get("Beta", np.nan)
-    if pd.notna(beta):
-        scores.append(_percentile_score(beta, 0.3, 2.0, inverse=True))
-    # Interest coverage (overlap with health but risk-specific)
-    ic = row.get("InterestCoverage", np.nan)
-    if pd.notna(ic) and ic > 0:
-        scores.append(_percentile_score(ic, 2.0, 12.0))
-    return np.mean(scores) if scores else 50.0
+def risk_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS) -> pd.Series:
+    """Sector-relative risk score (0-100, higher = safer).
+
+    Components:
+        - Beta: lower is safer (inverse rank).
+        - InterestCoverage: higher is safer (overlap with health, kept
+          for risk-specific weighting).
+    """
+    df = _ensure_columns(df, ["Beta", "InterestCoverage", "Sector"])
+    df = df.copy()
+    ic = pd.to_numeric(df["InterestCoverage"], errors="coerce")
+    df["InterestCoverage"] = ic.where(ic > 0)
+
+    parts = pd.concat(
+        [
+            score_sector_relative(df, "Beta", inverse=True, min_n=min_n).rename("Beta"),
+            score_sector_relative(df, "InterestCoverage", inverse=False, min_n=min_n).rename(
+                "InterestCoverage"
+            ),
+        ],
+        axis=1,
+    )
+    return parts.mean(axis=1, skipna=True)
 
 
-def compute_composite_score(row: pd.Series) -> Dict[str, float]:
-    """Calculate full composite score with category breakdown."""
+def _composite_from_subscores(subscores: pd.DataFrame) -> pd.Series:
+    """Weighted sum of sub-scores into a single composite Series."""
+    composite = (
+        subscores["Valuation_Score"] * SCORING_WEIGHTS["valuation"]
+        + subscores["Health_Score"] * SCORING_WEIGHTS["financial_health"]
+        + subscores["Profitability_Score"] * SCORING_WEIGHTS["profitability"]
+        + subscores["Growth_Score"] * SCORING_WEIGHTS["growth"]
+        + subscores["Shareholder_Score"] * SCORING_WEIGHTS["shareholder_return"]
+        + subscores["Risk_Score"] * SCORING_WEIGHTS["risk"]
+    )
+    return composite
+
+
+# ══════════════════════════════════════════════════════════════
+# Per-row API (back-compat shim, M3)
+#
+# These functions exist so legacy callers (snapshot tests via
+# ``score_row``, the company-detail endpoint via
+# ``ScoringService.score_single``) keep compiling. They wrap the row in
+# a 1-row DataFrame and call the vectorised builder. With a 1-row
+# DataFrame and no peers, sector-relative ranking degenerates to "this
+# row is the only one" -> rank = 100 (or 0 inverse). For meaningful
+# peer-aware scoring, callers should switch to the DataFrame-shaped
+# entry points (``score_dataframe``, ``compute_composite_score_with_peers``).
+# ══════════════════════════════════════════════════════════════
+
+
+def _single_row_df(row: pd.Series) -> pd.DataFrame:
+    """Wrap a Series in a 1-row DataFrame, indexed by the Series name (or '_').
+
+    Series.to_frame().T loses the dtype hints of empty cells; we explicitly
+    coerce numeric-looking columns to numeric so subsequent rank math works.
+    """
+    name = row.name if row.name is not None else "_"
+    df = pd.DataFrame([row.to_dict()], index=[name])
+    return df
+
+
+def valuation_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+    """Per-row valuation score; uses ``peers`` as the peer universe if given."""
+    df = peers if peers is not None else _single_row_df(row)
+    if peers is not None and (row.name not in df.index):
+        # Caller supplied peers without this row in them — append it so we
+        # rank the row in context. Avoid mutating the caller's DataFrame.
+        df = pd.concat([df, _single_row_df(row)])
+    score_series = valuation_score_df(df)
+    return float(score_series.loc[row.name if row.name is not None else "_"])
+
+
+def financial_health_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+    df = peers if peers is not None else _single_row_df(row)
+    if peers is not None and (row.name not in df.index):
+        df = pd.concat([df, _single_row_df(row)])
+    return float(financial_health_score_df(df).loc[row.name if row.name is not None else "_"])
+
+
+def profitability_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+    df = peers if peers is not None else _single_row_df(row)
+    if peers is not None and (row.name not in df.index):
+        df = pd.concat([df, _single_row_df(row)])
+    return float(profitability_score_df(df).loc[row.name if row.name is not None else "_"])
+
+
+def growth_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+    df = peers if peers is not None else _single_row_df(row)
+    if peers is not None and (row.name not in df.index):
+        df = pd.concat([df, _single_row_df(row)])
+    return float(growth_score_df(df).loc[row.name if row.name is not None else "_"])
+
+
+def shareholder_return_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+    df = peers if peers is not None else _single_row_df(row)
+    if peers is not None and (row.name not in df.index):
+        df = pd.concat([df, _single_row_df(row)])
+    return float(shareholder_return_score_df(df).loc[row.name if row.name is not None else "_"])
+
+
+def risk_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+    df = peers if peers is not None else _single_row_df(row)
+    if peers is not None and (row.name not in df.index):
+        df = pd.concat([df, _single_row_df(row)])
+    return float(risk_score_df(df).loc[row.name if row.name is not None else "_"])
+
+
+def compute_composite_score(
+    row: pd.Series,
+    peers: Optional[pd.DataFrame] = None,
+) -> Dict[str, float]:
+    """Calculate full composite score with category breakdown.
+
+    Without ``peers``, ranks against a 1-row universe (degenerate but
+    backward-compatible with snapshot tests). With ``peers``, ranks the
+    row against the supplied DataFrame.
+    """
+    df = peers if peers is not None else _single_row_df(row)
+    if peers is not None and (row.name not in df.index):
+        df = pd.concat([df, _single_row_df(row)])
+    idx = row.name if row.name is not None else "_"
+
+    # Replace NaN sub-scores with 50.0 (legacy semantics: missing data is
+    # neutral, not a zero penalty). This preserves the score-out scale
+    # callers expect even when an entire sub-score is NaN.
+    valuation = _nan_to_neutral(valuation_score_df(df).loc[idx])
+    health = _nan_to_neutral(financial_health_score_df(df).loc[idx])
+    profitability = _nan_to_neutral(profitability_score_df(df).loc[idx])
+    growth = _nan_to_neutral(growth_score_df(df).loc[idx])
+    shareholder = _nan_to_neutral(shareholder_return_score_df(df).loc[idx])
+    risk = _nan_to_neutral(risk_score_df(df).loc[idx])
+
     categories = {
-        "valuation": valuation_score(row),
-        "financial_health": financial_health_score(row),
-        "profitability": profitability_score(row),
-        "growth": growth_score(row),
-        "shareholder_return": shareholder_return_score(row),
-        "risk": risk_score(row),
+        "valuation": valuation,
+        "financial_health": health,
+        "profitability": profitability,
+        "growth": growth,
+        "shareholder_return": shareholder,
+        "risk": risk,
     }
     composite = sum(categories[k] * SCORING_WEIGHTS[k] for k in categories)
     categories["composite"] = round(composite, 1)
     return categories
+
+
+def _nan_to_neutral(val: float) -> float:
+    """Map NaN sub-scores to 50.0 (neutral). Preserve finite values."""
+    if isinstance(val, (float, np.floating)) and np.isnan(val):
+        return 50.0
+    return float(val)
+
+
+def compute_composite_score_with_peers(
+    row: pd.Series, peers: pd.DataFrame
+) -> Dict[str, float]:
+    """Convenience: ``compute_composite_score`` requiring an explicit peer DF."""
+    return compute_composite_score(row, peers=peers)
 
 
 def generate_signal(composite_score: float) -> str:
@@ -436,37 +662,93 @@ def data_completeness(row: pd.Series) -> float:
     return round(present / len(_SCORING_INPUT_FIELDS), 2)
 
 
-def score_universe(df: pd.DataFrame) -> pd.DataFrame:
-    """Score entire universe and add all analytical columns."""
-    results = []
-    for ticker, row in df.iterrows():
-        scores = compute_composite_score(row)
-        az = altman_z_score(row)
-        gn = graham_number(row)
-        results.append({
-            "Ticker": ticker,
-            "Composite_Score": scores["composite"],
-            "Valuation_Score": round(scores["valuation"], 1),
-            "Health_Score": round(scores["financial_health"], 1),
-            "Profitability_Score": round(scores["profitability"], 1),
-            "Growth_Score": round(scores["growth"], 1),
-            "Shareholder_Score": round(scores["shareholder_return"], 1),
-            "Risk_Score": round(scores["risk"], 1),
-            "Signal": generate_signal(scores["composite"]),
-            "Piotroski_F": piotroski_f_score(row),
-            "Altman_Z": round(az, 2) if pd.notna(az) else np.nan,
-            "Graham_Number": round(gn, 2) if pd.notna(gn) else np.nan,
-            # M1 audit-trail field; not in public API schema yet (see M10).
-            "data_completeness": data_completeness(row),
-        })
-    scores_df = pd.DataFrame(results).set_index("Ticker")
-    # Merge back with original
-    merged = df.join(scores_df)
-    # Graham margin of safety
-    merged["Graham_MoS"] = np.where(
-        merged["Graham_Number"].notna() & (merged["Price"] > 0),
-        (merged["Graham_Number"] / merged["Price"] - 1) * 100,
-        np.nan
+# ══════════════════════════════════════════════════════════════
+# Vectorised universe scorer (M3)
+# ══════════════════════════════════════════════════════════════
+
+
+def score_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Score the entire universe in one vectorised pass and append columns.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Universe indexed by ticker, with the standard column schema. The
+        ``Sector`` column drives sector-relative ranking (sectors with
+        fewer than 5 peers fall back to global rank).
+
+    Returns
+    -------
+    pd.DataFrame
+        ``df`` joined with ``Composite_Score``, ``Valuation_Score``,
+        ``Health_Score``, ``Profitability_Score``, ``Growth_Score``,
+        ``Shareholder_Score``, ``Risk_Score``, ``Signal``, ``Piotroski_F``,
+        ``Altman_Z``, ``Graham_Number``, ``Graham_MoS`` and
+        ``data_completeness``. Sorted descending by composite score.
+    """
+    if df.empty:
+        return df
+
+    # Vectorised sub-scores. Replace NaN sub-scores with 50.0 (neutral) so
+    # the composite scale stays stable across rows with sparse data.
+    valuation = valuation_score_df(df).apply(_nan_to_neutral)
+    health = financial_health_score_df(df).apply(_nan_to_neutral)
+    profitability = profitability_score_df(df).apply(_nan_to_neutral)
+    growth = growth_score_df(df).apply(_nan_to_neutral)
+    shareholder = shareholder_return_score_df(df).apply(_nan_to_neutral)
+    risk = risk_score_df(df).apply(_nan_to_neutral)
+
+    subscores = pd.DataFrame(
+        {
+            "Valuation_Score": valuation.round(1),
+            "Health_Score": health.round(1),
+            "Profitability_Score": profitability.round(1),
+            "Growth_Score": growth.round(1),
+            "Shareholder_Score": shareholder.round(1),
+            "Risk_Score": risk.round(1),
+        }
     )
-    merged["Graham_MoS"] = merged["Graham_MoS"].round(1)
-    return merged.sort_values("Composite_Score", ascending=False)
+    composite = _composite_from_subscores(subscores).round(1)
+
+    # Per-row analytics that still operate row-wise (Altman, Graham,
+    # Piotroski, completeness — these are not percentile-based).
+    altman = df.apply(altman_z_score, axis=1)
+    graham = df.apply(graham_number, axis=1)
+    piotroski = df.apply(piotroski_f_score, axis=1).astype(int)
+    completeness = df.apply(data_completeness, axis=1)
+    signals = composite.apply(generate_signal)
+
+    out = df.copy()
+    out["Composite_Score"] = composite
+    out["Valuation_Score"] = subscores["Valuation_Score"]
+    out["Health_Score"] = subscores["Health_Score"]
+    out["Profitability_Score"] = subscores["Profitability_Score"]
+    out["Growth_Score"] = subscores["Growth_Score"]
+    out["Shareholder_Score"] = subscores["Shareholder_Score"]
+    out["Risk_Score"] = subscores["Risk_Score"]
+    out["Signal"] = signals
+    out["Piotroski_F"] = piotroski
+    out["Altman_Z"] = altman.apply(lambda v: round(v, 2) if pd.notna(v) else np.nan)
+    out["Graham_Number"] = graham.apply(lambda v: round(v, 2) if pd.notna(v) else np.nan)
+    out["data_completeness"] = completeness
+
+    # Graham margin of safety (vectorised).
+    if "Price" in out.columns:
+        price = pd.to_numeric(out["Price"], errors="coerce")
+        gn = out["Graham_Number"]
+        out["Graham_MoS"] = np.where(
+            gn.notna() & price.notna() & (price > 0),
+            (gn / price - 1) * 100,
+            np.nan,
+        )
+        out["Graham_MoS"] = out["Graham_MoS"].round(1)
+    else:
+        out["Graham_MoS"] = np.nan
+
+    return out.sort_values("Composite_Score", ascending=False)
+
+
+# Backward-compatible alias. Existing callers (daily_run.py,
+# reporting/*.py, ScoringService.score_dataframe) keep working without
+# modification.
+score_universe = score_dataframe
