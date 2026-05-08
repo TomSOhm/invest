@@ -46,6 +46,7 @@ from src.analysis.scoring_engine import (  # noqa: E402
     graham_number,
     piotroski_f_score,
 )
+from functools import lru_cache
 
 GOLDEN_DIR = PROJECT_ROOT / "tests" / "golden"
 INPUTS_DIR = GOLDEN_DIR / "inputs"
@@ -134,10 +135,60 @@ def fetch_input(fetcher: DataFetcher, ticker: str) -> Dict[str, Any] | None:
     return row
 
 
-def score_row(row: Dict[str, Any]) -> Dict[str, Any]:
-    """Run the current scoring engine on a frozen input row → snapshot dict."""
+@lru_cache(maxsize=1)
+def _golden_peer_universe() -> pd.DataFrame:
+    """Load every frozen input under tests/golden/inputs/ as the peer DataFrame.
+
+    The cached DataFrame is re-used for every ``score_row`` call so M3
+    sector-relative ranking is computed against the same 25-ticker
+    universe every time (deterministic snapshots). Index is the ticker
+    symbol parsed from the filename.
+    """
+    rows: Dict[str, Dict[str, Any]] = {}
+    if not INPUTS_DIR.exists():
+        return pd.DataFrame()
+    for path in sorted(INPUTS_DIR.glob("*.json")):
+        ticker = path.stem
+        if ticker.startswith("_"):
+            # Reverse the Windows-DOS-reserved-name escaping (e.g. `_CON.DE`
+            # was saved for `CON.DE`). The leading underscore is dropped.
+            ticker = ticker[1:]
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:  # noqa: BLE001
+            continue
+        rows[ticker] = _decode_floats(data)
+    if not rows:
+        return pd.DataFrame()
+    return pd.DataFrame.from_dict(rows, orient="index")
+
+
+def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
+    """Run the current scoring engine on a frozen input row → snapshot dict.
+
+    The peer universe used for sector-relative ranking is loaded lazily
+    from every JSON under ``tests/golden/inputs/``. ``ticker`` (if
+    supplied) names this row inside the peer DataFrame so the lookup
+    after ``score_dataframe`` finds the right row; otherwise it defaults
+    to "_TARGET_" and the row is appended fresh.
+    """
     series = pd.Series(_decode_floats(row))
-    breakdown = compute_composite_score(series)
+    peers = _golden_peer_universe()
+
+    # If the caller passed a ticker that already lives in the peer universe,
+    # use that index. Otherwise tag the row "_TARGET_" and append it.
+    if ticker and ticker in peers.index:
+        series.name = ticker
+        peers_for_score = peers
+    else:
+        series.name = "_TARGET_"
+        peers_for_score = (
+            pd.concat([peers, pd.DataFrame([series.to_dict()], index=[series.name])])
+            if not peers.empty
+            else pd.DataFrame([series.to_dict()], index=[series.name])
+        )
+
+    breakdown = compute_composite_score(series, peers=peers_for_score)
     composite = breakdown["composite"]
     az = altman_z_score(series)
     gn = graham_number(series)
@@ -191,7 +242,7 @@ def main(argv: List[str] | None = None) -> int:
                 n_skip += 1
                 continue
             row = json.loads(in_path.read_text(encoding="utf-8"))
-            snap = score_row(row)
+            snap = score_row(row, ticker=ticker)
             write_json(SNAPSHOTS_DIR / f"{safe_filename(ticker)}.json", snap)
             print(f"[rescored] {ticker} -> score={snap['Composite_Score']} signal={snap['Signal']}")
             n_ok += 1
@@ -209,7 +260,10 @@ def main(argv: List[str] | None = None) -> int:
         # Drop the Ticker key from the persisted row — it's encoded in the filename.
         row_to_save = {k: v for k, v in row.items() if k != "Ticker"}
         write_json(INPUTS_DIR / f"{safe_filename(ticker)}.json", row_to_save)
-        snap = score_row(row_to_save)
+        # Bust the lru_cache so the freshly-written input shows up in the
+        # peer universe used to score subsequent tickers in this run.
+        _golden_peer_universe.cache_clear()
+        snap = score_row(row_to_save, ticker=ticker)
         write_json(SNAPSHOTS_DIR / f"{safe_filename(ticker)}.json", snap)
         print(f"[captured] {ticker} -> score={snap['Composite_Score']} signal={snap['Signal']}")
         n_ok += 1

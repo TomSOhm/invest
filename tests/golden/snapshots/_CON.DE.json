@@ -1,15 +1,15 @@
 {
   "Altman_Z": 2.13,
-  "Composite_Score": 39.7,
+  "Composite_Score": 39.5,
   "Graham_MoS": "NaN",
   "Graham_Number": "NaN",
-  "Growth_Score": 0.0,
-  "Health_Score": 34.5,
+  "Growth_Score": 13.0,
+  "Health_Score": 21.8,
   "Piotroski_F": 7,
-  "Profitability_Score": 30.1,
-  "Risk_Score": 20.3,
+  "Profitability_Score": 30.7,
+  "Risk_Score": 12.8,
   "Shareholder_Score": 50.0,
   "Signal": "Sell",
-  "Valuation_Score": 78.8,
+  "Valuation_Score": 82.9,
   "data_completeness": 0.91
 }

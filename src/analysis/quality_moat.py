@@ -229,21 +229,38 @@ def moat_score(df: pd.DataFrame) -> pd.Series:
     spread = df.apply(roic_wacc_spread, axis=1)
     reinvest = df.apply(reinvestment_efficiency, axis=1)
 
+    # Build a temp DataFrame so we can call M3's score_sector_relative
+    # (which expects df + metric column name + inverse=...).
+    sectors = df.get("Sector", pd.Series(["" for _ in range(len(df))], index=df.index))
+    tmp = pd.DataFrame(
+        {
+            "gp": gp,
+            "roic_avg": roic_avg,
+            "roic_stab": roic_stab,
+            "op_stab": op_stab,
+            "spread": spread,
+            "reinvest": reinvest,
+            "Sector": sectors,
+        },
+        index=df.index,
+    )
     try:
         from src.analysis.sector_percentile import score_sector_relative  # type: ignore
-        sectors = df.get("Sector", pd.Series(["" for _ in range(len(df))], index=df.index))
-        norm = lambda s, hib: score_sector_relative(s, sectors, higher_is_better=hib)
-    except (ImportError, AttributeError):
-        norm = _zscore_norm
+
+        def _norm(metric: str, higher_is_better: bool) -> pd.Series:
+            return score_sector_relative(tmp, metric, inverse=not higher_is_better)
+    except (ImportError, AttributeError, TypeError):
+        def _norm(metric: str, higher_is_better: bool) -> pd.Series:
+            return _zscore_norm(tmp[metric], higher_is_better=higher_is_better)
 
     parts = pd.concat(
         {
-            "gp": norm(gp, True),
-            "roic_avg": norm(roic_avg, True),
-            "roic_stab": norm(roic_stab, True),
-            "op_stab": norm(op_stab, True),
-            "spread": norm(spread, True),
-            "reinvest": norm(reinvest, True),
+            "gp": _norm("gp", True),
+            "roic_avg": _norm("roic_avg", True),
+            "roic_stab": _norm("roic_stab", True),
+            "op_stab": _norm("op_stab", True),
+            "spread": _norm("spread", True),
+            "reinvest": _norm("reinvest", True),
         },
         axis=1,
     )

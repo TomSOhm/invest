@@ -283,24 +283,39 @@ def risk_score_real(
         beta_series = pd.Series([np.nan] * len(df), index=df.index)
 
     # ------------------------------------------------------------------
-    # 3. Normalise (sector-relative if M3 ships, else z-score)
+    # 3. Normalise (sector-relative via M3, else z-score fallback)
     # ------------------------------------------------------------------
+    sectors = df.get("Sector", pd.Series(["" for _ in range(len(df))], index=df.index))
+    tmp = pd.DataFrame(
+        {
+            "nd_ebitda": nd_ebitda,
+            "ic": ic,
+            "altman": zscore,
+            "vol": vol_series,
+            "mdd": mdd_series,
+            "beta": beta_series,
+            "Sector": sectors,
+        },
+        index=df.index,
+    )
     try:
         from src.analysis.sector_percentile import score_sector_relative  # type: ignore
-        sectors = df.get("Sector", pd.Series(["" for _ in range(len(df))], index=df.index))
-        norm = lambda s, hib: score_sector_relative(s, sectors, higher_is_better=hib)
-    except (ImportError, AttributeError):
-        norm = _zscore_norm
+
+        def _norm(metric: str, higher_is_better: bool) -> pd.Series:
+            return score_sector_relative(tmp, metric, inverse=not higher_is_better)
+    except (ImportError, AttributeError, TypeError):
+        def _norm(metric: str, higher_is_better: bool) -> pd.Series:
+            return _zscore_norm(tmp[metric], higher_is_better=higher_is_better)
 
     parts: Dict[str, pd.Series] = {
-        "nd_ebitda": norm(nd_ebitda, False),  # lower is safer
-        "ic": norm(ic, True),
-        "altman": norm(zscore, True),
+        "nd_ebitda": _norm("nd_ebitda", False),  # lower is safer
+        "ic": _norm("ic", True),
+        "altman": _norm("altman", True),
     }
     if have_prices:
-        parts["vol"] = norm(vol_series, False)       # lower vol = safer
-        parts["mdd"] = norm(mdd_series, True)         # closer to 0 (less negative) = safer
-        parts["beta"] = norm(beta_series, False)      # lower beta = safer
+        parts["vol"] = _norm("vol", False)       # lower vol = safer
+        parts["mdd"] = _norm("mdd", True)         # closer to 0 (less negative) = safer
+        parts["beta"] = _norm("beta", False)      # lower beta = safer
 
     combined = pd.concat(parts, axis=1)
     score = combined.mean(axis=1, skipna=True).fillna(50.0).clip(0.0, 100.0)

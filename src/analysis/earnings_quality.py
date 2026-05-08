@@ -332,14 +332,16 @@ def earnings_quality_score(df: pd.DataFrame) -> pd.Series:
         axis=1,
     )
 
-    # Try M3's sector-relative percentile; fall back to z-score normalisation
+    # M3 sector-relative percentile (canonical API: score_sector_relative(df,
+    # metric, inverse=...)). Fall back to z-score normalisation if missing.
     try:
         from src.analysis.sector_percentile import score_sector_relative  # type: ignore
         sectors = df.get("Sector", pd.Series(["" for _ in range(len(df))], index=df.index))
-        m_norm = score_sector_relative(m_scores, sectors, higher_is_better=False)
-        sloan_norm = score_sector_relative(sloan_vals, sectors, higher_is_better=False)
-        ccr_norm = score_sector_relative(ccr_vals, sectors, higher_is_better=True)
-    except (ImportError, AttributeError):
+        tmp = pd.DataFrame({"m": m_scores, "sloan": sloan_vals, "ccr": ccr_vals, "Sector": sectors}, index=df.index)
+        m_norm = score_sector_relative(tmp, "m", inverse=True)
+        sloan_norm = score_sector_relative(tmp, "sloan", inverse=True)
+        ccr_norm = score_sector_relative(tmp, "ccr", inverse=False)
+    except (ImportError, AttributeError, TypeError):
         m_norm = _zscore_norm(m_scores, higher_is_better=False)
         sloan_norm = _zscore_norm(sloan_vals, higher_is_better=False)
         ccr_norm = _zscore_norm(ccr_vals, higher_is_better=True)
