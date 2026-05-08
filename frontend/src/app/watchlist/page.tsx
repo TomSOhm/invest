@@ -3,18 +3,54 @@
 import { useState, useRef } from "react";
 import { Plus, RefreshCw, Trash2, PlusCircle } from "lucide-react";
 import { useWatchlist } from "@/hooks/useWatchlist";
-import type { AddPositionRequest, WatchlistItem } from "@/lib/types";
-import { formatCurrency, formatNumber, formatPercent, formatDate } from "@/lib/formatters";
+import type {
+  AddPositionRequest,
+  Horizon,
+  WatchlistItem,
+} from "@/lib/types";
+import {
+  formatCurrency,
+  formatNumber,
+  formatPercent,
+  formatDate,
+} from "@/lib/formatters";
 import SignalBadge from "@/components/ui/SignalBadge";
 import PeaBadge from "@/components/ui/PeaBadge";
 import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
 import { ScoreBar } from "@/components/ui/ScoreGauge";
+import HorizonSelector from "@/components/ui/HorizonSelector";
+import CTOWarningBanner from "@/components/ui/CTOWarningBanner";
 import { api } from "@/lib/api";
 import type { PortfolioPosition } from "@/lib/types";
 import clsx from "clsx";
 
-// Inline add-position modal for watchlist
+// ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function getScoreForHorizon(item: WatchlistItem, horizon: Horizon): number | null {
+  if (horizon === "long_term") return item.score_lt ?? null;
+  if (horizon === "medium_term") return item.score_mt ?? null;
+  return item.score_st ?? null;
+}
+
+function getSignalForHorizon(item: WatchlistItem, horizon: Horizon): string | null {
+  if (horizon === "long_term") return item.signal_lt ?? null;
+  if (horizon === "medium_term") return item.signal_mt ?? null;
+  return item.signal_st ?? null;
+}
+
+function passesGatesForHorizon(item: WatchlistItem, horizon: Horizon): boolean | null {
+  // WatchlistItem does not expose passes_gates; use score as proxy (null if unavailable)
+  const score = getScoreForHorizon(item, horizon);
+  return score != null ? score >= 50 : null;
+}
+
+// ---------------------------------------------------------------------------
+// Add-to-portfolio modal
+// ---------------------------------------------------------------------------
+
 function AddToPortfolioModal({
   open,
   onClose,
@@ -35,7 +71,10 @@ function AddToPortfolioModal({
   const [err, setErr] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  function update<K extends keyof typeof form>(key: K, val: (typeof form)[K]) {
+  function update<K extends keyof typeof form>(
+    key: K,
+    val: (typeof form)[K]
+  ) {
     setForm((f) => ({ ...f, [key]: val }));
   }
 
@@ -65,10 +104,15 @@ function AddToPortfolioModal({
 
   const inputCls =
     "w-full px-3 py-2 text-sm bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-md text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-emerald-500";
-  const labelCls = "block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1";
+  const labelCls =
+    "block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1";
 
   return (
-    <Modal open={open} onClose={onClose} title={`Add ${item?.ticker ?? ""} to Portfolio`}>
+    <Modal
+      open={open}
+      onClose={onClose}
+      title={`Add ${item?.ticker ?? ""} to Portfolio`}
+    >
       {success ? (
         <div className="py-6 text-center text-emerald-600 dark:text-emerald-400 text-sm font-medium">
           Position added successfully!
@@ -96,7 +140,9 @@ function AddToPortfolioModal({
                 min={0.001}
                 step="any"
                 value={form.buy_price}
-                onChange={(e) => update("buy_price", parseFloat(e.target.value))}
+                onChange={(e) =>
+                  update("buy_price", parseFloat(e.target.value))
+                }
                 required
               />
             </div>
@@ -105,7 +151,12 @@ function AddToPortfolioModal({
               <select
                 className={inputCls}
                 value={form.account_type}
-                onChange={(e) => update("account_type", e.target.value as typeof form.account_type)}
+                onChange={(e) =>
+                  update(
+                    "account_type",
+                    e.target.value as typeof form.account_type
+                  )
+                }
               >
                 <option value="pea">PEA</option>
                 <option value="pea_pme">PEA-PME</option>
@@ -155,13 +206,20 @@ function AddToPortfolioModal({
   );
 }
 
+// ---------------------------------------------------------------------------
+// Main page
+// ---------------------------------------------------------------------------
+
 export default function WatchlistPage() {
   const { data, loading, error, addItem, removeItem, refresh } = useWatchlist();
+  const [horizon, setHorizon] = useState<Horizon>("long_term");
   const [tickerInput, setTickerInput] = useState("");
   const [notesInput, setNotesInput] = useState("");
   const [adding, setAdding] = useState(false);
   const [addErr, setAddErr] = useState<string | null>(null);
-  const [portfolioItem, setPortfolioItem] = useState<WatchlistItem | null>(null);
+  const [portfolioItem, setPortfolioItem] = useState<WatchlistItem | null>(
+    null
+  );
   const inputRef = useRef<HTMLInputElement>(null);
 
   async function handleAdd() {
@@ -186,17 +244,25 @@ export default function WatchlistPage() {
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6 space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Watchlist</h1>
-        <button
-          onClick={() => refresh()}
-          disabled={loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
-        >
-          <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
-          Refresh
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
+          Watchlist
+        </h1>
+        <div className="flex flex-wrap items-center gap-2">
+          <HorizonSelector value={horizon} onChange={setHorizon} />
+          <button
+            onClick={() => refresh()}
+            disabled={loading}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors"
+          >
+            <RefreshCw size={14} className={loading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
       </div>
+
+      {/* CTO warning for short-term */}
+      {horizon === "short_term" && <CTOWarningBanner />}
 
       {/* Add ticker form */}
       <div className="flex gap-2 flex-wrap">
@@ -222,7 +288,9 @@ export default function WatchlistPage() {
           {adding ? <Spinner size={14} /> : <Plus size={14} />}
           Add
         </button>
-        {addErr && <span className="text-sm text-red-500 self-center">{addErr}</span>}
+        {addErr && (
+          <span className="text-sm text-red-500 self-center">{addErr}</span>
+        )}
       </div>
 
       {/* Error */}
@@ -243,7 +311,7 @@ export default function WatchlistPage() {
       {data && (
         <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
           <div className="overflow-x-auto">
-            <table>
+            <table className="w-full">
               <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
                 <tr>
                   <th className={thCls}>Ticker</th>
@@ -254,8 +322,10 @@ export default function WatchlistPage() {
                   <th className={`${thCls} text-right`}>P/E</th>
                   <th className={`${thCls} text-right`}>ROE</th>
                   <th className={`${thCls} text-right`}>Graham MoS</th>
+                  <th className={`${thCls} text-right`}>DCF MoS</th>
                   <th className={thCls}>Analyst</th>
                   <th className={thCls}>PEA</th>
+                  {horizon === "short_term" && <th className={thCls}>Account</th>}
                   <th className={thCls}>Added</th>
                   <th className={thCls}></th>
                 </tr>
@@ -263,97 +333,135 @@ export default function WatchlistPage() {
               <tbody>
                 {data.items.length === 0 && (
                   <tr>
-                    <td colSpan={12} className="text-center py-12 text-sm text-slate-400">
+                    <td
+                      colSpan={13}
+                      className="text-center py-12 text-sm text-slate-400"
+                    >
                       No items in watchlist. Add a ticker above.
                     </td>
                   </tr>
                 )}
-                {data.items.map((item) => (
-                  <tr
-                    key={item.id}
-                    className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
-                  >
-                    <td className={tdCls}>
-                      <a
-                        href={`/company/${item.ticker}`}
-                        className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
-                      >
-                        {item.ticker}
-                      </a>
-                    </td>
-                    <td className={`${tdCls} max-w-[160px]`}>
-                      <span className="truncate block text-slate-700 dark:text-slate-300">
-                        {item.name}
-                      </span>
-                    </td>
-                    <td className={`${tdCls} text-right font-mono`}>
-                      {formatCurrency(item.current_price)}
-                    </td>
-                    <td className={tdCls}>
-                      <ScoreBar score={item.composite_score} />
-                    </td>
-                    <td className={tdCls}>
-                      <SignalBadge signal={item.signal} />
-                    </td>
-                    <td className={`${tdCls} text-right font-mono text-slate-600 dark:text-slate-400`}>
-                      {formatNumber(item.pe, 1)}
-                    </td>
-                    <td
-                      className={clsx(
-                        `${tdCls} text-right font-mono`,
-                        item.roe != null && item.roe > 10
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-slate-600 dark:text-slate-400"
-                      )}
+                {data.items.map((item) => {
+                  const horizonScore = getScoreForHorizon(item, horizon);
+                  const horizonSignal = getSignalForHorizon(item, horizon);
+                  // ST view shows CTO chip when passes_gates_st proxy is true
+                  const showCTOChip =
+                    horizon === "short_term" &&
+                    passesGatesForHorizon(item, "short_term");
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 transition-colors"
                     >
-                      {item.roe != null ? formatPercent(item.roe) : "—"}
-                    </td>
-                    <td
-                      className={clsx(
-                        `${tdCls} text-right font-mono`,
-                        item.graham_mos != null && item.graham_mos > 0
-                          ? "text-emerald-600 dark:text-emerald-400"
-                          : "text-red-500 dark:text-red-400"
-                      )}
-                    >
-                      {item.graham_mos != null ? formatPercent(item.graham_mos) : "—"}
-                    </td>
-                    <td className={`${tdCls} text-slate-500`}>
-                      {item.analyst_rating ?? "—"}
-                      {item.analyst_target_price != null && (
-                        <span className="ml-1 text-xs">
-                          {formatCurrency(item.analyst_target_price)}
+                      <td className={tdCls}>
+                        <a
+                          href={`/company/${item.ticker}`}
+                          className="font-mono font-semibold text-emerald-600 dark:text-emerald-400 hover:underline"
+                        >
+                          {item.ticker}
+                        </a>
+                      </td>
+                      <td className={`${tdCls} max-w-[160px]`}>
+                        <span className="truncate block text-slate-700 dark:text-slate-300">
+                          {item.name}
                         </span>
+                      </td>
+                      <td className={`${tdCls} text-right font-mono`}>
+                        {formatCurrency(item.current_price)}
+                      </td>
+                      <td className={tdCls}>
+                        <ScoreBar score={horizonScore} />
+                      </td>
+                      <td className={tdCls}>
+                        <SignalBadge signal={horizonSignal} />
+                      </td>
+                      <td className={`${tdCls} text-right font-mono text-slate-600 dark:text-slate-400`}>
+                        {formatNumber(item.pe, 1)}
+                      </td>
+                      <td
+                        className={clsx(
+                          `${tdCls} text-right font-mono`,
+                          item.roe != null && item.roe > 10
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-slate-600 dark:text-slate-400"
+                        )}
+                      >
+                        {item.roe != null ? formatPercent(item.roe) : "—"}
+                      </td>
+                      <td
+                        className={clsx(
+                          `${tdCls} text-right font-mono`,
+                          item.graham_mos != null && item.graham_mos > 0
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-red-500 dark:text-red-400"
+                        )}
+                      >
+                        {item.graham_mos != null
+                          ? formatPercent(item.graham_mos)
+                          : "—"}
+                      </td>
+                      <td
+                        className={clsx(
+                          `${tdCls} text-right font-mono`,
+                          item.dcf_mos_mid != null && item.dcf_mos_mid > 0
+                            ? "text-emerald-600 dark:text-emerald-400"
+                            : "text-red-500 dark:text-red-400"
+                        )}
+                      >
+                        {item.dcf_mos_mid != null
+                          ? formatPercent(item.dcf_mos_mid * 100)
+                          : "—"}
+                      </td>
+                      <td className={`${tdCls} text-slate-500`}>
+                        {item.analyst_rating ?? "—"}
+                        {item.analyst_target_price != null && (
+                          <span className="ml-1 text-xs">
+                            {formatCurrency(item.analyst_target_price)}
+                          </span>
+                        )}
+                      </td>
+                      <td className={tdCls}>
+                        <PeaBadge
+                          eligible={item.pea_eligible ?? false}
+                          pme={item.pea_pme_eligible ?? false}
+                        />
+                      </td>
+                      {horizon === "short_term" && (
+                        <td className={tdCls}>
+                          {showCTOChip ? (
+                            <span className="px-1.5 py-0.5 text-xs font-semibold rounded bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300">
+                              CTO
+                            </span>
+                          ) : null}
+                        </td>
                       )}
-                    </td>
-                    <td className={tdCls}>
-                      <PeaBadge eligible={item.pea_eligible} pme={item.pea_pme_eligible} />
-                    </td>
-                    <td className={`${tdCls} text-slate-400 text-xs`}>
-                      {formatDate(item.added_date)}
-                    </td>
-                    <td className={tdCls}>
-                      <div className="flex items-center gap-1">
-                        <button
-                          onClick={() => setPortfolioItem(item)}
-                          title="Add to Portfolio"
-                          className="p-1 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
-                          aria-label="Add to portfolio"
-                        >
-                          <PlusCircle size={14} />
-                        </button>
-                        <button
-                          onClick={() => removeItem(item.id)}
-                          title="Remove from watchlist"
-                          className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                          aria-label="Remove from watchlist"
-                        >
-                          <Trash2 size={13} />
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                      <td className={`${tdCls} text-slate-400 text-xs`}>
+                        {formatDate(item.added_date)}
+                      </td>
+                      <td className={tdCls}>
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => setPortfolioItem(item)}
+                            title="Add to Portfolio"
+                            className="p-1 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 transition-colors"
+                            aria-label="Add to portfolio"
+                          >
+                            <PlusCircle size={14} />
+                          </button>
+                          <button
+                            onClick={() => removeItem(item.id)}
+                            title="Remove from watchlist"
+                            className="p-1 rounded text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                            aria-label="Remove from watchlist"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

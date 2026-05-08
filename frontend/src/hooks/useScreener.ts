@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { api } from "@/lib/api";
-import type { ScreenerRequest, ScreenerResponse } from "@/lib/types";
+import type { Horizon, ScreenerRequest, ScreenerResponse } from "@/lib/types";
 
 export function useScreener() {
   const [results, setResults] = useState<ScreenerResponse | null>(null);
@@ -23,14 +23,14 @@ export function useScreener() {
   }, []);
 
   const runPreset = useCallback(
-    async (name: string, peaOnly = false, topN = 50) => {
+    async (name: string, peaOnly = false, limit = 50) => {
       setLoading(true);
       setError(null);
       try {
-        const res = await api.post<ScreenerResponse>(`/api/screener/preset/${name}`, {
-          pea_only: peaOnly,
-          top_n: topN,
-        });
+        const res = await api.post<ScreenerResponse>(
+          `/api/screener/preset/${name}`,
+          { pea_only: peaOnly, limit }
+        );
         setResults(res);
       } catch (e) {
         setError(e instanceof Error ? e.message : "Preset screener failed");
@@ -41,18 +41,24 @@ export function useScreener() {
     []
   );
 
-  const scoreTickers = useCallback(async (tickers: string[]) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.post<ScreenerResponse>("/api/screener/tickers", { tickers });
-      setResults(res);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Ticker scoring failed");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const scoreTickers = useCallback(
+    async (tickers: string[], horizon: Horizon = "long_term") => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await api.post<ScreenerResponse>("/api/screener/tickers", {
+          tickers,
+          horizon,
+        });
+        setResults(res);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Ticker scoring failed");
+      } finally {
+        setLoading(false);
+      }
+    },
+    []
+  );
 
   return {
     results,

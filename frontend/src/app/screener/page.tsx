@@ -1,34 +1,59 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Play, List, RefreshCw } from "lucide-react";
 import { useScreener } from "@/hooks/useScreener";
-import type { ScreenerFilters } from "@/lib/types";
+import type { Horizon, ScreenerResultItem, PresetMeta } from "@/lib/types";
 import { formatNumber, formatPercent, formatLargeNumber } from "@/lib/formatters";
 import SignalBadge from "@/components/ui/SignalBadge";
 import PeaBadge from "@/components/ui/PeaBadge";
 import Spinner from "@/components/ui/Spinner";
 import { ScoreBar } from "@/components/ui/ScoreGauge";
+import HorizonSelector from "@/components/ui/HorizonSelector";
+import CTOWarningBanner from "@/components/ui/CTOWarningBanner";
+import { fetchScreenerPresets } from "@/lib/api";
 import clsx from "clsx";
 
-const PRESETS = [
-  { name: "pea_value", label: "PEA Value" },
-  { name: "pea_quality", label: "PEA Quality" },
-  { name: "dividend", label: "Dividend" },
-  { name: "global", label: "Global Best" },
+// Fallback preset list shown before API resolves
+const FALLBACK_PRESETS: PresetMeta[] = [
+  { name: "pea_value", horizon: "long_term", description: "PEA Value", recommended_account: "PEA" },
+  { name: "pea_quality", horizon: "long_term", description: "PEA Quality", recommended_account: "PEA" },
+  { name: "dividend", horizon: "long_term", description: "Dividend", recommended_account: "PEA" },
+  { name: "global", horizon: "long_term", description: "Global Best" },
 ];
 
-const DEFAULT_FILTERS: ScreenerFilters = {
-  max_pe: undefined,
-  min_roe: undefined,
-  min_market_cap: undefined,
-  max_debt_equity: undefined,
-  min_operating_margin: undefined,
-  min_div_yield: undefined,
-  min_composite_score: undefined,
-  min_revenue_growth: undefined,
-};
+function getScoreForHorizon(item: ScreenerResultItem, horizon: Horizon): number {
+  if (horizon === "long_term") return item.score_lt;
+  if (horizon === "medium_term") return item.score_mt;
+  return item.score_st;
+}
+
+function getSignalForHorizon(item: ScreenerResultItem, horizon: Horizon): string {
+  if (horizon === "long_term") return item.signal_lt;
+  if (horizon === "medium_term") return item.signal_mt;
+  return item.signal_st;
+}
+
+function getKeyMetricForHorizon(
+  item: ScreenerResultItem,
+  horizon: Horizon
+): { label: string; value: string } {
+  if (horizon === "long_term") {
+    return { label: "P/E", value: formatNumber(item.pe, 1) };
+  }
+  if (horizon === "medium_term") {
+    return {
+      label: "DCF MoS",
+      value: item.dcf_mos_mid != null ? formatPercent(item.dcf_mos_mid * 100) : "—",
+    };
+  }
+  // short_term
+  return {
+    label: "Score ST",
+    value: formatNumber(item.score_st, 1),
+  };
+}
 
 function FilterInput({
   label,
@@ -78,6 +103,10 @@ function Toggle({
           checked ? "bg-emerald-500" : "bg-slate-300 dark:bg-slate-600"
         )}
         onClick={() => onChange(!checked)}
+        role="switch"
+        aria-checked={checked}
+        tabIndex={0}
+        onKeyDown={(e) => e.key === "Enter" || e.key === " " ? onChange(!checked) : undefined}
       >
         <div
           className={clsx(
@@ -91,34 +120,57 @@ function Toggle({
   );
 }
 
+interface CustomFilters {
+  max_pe?: number;
+  min_roe?: number;
+  min_market_cap?: number;
+  max_debt_equity?: number;
+  min_operating_margin?: number;
+  min_div_yield?: number;
+  min_revenue_growth?: number;
+}
+
+const DEFAULT_FILTERS: CustomFilters = {};
+
 export default function ScreenerPage() {
   const router = useRouter();
   const { results, loading, error, runScreen, runPreset, scoreTickers } = useScreener();
-  const [filters, setFilters] = useState<ScreenerFilters>(DEFAULT_FILTERS);
+  const [horizon, setHorizon] = useState<Horizon>("long_term");
+  const [filters, setFilters] = useState<CustomFilters>(DEFAULT_FILTERS);
   const [peaOnly, setPeaOnly] = useState(false);
   const [customTickers, setCustomTickers] = useState("");
   const [activePreset, setActivePreset] = useState<string | null>(null);
+  const [presets, setPresets] = useState<PresetMeta[]>(FALLBACK_PRESETS);
 
-  function updateFilter<K extends keyof ScreenerFilters>(key: K, val: ScreenerFilters[K]) {
+  useEffect(() => {
+    fetchScreenerPresets()
+      .then(setPresets)
+      .catch(() => {
+        // fallback already set
+      });
+  }, []);
+
+  function updateFilter<K extends keyof CustomFilters>(key: K, val: CustomFilters[K]) {
     setFilters((f) => ({ ...f, [key]: val }));
     setActivePreset(null);
   }
 
   function handleRunScreen() {
     setActivePreset(null);
-    // Percentage-based filters are entered by the user as whole numbers (e.g. 10 for 10%)
-    // but the backend stores data in decimal form (0.10). Divide by 100 before sending.
-    const convertedFilters: ScreenerFilters = {
-      ...filters,
-      min_roe: filters.min_roe != null ? filters.min_roe / 100 : undefined,
-      min_operating_margin: filters.min_operating_margin != null ? filters.min_operating_margin / 100 : undefined,
-      min_div_yield: filters.min_div_yield != null ? filters.min_div_yield / 100 : undefined,
-      min_revenue_growth: filters.min_revenue_growth != null ? filters.min_revenue_growth / 100 : undefined,
-    };
+    const customFiltersPayload: Record<string, unknown> = {};
+    if (filters.max_pe != null) customFiltersPayload.max_pe = filters.max_pe;
+    if (filters.min_roe != null) customFiltersPayload.min_roe = filters.min_roe / 100;
+    if (filters.min_market_cap != null) customFiltersPayload.min_market_cap = filters.min_market_cap * 1e6;
+    if (filters.max_debt_equity != null) customFiltersPayload.max_debt_equity = filters.max_debt_equity;
+    if (filters.min_operating_margin != null) customFiltersPayload.min_operating_margin = filters.min_operating_margin / 100;
+    if (filters.min_div_yield != null) customFiltersPayload.min_div_yield = filters.min_div_yield / 100;
+    if (filters.min_revenue_growth != null) customFiltersPayload.min_revenue_growth = filters.min_revenue_growth / 100;
+
     runScreen({
-      filters: convertedFilters,
+      horizon,
+      custom_filters: Object.keys(customFiltersPayload).length > 0 ? customFiltersPayload : null,
       pea_only: peaOnly,
-      sort_by: "composite_score",
+      sort_by: "score",
       sort_desc: true,
       limit: 100,
     });
@@ -135,8 +187,13 @@ export default function ScreenerPage() {
       .map((t) => t.trim().toUpperCase())
       .filter(Boolean);
     if (tickers.length === 0) return;
-    scoreTickers(tickers);
+    scoreTickers(tickers, horizon);
   }
+
+  const selectedPresetMeta = presets.find((p) => p.name === activePreset);
+  const showCTOBanner =
+    horizon === "short_term" ||
+    selectedPresetMeta?.horizon === "short_term";
 
   const thCls =
     "px-3 py-2 text-left text-xs font-medium text-slate-500 dark:text-slate-400 whitespace-nowrap";
@@ -146,7 +203,17 @@ export default function ScreenerPage() {
 
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6">
-      <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100 mb-5">Screener</h1>
+      <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
+        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Screener</h1>
+        <HorizonSelector value={horizon} onChange={setHorizon} />
+      </div>
+
+      {/* CTO Warning for short-term */}
+      {showCTOBanner && (
+        <div className="mb-4">
+          <CTOWarningBanner />
+        </div>
+      )}
 
       <div className="flex gap-5">
         {/* Left: Filter Panel */}
@@ -155,18 +222,22 @@ export default function ScreenerPage() {
           <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">Presets</div>
             <div className="grid grid-cols-2 gap-2">
-              {PRESETS.map((p) => (
+              {presets.map((p) => (
                 <button
                   key={p.name}
                   onClick={() => handlePreset(p.name)}
+                  title={p.description}
                   className={clsx(
-                    "px-2 py-1.5 text-xs rounded-md font-medium transition-colors border",
+                    "px-2 py-1.5 text-xs rounded-md font-medium transition-colors border relative",
                     activePreset === p.name
                       ? "bg-emerald-600 border-emerald-600 text-white"
                       : "border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-400 hover:border-emerald-400 hover:text-emerald-600 dark:hover:text-emerald-400"
                   )}
                 >
-                  {p.label}
+                  {p.description}
+                  {p.horizon === "short_term" && (
+                    <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-orange-400" title="Short-term preset" />
+                  )}
                 </button>
               ))}
             </div>
@@ -194,7 +265,7 @@ export default function ScreenerPage() {
             <FilterInput
               label="Min Market Cap (M)"
               value={filters.min_market_cap}
-              onChange={(v) => updateFilter("min_market_cap", v ? v * 1e6 : undefined)}
+              onChange={(v) => updateFilter("min_market_cap", v)}
               placeholder="e.g. 1000"
             />
             <FilterInput
@@ -213,12 +284,6 @@ export default function ScreenerPage() {
               label="Min Div Yield (%)"
               value={filters.min_div_yield}
               onChange={(v) => updateFilter("min_div_yield", v)}
-            />
-            <FilterInput
-              label="Min Score (0-100)"
-              value={filters.min_composite_score}
-              onChange={(v) => updateFilter("min_composite_score", v)}
-              placeholder="e.g. 60"
             />
             <FilterInput
               label="Min Rev Growth (%)"
@@ -282,7 +347,8 @@ export default function ScreenerPage() {
                 </span>
                 <span className="text-slate-400">|</span>
                 <span className="text-slate-600 dark:text-slate-400">
-                  Avg Score: <strong>{formatNumber(results.summary.avg_score, 1)}</strong>
+                  Avg Score:{" "}
+                  <strong>{formatNumber(results.summary.avg_score, 1)}</strong>
                 </span>
                 <span className="text-slate-400">|</span>
                 {Object.entries(summarySignals).map(([signal, count]) => (
@@ -290,108 +356,150 @@ export default function ScreenerPage() {
                     {count} {signal}
                   </span>
                 ))}
-                <span className="ml-auto text-xs text-slate-400">
-                  Screened: {results.summary.total_screened}
+                <span className="ml-auto text-xs text-slate-400 capitalize">
+                  {results.summary.horizon.replace("_", " ")}
                 </span>
               </div>
 
               {/* Results Table */}
               <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
                 <div className="overflow-x-auto">
-                  <table>
+                  <table className="w-full">
                     <thead className="bg-slate-50 dark:bg-slate-800/60 border-b border-slate-200 dark:border-slate-800">
                       <tr>
                         <th className={thCls}>Ticker</th>
                         <th className={thCls}>Name</th>
-                        <th className={thCls}>Score</th>
+                        {/* Score columns — active horizon highlighted */}
+                        <th
+                          className={clsx(
+                            thCls,
+                            horizon === "long_term" && "bg-emerald-50/50 dark:bg-emerald-900/10"
+                          )}
+                        >
+                          Score LT
+                        </th>
+                        <th
+                          className={clsx(
+                            thCls,
+                            horizon === "medium_term" && "bg-emerald-50/50 dark:bg-emerald-900/10"
+                          )}
+                        >
+                          Score MT
+                        </th>
+                        <th
+                          className={clsx(
+                            thCls,
+                            horizon === "short_term" && "bg-emerald-50/50 dark:bg-emerald-900/10"
+                          )}
+                        >
+                          Score ST
+                        </th>
                         <th className={thCls}>Signal</th>
-                        <th className={`${thCls} text-right`}>P/E</th>
-                        <th className={`${thCls} text-right`}>ROE%</th>
-                        <th className={`${thCls} text-right`}>Div%</th>
-                        <th className={`${thCls} text-right`}>Growth%</th>
-                        <th className={`${thCls} text-right`}>F-Score</th>
+                        <th className={thCls}>Sector</th>
                         <th className={`${thCls} text-right`}>Mkt Cap</th>
+                        <th className={`${thCls} text-right`}>
+                          {horizon === "long_term"
+                            ? "P/E"
+                            : horizon === "medium_term"
+                            ? "DCF MoS"
+                            : "ROE%"}
+                        </th>
+                        <th className={`${thCls} text-right`}>F-Score</th>
                         <th className={thCls}>PEA</th>
                       </tr>
                     </thead>
                     <tbody>
                       {results.results.length === 0 && (
                         <tr>
-                          <td colSpan={11} className="text-center py-10 text-sm text-slate-400">
+                          <td
+                            colSpan={11}
+                            className="text-center py-10 text-sm text-slate-400"
+                          >
                             No results match your filters.
                           </td>
                         </tr>
                       )}
-                      {results.results.map((item) => (
-                        <tr
-                          key={item.ticker}
-                          onClick={() => router.push(`/company/${item.ticker}`)}
-                          className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer transition-colors"
-                        >
-                          <td className={tdCls}>
-                            <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
-                              {item.ticker}
-                            </span>
-                          </td>
-                          <td className={`${tdCls} max-w-[160px]`}>
-                            <span className="truncate block text-slate-700 dark:text-slate-300">
-                              {item.name}
-                            </span>
-                          </td>
-                          <td className={tdCls}>
-                            <ScoreBar score={item.composite_score} />
-                          </td>
-                          <td className={tdCls}>
-                            <SignalBadge signal={item.signal} />
-                          </td>
-                          <td className={`${tdCls} text-right font-mono text-slate-600 dark:text-slate-400`}>
-                            {formatNumber(item.pe, 1)}
-                          </td>
-                          <td
-                            className={clsx(
-                              `${tdCls} text-right font-mono`,
-                              item.roe != null && item.roe > 0.10
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-slate-500"
-                            )}
+                      {results.results.map((item) => {
+                        const activeScore = getScoreForHorizon(item, horizon);
+                        const activeSignal = getSignalForHorizon(item, horizon);
+                        const keyMetric = getKeyMetricForHorizon(item, horizon);
+
+                        return (
+                          <tr
+                            key={item.ticker}
+                            onClick={() => router.push(`/company/${item.ticker}`)}
+                            className="border-t border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/30 cursor-pointer transition-colors"
                           >
-                            {item.roe != null ? formatPercent(item.roe * 100) : "—"}
-                          </td>
-                          <td className={`${tdCls} text-right font-mono text-slate-500`}>
-                            {item.div_yield != null ? formatPercent(item.div_yield * 100) : "—"}
-                          </td>
-                          <td
-                            className={clsx(
-                              `${tdCls} text-right font-mono`,
-                              item.revenue_growth != null && item.revenue_growth > 0
-                                ? "text-emerald-600 dark:text-emerald-400"
-                                : "text-red-500 dark:text-red-400"
-                            )}
-                          >
-                            {item.revenue_growth != null ? formatPercent(item.revenue_growth * 100) : "—"}
-                          </td>
-                          <td className={`${tdCls} text-right font-mono`}>
-                            <span
+                            <td className={tdCls}>
+                              <span className="font-mono font-semibold text-emerald-600 dark:text-emerald-400">
+                                {item.ticker}
+                              </span>
+                            </td>
+                            <td className={`${tdCls} max-w-[140px]`}>
+                              <span className="truncate block text-slate-700 dark:text-slate-300">
+                                {item.name ?? "—"}
+                              </span>
+                            </td>
+                            <td
                               className={clsx(
-                                "font-semibold",
-                                item.piotroski_f >= 7
-                                  ? "text-emerald-600 dark:text-emerald-400"
-                                  : item.piotroski_f >= 4
-                                  ? "text-amber-600 dark:text-amber-400"
-                                  : "text-red-500 dark:text-red-400"
+                                tdCls,
+                                horizon === "long_term" && "bg-emerald-50/30 dark:bg-emerald-900/5"
                               )}
                             >
-                              {item.piotroski_f}/9
-                            </span>
-                          </td>
-                          <td className={`${tdCls} text-right font-mono text-slate-500`}>
-                            {formatLargeNumber(item.market_cap)}
-                          </td>
-                          <td className={tdCls}>
-                            <PeaBadge eligible={item.pea_eligible} />
-                          </td>
-                        </tr>
-                      ))}
+                              <ScoreBar score={item.score_lt} />
+                            </td>
+                            <td
+                              className={clsx(
+                                tdCls,
+                                horizon === "medium_term" && "bg-emerald-50/30 dark:bg-emerald-900/5"
+                              )}
+                            >
+                              <ScoreBar score={item.score_mt} />
+                            </td>
+                            <td
+                              className={clsx(
+                                tdCls,
+                                horizon === "short_term" && "bg-emerald-50/30 dark:bg-emerald-900/5"
+                              )}
+                            >
+                              <ScoreBar score={item.score_st} />
+                            </td>
+                            <td className={tdCls}>
+                              <SignalBadge signal={activeSignal} />
+                            </td>
+                            <td className={`${tdCls} text-slate-500 text-xs max-w-[100px]`}>
+                              <span className="truncate block">{item.sector ?? "—"}</span>
+                            </td>
+                            <td className={`${tdCls} text-right font-mono text-slate-500`}>
+                              {formatLargeNumber(item.market_cap)}
+                            </td>
+                            <td className={`${tdCls} text-right font-mono text-slate-600 dark:text-slate-400`}>
+                              <span title={keyMetric.label}>{keyMetric.value}</span>
+                            </td>
+                            <td className={`${tdCls} text-right font-mono`}>
+                              {item.piotroski_f != null ? (
+                                <span
+                                  className={clsx(
+                                    "font-semibold",
+                                    item.piotroski_f >= 7
+                                      ? "text-emerald-600 dark:text-emerald-400"
+                                      : item.piotroski_f >= 4
+                                      ? "text-amber-600 dark:text-amber-400"
+                                      : "text-red-500 dark:text-red-400"
+                                  )}
+                                >
+                                  {item.piotroski_f}/9
+                                </span>
+                              ) : (
+                                <span className="text-slate-400">—</span>
+                              )}
+                            </td>
+                            <td className={tdCls}>
+                              <PeaBadge eligible={item.pea_eligible} />
+                            </td>
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>

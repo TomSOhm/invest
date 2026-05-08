@@ -2,15 +2,26 @@
 
 import { useEffect } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, TrendingUp, TrendingDown, Check, X } from "lucide-react";
+import { ArrowLeft, TrendingUp, TrendingDown } from "lucide-react";
 import { useCompany } from "@/hooks/useCompany";
-import { formatCurrency, formatNumber, formatPercent, formatDate, formatLargeNumber } from "@/lib/formatters";
+import {
+  formatCurrency,
+  formatNumber,
+  formatPercent,
+  formatDate,
+  formatLargeNumber,
+} from "@/lib/formatters";
 import { scoreToColor } from "@/lib/constants";
 import SignalBadge from "@/components/ui/SignalBadge";
 import PeaBadge from "@/components/ui/PeaBadge";
-import ScoreGauge from "@/components/ui/ScoreGauge";
 import Card from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";
+import HorizonScoreCard from "@/components/ui/HorizonScoreCard";
+import DCFFairValueRange from "@/components/ui/DCFFairValueRange";
+import EarningsQualityPanel from "@/components/ui/EarningsQualityPanel";
+import MomentumPanel from "@/components/ui/MomentumPanel";
+import { ScoreBar } from "@/components/ui/ScoreGauge";
+import type { AnalystRatings, RiskSignals, SubScores } from "@/lib/types";
 import clsx from "clsx";
 
 // Metric row inside a card
@@ -40,40 +51,6 @@ function MetricRow({
   );
 }
 
-// Score category bar
-function ScoreCategoryBar({
-  label,
-  score,
-  weight,
-}: {
-  label: string;
-  score: number;
-  weight?: number;
-}) {
-  const color = scoreToColor(score);
-  return (
-    <div className="space-y-1">
-      <div className="flex justify-between items-center">
-        <span className="text-xs text-slate-600 dark:text-slate-400">
-          {label}
-          {weight != null && (
-            <span className="ml-1 text-slate-400 text-[10px]">({Math.round(weight * 100)}%)</span>
-          )}
-        </span>
-        <span className="text-xs font-mono font-bold" style={{ color }}>
-          {Math.round(score)}
-        </span>
-      </div>
-      <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-        <div
-          className="h-full rounded-full transition-all duration-500"
-          style={{ width: `${score}%`, backgroundColor: color }}
-        />
-      </div>
-    </div>
-  );
-}
-
 // Analyst bar: buy/hold/sell distribution
 function AnalystBar({
   strongBuy,
@@ -97,39 +74,19 @@ function AnalystBar({
     <div className="space-y-2">
       <div className="flex h-4 rounded-full overflow-hidden gap-px">
         {strongBuy > 0 && (
-          <div
-            className="bg-emerald-600"
-            style={{ width: pct(strongBuy) }}
-            title={`Strong Buy: ${strongBuy}`}
-          />
+          <div className="bg-emerald-600" style={{ width: pct(strongBuy) }} title={`Strong Buy: ${strongBuy}`} />
         )}
         {buy > 0 && (
-          <div
-            className="bg-emerald-400"
-            style={{ width: pct(buy) }}
-            title={`Buy: ${buy}`}
-          />
+          <div className="bg-emerald-400" style={{ width: pct(buy) }} title={`Buy: ${buy}`} />
         )}
         {hold > 0 && (
-          <div
-            className="bg-amber-400"
-            style={{ width: pct(hold) }}
-            title={`Hold: ${hold}`}
-          />
+          <div className="bg-amber-400" style={{ width: pct(hold) }} title={`Hold: ${hold}`} />
         )}
         {sell > 0 && (
-          <div
-            className="bg-red-400"
-            style={{ width: pct(sell) }}
-            title={`Sell: ${sell}`}
-          />
+          <div className="bg-red-400" style={{ width: pct(sell) }} title={`Sell: ${sell}`} />
         )}
         {strongSell > 0 && (
-          <div
-            className="bg-red-600"
-            style={{ width: pct(strongSell) }}
-            title={`Strong Sell: ${strongSell}`}
-          />
+          <div className="bg-red-600" style={{ width: pct(strongSell) }} title={`Strong Sell: ${strongSell}`} />
         )}
       </div>
       <div className="flex gap-4 text-xs text-slate-500">
@@ -144,125 +101,134 @@ function AnalystBar({
   );
 }
 
-// Altman Z visual
-function AltmanZBar({ z }: { z: number | null }) {
-  if (z == null) return <span className="text-slate-400 text-sm">—</span>;
-
-  const clamped = Math.max(-1, Math.min(5, z));
-  const pct = ((clamped + 1) / 6) * 100;
-
-  const color =
-    z > 2.99 ? "#10b981" : z > 1.81 ? "#f59e0b" : "#ef4444";
-  const label = z > 2.99 ? "Safe Zone" : z > 1.81 ? "Grey Zone" : "Distress Zone";
-
+// Risk panel (lightweight)
+function RiskPanel({ risk }: { risk: RiskSignals }) {
   return (
-    <div className="space-y-2">
-      <div className="relative h-4 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-        {/* Zone markers */}
-        <div
-          className="absolute top-0 bottom-0 bg-red-200 dark:bg-red-900/30"
-          style={{ left: 0, width: `${((1.81 + 1) / 6) * 100}%` }}
-        />
-        <div
-          className="absolute top-0 bottom-0 bg-amber-100 dark:bg-amber-900/20"
-          style={{
-            left: `${((1.81 + 1) / 6) * 100}%`,
-            width: `${((2.99 - 1.81) / 6) * 100}%`,
-          }}
-        />
-        <div
-          className="absolute top-0 bottom-0 bg-emerald-100 dark:bg-emerald-900/20"
-          style={{ left: `${((2.99 + 1) / 6) * 100}%`, right: 0 }}
-        />
-        {/* Indicator */}
-        <div
-          className="absolute top-1 bottom-1 w-2 rounded-full"
-          style={{ left: `calc(${pct}% - 4px)`, backgroundColor: color }}
-        />
-      </div>
-      <div className="flex justify-between text-[10px] text-slate-400">
-        <span>Distress &lt;1.81</span>
-        <span>Grey 1.81-2.99</span>
-        <span>Safe &gt;2.99</span>
-      </div>
-      <div className="flex items-center gap-2">
-        <span className="text-lg font-bold font-mono" style={{ color }}>
-          {z.toFixed(2)}
-        </span>
-        <span className="text-sm" style={{ color }}>
-          {label}
-        </span>
+    <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-3">
+      <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide">
+        Risk
+      </span>
+      <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+        {risk.risk_score != null && (
+          <div>
+            <div className="text-xs text-slate-400 mb-0.5">Risk Score</div>
+            <ScoreBar score={risk.risk_score} />
+          </div>
+        )}
+        {risk.realized_vol_1y != null && (
+          <MetricRow
+            label="Vol 1Y"
+            value={formatPercent(risk.realized_vol_1y * 100)}
+            isGood={risk.realized_vol_1y < 0.25}
+          />
+        )}
+        {risk.max_drawdown_3y != null && (
+          <MetricRow
+            label="Max DD 3Y"
+            value={formatPercent(risk.max_drawdown_3y * 100)}
+            isGood={risk.max_drawdown_3y > -0.3}
+          />
+        )}
+        {risk.net_debt_ebitda != null && (
+          <MetricRow
+            label="ND/EBITDA"
+            value={formatNumber(risk.net_debt_ebitda, 1) + "x"}
+            isGood={risk.net_debt_ebitda < 3}
+          />
+        )}
+        {risk.interest_coverage != null && (
+          <MetricRow
+            label="Interest Cov."
+            value={formatNumber(risk.interest_coverage, 1) + "x"}
+            isGood={risk.interest_coverage > 3}
+          />
+        )}
+        {risk.beta != null && (
+          <MetricRow
+            label="Beta"
+            value={formatNumber(risk.beta, 2)}
+          />
+        )}
       </div>
     </div>
   );
 }
 
-// Piotroski grid (9 criteria)
-function PiotroskiGrid({ score }: { score: number }) {
-  const criteria = [
-    { label: "ROA > 0" },
-    { label: "CFO > 0" },
-    { label: "ROA Improving" },
-    { label: "CFO > ROA (Accruals)" },
-    { label: "Lower Leverage" },
-    { label: "Higher Current Ratio" },
-    { label: "No Share Dilution" },
-    { label: "Higher Gross Margin" },
-    { label: "Higher Asset Turnover" },
+// Sub-scores panel (collapsible)
+function SubScoresPanel({ subScores }: { subScores: SubScores }) {
+  const items = [
+    { label: "Valuation", score: subScores.valuation },
+    { label: "Profitability", score: subScores.profitability },
+    { label: "Financial Health", score: subScores.health },
+    { label: "Growth", score: subScores.growth },
+    { label: "Shareholder Returns", score: subScores.shareholder },
+    { label: "Risk (Legacy)", score: subScores.risk_legacy },
   ];
 
-  // The API only returns total score, so we fill from top
-  const filled = Math.round(score);
-
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-3 gap-2">
-        {criteria.map((c, i) => {
-          const pass = i < filled;
+    <details className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 overflow-hidden">
+      <summary className="px-4 py-3 cursor-pointer text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors">
+        Sub-Scores (Legacy M3)
+      </summary>
+      <div className="px-4 pb-4 pt-2 space-y-2.5">
+        {items.map((item) => {
+          const color = scoreToColor(item.score);
           return (
-            <div
-              key={c.label}
-              className={clsx(
-                "flex items-center gap-1.5 px-2 py-1.5 rounded text-xs",
-                pass
-                  ? "bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
-                  : "bg-red-50 dark:bg-red-900/20 text-red-500 dark:text-red-400"
-              )}
-            >
-              {pass ? <Check size={11} /> : <X size={11} />}
-              <span className="leading-tight">{c.label}</span>
+            <div key={item.label} className="space-y-1">
+              <div className="flex justify-between items-center">
+                <span className="text-xs text-slate-600 dark:text-slate-400">{item.label}</span>
+                <span className="text-xs font-mono font-bold" style={{ color }}>
+                  {Math.round(item.score)}
+                </span>
+              </div>
+              <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{ width: `${item.score}%`, backgroundColor: color }}
+                />
+              </div>
             </div>
           );
         })}
       </div>
-      <div className="flex items-center gap-3">
-        <div className="flex gap-1">
-          {Array.from({ length: 9 }).map((_, i) => (
-            <div
-              key={i}
-              className={clsx(
-                "w-4 h-4 rounded-sm",
-                i < filled
-                  ? "bg-emerald-500"
-                  : "bg-slate-200 dark:bg-slate-700"
-              )}
-            />
-          ))}
+    </details>
+  );
+}
+
+// Analyst targets panel
+function AnalystTargetsPanel({ analyst }: { analyst: AnalystRatings; currentPrice: number }) {
+  return (
+    <Card title="Analyst Consensus">
+      <div className="space-y-3">
+        <AnalystBar
+          strongBuy={analyst.strong_buy}
+          buy={analyst.buy}
+          hold={analyst.hold}
+          sell={analyst.sell}
+          strongSell={analyst.strong_sell}
+        />
+        <div className="grid grid-cols-3 gap-3 text-center">
+          <div>
+            <div className="text-xs text-slate-400">Low</div>
+            <div className="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {formatCurrency(analyst.target_low)}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-400">Mean</div>
+            <div className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
+              {formatCurrency(analyst.target_mean)}
+            </div>
+          </div>
+          <div>
+            <div className="text-xs text-slate-400">High</div>
+            <div className="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300">
+              {formatCurrency(analyst.target_high)}
+            </div>
+          </div>
         </div>
-        <span
-          className={clsx(
-            "font-bold text-base",
-            filled >= 7
-              ? "text-emerald-600 dark:text-emerald-400"
-              : filled >= 4
-              ? "text-amber-600 dark:text-amber-400"
-              : "text-red-500"
-          )}
-        >
-          {filled}/9 — {filled >= 7 ? "Strong" : filled >= 4 ? "Moderate" : "Weak"}
-        </span>
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -287,7 +253,10 @@ export default function CompanyPage() {
   if (error) {
     return (
       <div className="max-w-screen-xl mx-auto px-4 py-8">
-        <button onClick={() => router.back()} className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 mb-4 transition-colors">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 mb-4 transition-colors"
+        >
           <ArrowLeft size={15} /> Back
         </button>
         <div className="p-4 rounded-lg bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 text-sm">
@@ -299,7 +268,21 @@ export default function CompanyPage() {
 
   if (!data) return null;
 
-  const { metrics, scoring, analyst, pea_eligible, pea_pme_eligible, last_updated } = data;
+  const {
+    metrics,
+    horizons,
+    sub_scores,
+    valuation,
+    quality,
+    risk,
+    momentum,
+    analyst_ratings,
+    pea_eligible,
+    pea_pme_eligible,
+    last_updated,
+  } = data;
+
+  const currentPrice = metrics.price ?? data.price ?? 0;
 
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6 space-y-5">
@@ -313,29 +296,37 @@ export default function CompanyPage() {
 
       {/* Header */}
       <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-4 flex flex-wrap items-center gap-4">
-        <ScoreGauge score={scoring.composite_score} size={90} />
         <div className="flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2 mb-1">
             <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">
-              {metrics.name}
+              {metrics.name || data.name}
             </h1>
             <span className="font-mono text-sm bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 px-2 py-0.5 rounded">
-              {metrics.ticker}
+              {metrics.ticker || ticker}
             </span>
-            <SignalBadge signal={scoring.signal} />
             <PeaBadge eligible={pea_eligible} pme={pea_pme_eligible} />
           </div>
           <div className="flex flex-wrap gap-4 text-sm text-slate-500">
-            <span>{metrics.sector}</span>
-            <span>|</span>
-            <span>{metrics.industry}</span>
-            <span>|</span>
-            <span>{metrics.exchange} · {metrics.country}</span>
+            {metrics.sector && <span>{metrics.sector}</span>}
+            {metrics.industry && (
+              <>
+                <span>|</span>
+                <span>{metrics.industry}</span>
+              </>
+            )}
+            {metrics.exchange && metrics.country && (
+              <>
+                <span>|</span>
+                <span>
+                  {metrics.exchange} · {metrics.country}
+                </span>
+              </>
+            )}
           </div>
         </div>
         <div className="text-right">
           <div className="text-2xl font-bold font-mono text-slate-900 dark:text-slate-100">
-            {formatCurrency(metrics.price)}
+            {formatCurrency(currentPrice)}
           </div>
           <div className="text-xs text-slate-400 mt-0.5">
             Mkt Cap: {formatLargeNumber(metrics.market_cap)}
@@ -357,101 +348,46 @@ export default function CompanyPage() {
               {formatPercent(metrics.fifty_two_week_high_pct)} vs 52w high
             </div>
           )}
+          {data.data_completeness != null && (
+            <div className="text-xs text-slate-400 mt-0.5">
+              Data: {Math.round(data.data_completeness * 100)}% complete
+            </div>
+          )}
         </div>
       </div>
 
-      {/* Analyst + Score breakdown row */}
-      <div className="grid md:grid-cols-2 gap-4">
-        {/* Analyst */}
-        <Card title="Analyst Consensus">
-          {analyst ? (
-            <div className="space-y-3">
-              <AnalystBar
-                strongBuy={analyst.strong_buy}
-                buy={analyst.buy}
-                hold={analyst.hold}
-                sell={analyst.sell}
-                strongSell={analyst.strong_sell}
-              />
-              <div className="grid grid-cols-3 gap-3 text-center">
-                <div>
-                  <div className="text-xs text-slate-400">Low</div>
-                  <div className="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    {formatCurrency(analyst.target_low)}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-xs text-slate-400">Mean</div>
-                  <div className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
-                    {formatCurrency(analyst.target_mean)}
-                  </div>
-                  {analyst.target_mean != null && metrics.price > 0 && (
-                    <div
-                      className={clsx(
-                        "text-xs",
-                        analyst.target_mean > metrics.price
-                          ? "text-emerald-500"
-                          : "text-red-500"
-                      )}
-                    >
-                      {formatPercent(
-                        ((analyst.target_mean - metrics.price) / metrics.price) * 100
-                      )}{" "}
-                      upside
-                    </div>
-                  )}
-                </div>
-                <div>
-                  <div className="text-xs text-slate-400">High</div>
-                  <div className="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300">
-                    {formatCurrency(analyst.target_high)}
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-slate-400">No analyst data available.</p>
-          )}
-        </Card>
-
-        {/* Score breakdown */}
-        <Card title="Score Breakdown">
-          <div className="space-y-2.5">
-            <ScoreCategoryBar
-              label="Valuation"
-              score={scoring.valuation_score}
-              weight={scoring.scoring_weights?.valuation}
-            />
-            <ScoreCategoryBar
-              label="Profitability"
-              score={scoring.profitability_score}
-              weight={scoring.scoring_weights?.profitability}
-            />
-            <ScoreCategoryBar
-              label="Financial Health"
-              score={scoring.health_score}
-              weight={scoring.scoring_weights?.health}
-            />
-            <ScoreCategoryBar
-              label="Growth"
-              score={scoring.growth_score}
-              weight={scoring.scoring_weights?.growth}
-            />
-            <ScoreCategoryBar
-              label="Shareholder Returns"
-              score={scoring.shareholder_score}
-              weight={scoring.scoring_weights?.shareholder}
-            />
-            <ScoreCategoryBar
-              label="Risk"
-              score={scoring.risk_score}
-              weight={scoring.scoring_weights?.risk}
-            />
-          </div>
-        </Card>
+      {/* Three Horizon Score Cards */}
+      <div className="grid md:grid-cols-3 gap-4">
+        <HorizonScoreCard horizon="long_term" scoring={horizons.long_term} />
+        <HorizonScoreCard horizon="medium_term" scoring={horizons.medium_term} />
+        <HorizonScoreCard horizon="short_term" scoring={horizons.short_term} />
       </div>
 
-      {/* Metrics Grid */}
+      {/* DCF Fair Value Range */}
+      <DCFFairValueRange valuation={valuation} currentPrice={currentPrice} />
+
+      {/* Earnings Quality + Momentum */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <EarningsQualityPanel quality={quality} />
+        <MomentumPanel momentum={momentum} />
+      </div>
+
+      {/* Risk + Analyst */}
+      <div className="grid md:grid-cols-2 gap-4">
+        <RiskPanel risk={risk} />
+        {analyst_ratings ? (
+          <AnalystTargetsPanel
+            analyst={analyst_ratings}
+            currentPrice={currentPrice}
+          />
+        ) : (
+          <Card title="Analyst Consensus">
+            <p className="text-sm text-slate-400">No analyst data available.</p>
+          </Card>
+        )}
+      </div>
+
+      {/* Raw Metrics Grid */}
       <div className="grid md:grid-cols-3 lg:grid-cols-4 gap-4">
         {/* Valuation */}
         <Card title="Valuation">
@@ -500,57 +436,8 @@ export default function CompanyPage() {
         </Card>
       </div>
 
-      {/* Piotroski + Altman + Graham row */}
-      <div className="grid md:grid-cols-3 gap-4">
-        {/* Piotroski */}
-        <Card title={`Piotroski F-Score — ${scoring.piotroski_f}/9`} className="md:col-span-1">
-          <PiotroskiGrid score={scoring.piotroski_f} />
-        </Card>
-
-        {/* Altman Z */}
-        <Card title="Altman Z-Score">
-          <AltmanZBar z={scoring.altman_z} />
-        </Card>
-
-        {/* Graham */}
-        <Card title="Graham Analysis">
-          <div className="space-y-3">
-            <MetricRow
-              label="Graham Number"
-              value={scoring.graham_number != null ? formatCurrency(scoring.graham_number) : "—"}
-            />
-            <MetricRow
-              label="Current Price"
-              value={formatCurrency(metrics.price)}
-            />
-            <MetricRow
-              label="Margin of Safety"
-              value={scoring.graham_mos != null ? formatPercent(scoring.graham_mos) : "—"}
-              isGood={scoring.graham_mos != null ? scoring.graham_mos > 0 : null}
-            />
-            {scoring.graham_mos != null && (
-              <div className="pt-2">
-                <div className="h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
-                  <div
-                    className={clsx(
-                      "h-full rounded-full transition-all",
-                      scoring.graham_mos > 0 ? "bg-emerald-500" : "bg-red-500"
-                    )}
-                    style={{
-                      width: `${Math.min(100, Math.abs(scoring.graham_mos))}%`,
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  {scoring.graham_mos > 0
-                    ? `Undervalued by ${formatPercent(scoring.graham_mos)} vs Graham Number`
-                    : `Overvalued by ${formatPercent(Math.abs(scoring.graham_mos))} vs Graham Number`}
-                </p>
-              </div>
-            )}
-          </div>
-        </Card>
-      </div>
+      {/* Sub-scores (collapsible) */}
+      <SubScoresPanel subScores={sub_scores} />
 
       {/* Footer */}
       <div className="text-xs text-slate-400 pb-4">

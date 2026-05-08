@@ -1,3 +1,11 @@
+import type {
+  CompanyDetail,
+  Horizon,
+  PortfolioResponse,
+  PresetMeta,
+  ScreenerResponse,
+} from "./types";
+
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
 class ApiError extends Error {
@@ -27,7 +35,10 @@ async function request<T>(
     try {
       const body = await res.json();
       if (body?.detail) {
-        message = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+        message =
+          typeof body.detail === "string"
+            ? body.detail
+            : JSON.stringify(body.detail);
       }
     } catch {
       // ignore JSON parse error
@@ -61,5 +72,36 @@ export const api = {
     return request<T>(path, { method: "DELETE" });
   },
 };
+
+// ---------------------------------------------------------------------------
+// Typed helpers (M11)
+// ---------------------------------------------------------------------------
+
+export async function fetchScreenerPresets(): Promise<PresetMeta[]> {
+  return api.get<PresetMeta[]>("/api/screener/presets");
+}
+
+export async function fetchHorizonScreening(
+  preset: string,
+  peaOnly = false,
+  limit = 50
+): Promise<ScreenerResponse> {
+  return api.post<ScreenerResponse>(`/api/screener/preset/${preset}`, {
+    pea_only: peaOnly,
+    limit,
+  });
+}
+
+export async function fetchCompanyDetail(
+  ticker: string
+): Promise<CompanyDetail> {
+  return api.get<CompanyDetail>(`/api/company/${ticker.toUpperCase()}`);
+}
+
+export async function fetchPortfolio(
+  horizon: Horizon = "long_term"
+): Promise<PortfolioResponse> {
+  return api.get<PortfolioResponse>(`/api/portfolio/?horizon=${horizon}`);
+}
 
 export { ApiError };
