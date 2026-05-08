@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Briefcase, Eye, Search, BarChart3 } from "lucide-react";
+import { Briefcase, Eye, Search, BarChart3, BookOpen } from "lucide-react";
 import ThemeToggle from "./ThemeToggle";
 import clsx from "clsx";
 
@@ -10,6 +10,7 @@ const NAV_LINKS = [
   { href: "/portfolio", label: "Portfolio", icon: Briefcase },
   { href: "/watchlist", label: "Watchlist", icon: Eye },
   { href: "/screener", label: "Screener", icon: Search },
+  { href: "/glossary", label: "Glossary", icon: BookOpen },
 ];
 
 export default function Navbar() {
