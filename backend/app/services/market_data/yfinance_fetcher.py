@@ -66,8 +66,27 @@ def _latest_from_statement(
     first non-NaN, non-zero value from the most-recent column. Returns NaN if
     nothing is found. Never raises.
     """
+    return _nth_from_statement(statement, candidate_keys, n=0)
+
+
+def _nth_from_statement(
+    statement: Optional[pd.DataFrame],
+    candidate_keys: Sequence[str],
+    n: int = 0,
+) -> float:
+    """Like :func:`_latest_from_statement` but reads the *n*-th most-recent column.
+
+    ``n=0`` -> most recent (current fiscal year)
+    ``n=1`` -> second-most-recent (prior fiscal year)
+    Returns NaN if the statement has fewer than ``n+1`` columns or none of the
+    candidate keys exist.  Used by M4 to populate ``*_PriorYear`` fields.
+    """
     if statement is None or not isinstance(statement, pd.DataFrame) or statement.empty:
         return np.nan
+    cols = list(statement.columns)
+    if n >= len(cols):
+        return np.nan
+    target_col = cols[n]
     for key in candidate_keys:
         if key not in statement.index:
             continue
@@ -79,10 +98,11 @@ def _latest_from_statement(
             if row.empty:
                 continue
             row = row.iloc[0]
-        for col in row.index:
-            val = row[col]
-            if _is_finite_number(val) and float(val) != 0:
-                return float(val)
+        if target_col not in row.index:
+            continue
+        val = row[target_col]
+        if _is_finite_number(val) and float(val) != 0:
+            return float(val)
     return np.nan
 
 
@@ -242,6 +262,108 @@ def _get_balance_sheet_items(
             ],
         ),
     }
+
+
+# ---------------------------------------------------------------------------
+# M4 -- Year-over-Year (prior-year) extractor for Piotroski deltas
+# ---------------------------------------------------------------------------
+
+# yfinance row labels for line items we need YoY pairs for.
+_LTD_KEYS = (
+    "Long Term Debt",
+    "LongTermDebt",
+    "Long Term Debt And Capital Lease Obligation",
+    "Long Term Debt Noncurrent",
+)
+_TA_KEYS = ("Total Assets", "TotalAssets")
+_REV_KEYS = (
+    "Total Revenue",
+    "TotalRevenue",
+    "Revenue",
+    "Operating Revenue",
+)
+_NI_KEYS = (
+    "Net Income",
+    "NetIncome",
+    "Net Income Common Stockholders",
+    "Net Income Continuous Operations",
+)
+_CFO_KEYS = (
+    "Operating Cash Flow",
+    "Cash Flow From Continuing Operating Activities",
+    "Total Cash From Operating Activities",
+    "OperatingCashFlow",
+)
+_GP_KEYS = (
+    "Gross Profit",
+    "GrossProfit",
+)
+_CA_KEYS = ("Current Assets", "Total Current Assets", "CurrentAssets")
+_CL_KEYS = ("Current Liabilities", "Total Current Liabilities", "CurrentLiabilities")
+
+
+def _get_yoy_inputs(
+    balance_sheet: Optional[pd.DataFrame],
+    financials: Optional[pd.DataFrame],
+    cashflow: Optional[pd.DataFrame],
+) -> Dict[str, float]:
+    """Pull prior-year (n=1 column) values needed for Piotroski YoY deltas.
+
+    Returns a dict with the M4 ``*_PriorYear`` fields plus ``LongTermDebt`` and
+    ``LongTermDebt_PriorYear``.  Missing values are NaN.
+
+    Note
+    ----
+    Each value is fetched from the second-most-recent column of the relevant
+    yfinance statement.  When the source has fewer than 2 historical periods
+    (very common for European mid-caps on the free tier), values are NaN and
+    the corresponding Piotroski signals will simply be skipped.
+    """
+    out: Dict[str, float] = {}
+
+    # Balance sheet ------------------------------------------------------
+    out["LongTermDebt"] = _nth_from_statement(balance_sheet, _LTD_KEYS, n=0)
+    out["LongTermDebt_PriorYear"] = _nth_from_statement(balance_sheet, _LTD_KEYS, n=1)
+    out["TotalAssets_PriorYear"] = _nth_from_statement(balance_sheet, _TA_KEYS, n=1)
+    ca_prior = _nth_from_statement(balance_sheet, _CA_KEYS, n=1)
+    cl_prior = _nth_from_statement(balance_sheet, _CL_KEYS, n=1)
+    if (
+        _is_finite_number(ca_prior)
+        and _is_finite_number(cl_prior)
+        and float(cl_prior) != 0
+    ):
+        out["CurrentRatio_PriorYear"] = float(ca_prior) / float(cl_prior)
+    else:
+        out["CurrentRatio_PriorYear"] = np.nan
+
+    # Income statement ---------------------------------------------------
+    rev_prior = _nth_from_statement(financials, _REV_KEYS, n=1)
+    ni_prior = _nth_from_statement(financials, _NI_KEYS, n=1)
+    gp_prior = _nth_from_statement(financials, _GP_KEYS, n=1)
+    out["Revenue_PriorYear"] = rev_prior
+    if (
+        _is_finite_number(gp_prior)
+        and _is_finite_number(rev_prior)
+        and float(rev_prior) > 0
+    ):
+        out["GrossMargin_PriorYear"] = float(gp_prior) / float(rev_prior)
+    else:
+        out["GrossMargin_PriorYear"] = np.nan
+
+    # ROA prior year = NI_prior / TotalAssets_prior (real, not approximated)
+    if (
+        _is_finite_number(ni_prior)
+        and _is_finite_number(out["TotalAssets_PriorYear"])
+        and float(out["TotalAssets_PriorYear"]) > 0
+    ):
+        out["ROA_PriorYear"] = float(ni_prior) / float(out["TotalAssets_PriorYear"])
+    else:
+        out["ROA_PriorYear"] = np.nan
+
+    # Cash flow ----------------------------------------------------------
+    out["OperatingCashflow_PriorYear"] = _nth_from_statement(cashflow, _CFO_KEYS, n=1)
+
+    return out
 
 
 def _years_since_first_trade(info: Dict[str, Any]) -> float:
@@ -749,6 +871,15 @@ class YFinanceDataFetcher:
 
             # Piotroski dilution
             result["Shares_PriorYear"] = _get_shares_prior_year(tk)
+
+            # M4: Year-over-Year inputs for Piotroski deltas (real, not proxied)
+            yoy = _get_yoy_inputs(
+                balance_sheet=balance_sheet,
+                financials=financials,
+                cashflow=cashflow,
+            )
+            for k, v in yoy.items():
+                result[k] = v
 
             # Extra fields
             result["ForwardPE"] = _safe_get(info, "forwardPE", np.nan)

@@ -206,8 +206,13 @@ def main(argv: List[str] | None = None) -> int:
         if row is None:
             n_fail += 1
             continue
-        # Drop the Ticker key from the persisted row — it's encoded in the filename.
-        row_to_save = {k: v for k, v in row.items() if k != "Ticker"}
+        # Drop the Ticker key (encoded in the filename) and the hybrid-fetcher
+        # audit metadata (`data_completeness`, `field_sources`) which are
+        # provenance details not part of the scoring contract. Persisting them
+        # would cause column collisions when ``score_universe`` joins the
+        # input back with its own computed ``data_completeness`` column.
+        _META_KEYS = {"Ticker", "data_completeness", "field_sources"}
+        row_to_save = {k: v for k, v in row.items() if k not in _META_KEYS}
         write_json(INPUTS_DIR / f"{safe_filename(ticker)}.json", row_to_save)
         snap = score_row(row_to_save)
         write_json(SNAPSHOTS_DIR / f"{safe_filename(ticker)}.json", snap)

@@ -1,15 +1,15 @@
 {
   "Altman_Z": "NaN",
   "Composite_Score": 65.5,
-  "Graham_MoS": 0.9,
+  "Graham_MoS": 0.5,
   "Graham_Number": 73.51,
   "Growth_Score": 45.7,
   "Health_Score": 62.5,
-  "Piotroski_F": 8,
+  "Piotroski_F": 7,
   "Profitability_Score": 59.1,
   "Risk_Score": 94.3,
   "Shareholder_Score": 60.9,
   "Signal": "Buy",
   "Valuation_Score": 75.1,
-  "data_completeness": 0.97
+  "data_completeness": 0.98
 }

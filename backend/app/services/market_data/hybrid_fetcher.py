@@ -50,6 +50,11 @@ _FMP_SUPPLIED_FIELDS = {
     "CurrentAssets", "CurrentLiabilities", "RetainedEarnings",
     "GrossMargin", "OperatingMargin", "NetMargin", "RevenueGrowth",
     "ROE", "ROA",
+    # M4 -- Year-over-Year prior-period inputs for Piotroski deltas
+    "LongTermDebt", "LongTermDebt_PriorYear",
+    "ROA_PriorYear", "OperatingCashflow_PriorYear",
+    "CurrentRatio_PriorYear", "GrossMargin_PriorYear",
+    "Revenue_PriorYear", "TotalAssets_PriorYear",
 }
 
 
