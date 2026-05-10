@@ -146,3 +146,12 @@ class CompanyDetail(BaseModel):
 
     data_source: str = "yfinance"
     last_updated: str = ""
+
+    score_source: Literal["universe", "single_row_fallback"] = Field(
+        "single_row_fallback",
+        description=(
+            "'universe' when the score came from the screener's scored cache "
+            "(peer-relative percentiles); 'single_row_fallback' when it was "
+            "computed in isolation (peer percentiles approximate)"
+        ),
+    )

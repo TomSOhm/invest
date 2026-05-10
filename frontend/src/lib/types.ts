@@ -181,6 +181,7 @@ export interface CompanyDetail {
   data_completeness: number;
   data_source: string;
   last_updated: string;
+  score_source: "universe" | "single_row_fallback";
 }
 
 // ---------------------------------------------------------------------------
@@ -235,6 +236,15 @@ export interface ScreenerSummary {
 export interface ScreenerResponse {
   results: ScreenerResultItem[];
   summary: ScreenerSummary;
+  last_refreshed?: string | null;
+}
+
+export interface ScreenerRefreshResponse {
+  tickers_fetched: number;
+  tickers_failed: string[];
+  last_refreshed: string;
+  duration_seconds: number;
+  universe_size: number;
 }
 
 // Preset metadata returned by GET /api/screener/presets

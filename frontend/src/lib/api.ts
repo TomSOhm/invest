@@ -3,6 +3,7 @@ import type {
   Horizon,
   PortfolioResponse,
   PresetMeta,
+  ScreenerRefreshResponse,
   ScreenerResponse,
 } from "./types";
 
@@ -102,6 +103,10 @@ export async function fetchPortfolio(
   horizon: Horizon = "long_term"
 ): Promise<PortfolioResponse> {
   return api.get<PortfolioResponse>(`/api/portfolio/?horizon=${horizon}`);
+}
+
+export async function refreshScreenerUniverse(): Promise<ScreenerRefreshResponse> {
+  return api.post<ScreenerRefreshResponse>("/api/screener/refresh");
 }
 
 export { ApiError };

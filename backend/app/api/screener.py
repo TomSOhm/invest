@@ -24,11 +24,13 @@ from backend.app.dependencies import (
     get_screener_service,
 )
 from backend.app.models.screener import (
+    ScreenerRefreshResponse,
     ScreenerRequest,
     ScreenerResponse,
     ScreenerResultItem,
     ScreenerSummary,
 )
+from backend.app.services import screener_cache
 from backend.app.services.data_fetcher import DataFetcher
 from backend.app.services.scoring_service import ScoringService
 from backend.app.services.screener_service import ScreenerService
@@ -74,11 +76,17 @@ class PresetRunRequest(BaseModel):
 # ---------------------------------------------------------------------------
 
 def _build_scored_universe() -> pd.DataFrame:
-    """Load sample universe and score it."""
-    from src.data.sample_universe import get_universe_dataframe
-    df = get_universe_dataframe()
-    scorer = get_scoring_service()
-    return scorer.score_dataframe(df)
+    """Return the live, scored universe from the screener cache.
+
+    Raises ``HTTPException(409)`` when no refresh has been performed yet.
+    """
+    try:
+        return screener_cache.get_scored()
+    except screener_cache.ScreenerNotRefreshed as exc:
+        raise HTTPException(
+            status_code=409,
+            detail="Universe not refreshed yet — POST /api/screener/refresh first",
+        ) from exc
 
 
 # ---------------------------------------------------------------------------
@@ -276,7 +284,11 @@ async def run_screen(
     results = _df_to_results(result_df, horizon=req.horizon)
     summary = _build_summary(total_universe, result_df, horizon=req.horizon)
 
-    return {"results": results, "summary": summary}
+    return {
+        "results": results,
+        "summary": summary,
+        "last_refreshed": screener_cache.last_refreshed(),
+    }
 
 
 @router.get("/presets")
@@ -317,7 +329,27 @@ async def run_preset(
     results = _df_to_results(result_df, horizon=horizon)
     summary = _build_summary(total_universe, result_df, horizon=horizon)
 
-    return {"results": results, "summary": summary}
+    return {
+        "results": results,
+        "summary": summary,
+        "last_refreshed": screener_cache.last_refreshed(),
+    }
+
+
+@router.post("/refresh", response_model=ScreenerRefreshResponse)
+async def refresh_universe(
+    fetcher: DataFetcher = Depends(_get_fetcher),
+    scorer: ScoringService = Depends(_get_scorer),
+) -> Dict[str, Any]:
+    """Pull live data for the full PEA universe, score it, persist to cache.
+
+    Synchronous: blocks the request until all tickers are fetched and
+    scored. With ~120 tickers this typically takes 20-40 seconds.
+    """
+    try:
+        return screener_cache.refresh(fetcher, scorer)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/tickers", response_model=ScreenerResponse)
@@ -332,10 +364,15 @@ async def score_ticker_list(
         return {
             "results": [],
             "summary": _build_summary(0, df, horizon=req.horizon),
+            "last_refreshed": screener_cache.last_refreshed(),
         }
 
     scored_df = scorer.score_dataframe(df)
     results = _df_to_results(scored_df, horizon=req.horizon)
     summary = _build_summary(len(req.tickers), scored_df, horizon=req.horizon)
 
-    return {"results": results, "summary": summary}
+    return {
+        "results": results,
+        "summary": summary,
+        "last_refreshed": screener_cache.last_refreshed(),
+    }

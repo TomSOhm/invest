@@ -16,6 +16,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
+from backend.app.services import screener_cache
 from backend.app.services.data_fetcher import DataFetcher
 from backend.app.services.scoring_service import ScoringService
 
@@ -32,11 +33,25 @@ class CompanyService:
         Full company detail: metrics + three-horizon scoring + DCF + quality
         + risk + momentum blocks + analyst ratings + PEA status.
 
-        Returns a dict matching CompanyDetail schema.
+        Reads from the screener cache when the ticker is in the universe so
+        scores match the screener exactly (same peer set, same sector
+        percentiles). Falls back to a live single-row fetch + scoring
+        otherwise — note that single-row scoring degenerates the
+        sector-relative percentile path (no peers) so the resulting scores
+        are approximate; the response carries ``score_source`` so the UI
+        can warn the user.
         """
-        data = self._fetcher.fetch_single(ticker)
-        series = pd.Series(data)
-        scoring = self._scorer.score_single(series)
+        cached_row = screener_cache.lookup(ticker)
+        if cached_row is not None:
+            data = cached_row
+            scoring = self._scorer.extract_scoring_from_row(pd.Series(cached_row))
+            score_source = "universe"
+        else:
+            data = self._fetcher.fetch_single(ticker)
+            series = pd.Series(data)
+            scoring = self._scorer.score_single(series)
+            score_source = "single_row_fallback"
+
         analyst = self._fetcher.fetch_analyst_ratings(ticker)
 
         current_price = self._num(data.get("Price"))
@@ -133,6 +148,7 @@ class CompanyService:
             "data_completeness": scoring.get("data_completeness", 0.0),
             "data_source": "yfinance",
             "last_updated": datetime.now(timezone.utc).isoformat(),
+            "score_source": score_source,
         }
 
     def get_metrics(self, ticker: str) -> Dict[str, Any]:

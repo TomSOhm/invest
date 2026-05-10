@@ -123,3 +123,25 @@ class ScreenerResponse(BaseModel):
 
     results: List[ScreenerResultItem]
     summary: ScreenerSummary
+    last_refreshed: Optional[str] = Field(
+        None,
+        description="ISO timestamp of the last screener-cache refresh, or None when never refreshed",
+    )
+
+
+# ---------------------------------------------------------------------------
+# Refresh endpoint response
+# ---------------------------------------------------------------------------
+
+
+class ScreenerRefreshResponse(BaseModel):
+    """Summary returned by POST /api/screener/refresh."""
+
+    tickers_fetched: int = Field(..., description="Number of tickers with usable data after fetch")
+    tickers_failed: List[str] = Field(
+        default_factory=list,
+        description="Tickers that returned no usable data (failed live fetch)",
+    )
+    last_refreshed: str = Field(..., description="ISO timestamp of completion")
+    duration_seconds: float = Field(..., description="Elapsed wall-clock seconds for the refresh")
+    universe_size: int = Field(..., description="Total rows in the resulting scored cache")

@@ -622,9 +622,13 @@ def screen_horizon_preset(df: pd.DataFrame, preset_name: str) -> pd.DataFrame:
     pea_only = bool(preset["filters"].get("pea_only", False))
     filtered = apply_filters(df, preset["filters"], pea_only=pea_only)
 
-    # Apply the M7 investability gate when available on the DataFrame
+    # Apply the M7 investability gate when available on the DataFrame.
+    # NaN means the gate could not be evaluated (missing input data) — treat
+    # it as "not blocking" rather than as a hard fail, so universes that
+    # lack technical columns (DMAs, momentum) still surface results from
+    # the fundamentals-driven gates.
     if gates_col in filtered.columns:
-        filtered = filtered[filtered[gates_col].fillna(False).astype(bool)]
+        filtered = filtered[filtered[gates_col].fillna(True).astype(bool)]
 
     # Sort by the horizon score; fall back to Composite_Score for legacy DFs
     if score_col in filtered.columns:

@@ -311,6 +311,16 @@ export default function CompanyPage() {
         <ArrowLeft size={15} /> Back
       </button>
 
+      {/* Score-source warning when this ticker isn't in the screener universe */}
+      {data.score_source === "single_row_fallback" && (
+        <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-sm text-amber-800 dark:text-amber-200">
+          <strong>Approximate scores.</strong> {ticker} is not in the screened
+          universe, so sector-relative percentiles fall back to a global rank
+          against this ticker alone. Scores may differ from the screener. Add
+          this ticker to <code className="font-mono text-xs bg-amber-100 dark:bg-amber-900/50 px-1 rounded">data/universes/universe_pea_static.csv</code> and click <em>Refresh</em> on the screener to get peer-relative scoring.
+        </div>
+      )}
+
       {/* Header */}
       <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 px-5 py-4 flex flex-wrap items-center gap-4">
         <div className="flex-1 min-w-0">

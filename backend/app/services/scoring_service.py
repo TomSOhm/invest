@@ -101,8 +101,17 @@ class ScoringService:
         if scored_df.empty:
             return self._fallback_single(row)
 
-        scored_row = scored_df.iloc[0]
+        return self.extract_scoring_from_row(scored_df.iloc[0])
 
+    def extract_scoring_from_row(self, scored_row: pd.Series) -> Dict[str, Any]:
+        """
+        Build the scoring dict from a row that has ALREADY been scored.
+
+        Same output shape as ``score_single``. Used by the company-detail
+        endpoint when a row comes from the screener cache: the row already
+        carries every Valuation_Score / score_lt / DCF_* / Risk_* column,
+        so we skip the engine call and just project to the API shape.
+        """
         # --- Sub-scores ---
         sub = {
             "valuation_score": _safe_float(scored_row.get("Valuation_Score", 50.0)),

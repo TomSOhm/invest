@@ -135,7 +135,17 @@ const DEFAULT_FILTERS: CustomFilters = {};
 
 export default function ScreenerPage() {
   const router = useRouter();
-  const { results, loading, error, runScreen, runPreset, scoreTickers } = useScreener();
+  const {
+    results,
+    loading,
+    refreshing,
+    error,
+    lastRefreshed,
+    runScreen,
+    runPreset,
+    scoreTickers,
+    refresh,
+  } = useScreener();
   const [horizon, setHorizon] = useState<Horizon>("long_term");
   const [filters, setFilters] = useState<CustomFilters>(DEFAULT_FILTERS);
   const [peaOnly, setPeaOnly] = useState(false);
@@ -191,6 +201,24 @@ export default function ScreenerPage() {
     scoreTickers(tickers, horizon);
   }
 
+  async function handleRefresh() {
+    const summary = await refresh();
+    if (summary && activePreset) {
+      runPreset(activePreset, peaOnly, 50);
+    }
+  }
+
+  function formatRelativeTime(iso: string | null): string {
+    if (!iso) return "never";
+    const ts = new Date(iso).getTime();
+    if (Number.isNaN(ts)) return iso;
+    const deltaSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
+    if (deltaSec < 60) return `${deltaSec}s ago`;
+    if (deltaSec < 3600) return `${Math.floor(deltaSec / 60)}m ago`;
+    if (deltaSec < 86400) return `${Math.floor(deltaSec / 3600)}h ago`;
+    return `${Math.floor(deltaSec / 86400)}d ago`;
+  }
+
   const selectedPresetMeta = presets.find((p) => p.name === activePreset);
   const showCTOBanner =
     horizon === "short_term" ||
@@ -205,8 +233,24 @@ export default function ScreenerPage() {
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6">
       <div className="flex flex-wrap items-center justify-between gap-3 mb-5">
-        <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Screener</h1>
-        <HorizonSelector value={horizon} onChange={setHorizon} />
+        <div className="flex items-center gap-3">
+          <h1 className="text-xl font-bold text-slate-900 dark:text-slate-100">Screener</h1>
+          <span className="text-xs text-slate-500 dark:text-slate-400">
+            Universe refreshed {formatRelativeTime(lastRefreshed)}
+          </span>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60 transition-colors"
+            title="Pull live data for the full PEA universe (~30s)"
+          >
+            {refreshing ? <Spinner size={13} /> : <RefreshCw size={13} />}
+            {refreshing ? "Refreshing universe…" : "Refresh"}
+          </button>
+          <HorizonSelector value={horizon} onChange={setHorizon} />
+        </div>
       </div>
 
       {/* CTO Warning for short-term */}
@@ -548,8 +592,31 @@ export default function ScreenerPage() {
             </>
           )}
 
-          {/* Empty state */}
-          {!results && !loading && !error && (
+          {/* Empty state — universe not refreshed yet */}
+          {!results && !loading && !error && !lastRefreshed && (
+            <div className="flex flex-col items-center justify-center py-24 text-slate-500 gap-3">
+              <RefreshCw size={32} className="opacity-30" />
+              <p className="text-sm">
+                The universe has not been refreshed yet.
+              </p>
+              <button
+                onClick={handleRefresh}
+                disabled={refreshing}
+                className="inline-flex items-center gap-2 px-4 py-2 text-sm rounded-md bg-emerald-600 hover:bg-emerald-700 text-white disabled:opacity-60 transition-colors"
+              >
+                {refreshing ? <Spinner size={14} /> : <RefreshCw size={14} />}
+                {refreshing ? "Refreshing universe…" : "Refresh universe (live data)"}
+              </button>
+              <p className="text-xs text-slate-400 max-w-md text-center">
+                Pulls live yfinance data for ~120 PEA-eligible tickers. Takes
+                roughly 30 seconds. Refresh again whenever you want fresher
+                quotes.
+              </p>
+            </div>
+          )}
+
+          {/* Empty state — universe refreshed but no results selected yet */}
+          {!results && !loading && !error && lastRefreshed && (
             <div className="flex flex-col items-center justify-center py-24 text-slate-400 gap-3">
               <RefreshCw size={32} className="opacity-30" />
               <p className="text-sm">Select a preset or configure filters to start screening.</p>

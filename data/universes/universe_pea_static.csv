@@ -1,0 +1,127 @@
+ticker,pea,pea_pme,country,name
+AC.PA,True,False,FR,Accor
+ACA.PA,True,False,FR,Crédit Agricole
+AI.PA,True,False,FR,Air Liquide
+AIR.PA,True,False,FR,Airbus
+ALO.PA,True,False,FR,Alstom
+ATO.PA,True,False,FR,Atos
+BN.PA,True,False,FR,Danone
+BNP.PA,True,False,FR,BNP Paribas
+BVI.PA,True,False,FR,Bureau Veritas
+CA.PA,True,False,FR,Carrefour
+CAP.PA,True,False,FR,Capgemini
+CS.PA,True,False,FR,AXA
+DG.PA,True,False,FR,Vinci
+DSY.PA,True,False,FR,Dassault Systèmes
+EDEN.PA,True,False,FR,Edenred
+EL.PA,True,False,FR,EssilorLuxottica
+EN.PA,True,False,FR,Bouygues
+ENGI.PA,True,False,FR,Engie
+ERF.PA,True,False,FR,Eurofins Scientific
+GLE.PA,True,False,FR,Société Générale
+HO.PA,True,False,FR,Thales
+KER.PA,True,False,FR,Kering
+LR.PA,True,False,FR,Legrand
+MC.PA,True,False,FR,LVMH
+ML.PA,True,False,FR,Michelin
+OR.PA,True,False,FR,L'Oréal
+ORA.PA,True,False,FR,Orange
+PUB.PA,True,False,FR,Publicis Groupe
+RI.PA,True,False,FR,Pernod Ricard
+RMS.PA,True,False,FR,Hermès International
+RNO.PA,True,False,FR,Renault
+SAF.PA,True,False,FR,Safran
+SAN.PA,True,False,FR,Sanofi
+SGO.PA,True,False,FR,Saint-Gobain
+STLAP.PA,True,False,FR,Stellantis
+STMPA.PA,True,False,FR,STMicroelectronics
+SU.PA,True,False,FR,Schneider Electric
+TEP.PA,True,False,FR,Teleperformance
+TTE.PA,True,False,FR,TotalEnergies
+VIE.PA,True,False,FR,Veolia Environnement
+VIV.PA,True,False,FR,Vivendi
+WLN.PA,True,True,FR,Worldline
+BB.PA,True,True,FR,Société BIC
+EDP.PA,True,True,FR,EDP Renováveis
+FR.PA,True,True,FR,Valeo
+ICAD.PA,True,True,FR,Icade
+IPN.PA,True,True,FR,Ipsen
+IPS.PA,True,True,FR,Ipsos
+NEX.PA,True,True,FR,Nexans
+NK.PA,True,True,FR,Imerys
+RXL.PA,True,True,FR,Rexel
+SCR.PA,True,True,FR,SCOR
+SW.PA,True,True,FR,Sodexo
+SOP.PA,True,True,FR,Sopra Steria
+GFC.PA,True,True,FR,Gecina
+LI.PA,True,False,FR,Klépierre
+URW.AS,True,False,NL,Unibail-Rodamco-Westfield
+ASML.AS,True,False,NL,ASML Holding
+INGA.AS,True,False,NL,ING Groep
+PHIA.AS,True,False,NL,Koninklijke Philips
+HEIA.AS,True,False,NL,Heineken
+DSM.AS,True,False,NL,DSM-Firmenich
+RAND.AS,True,False,NL,Randstad
+WKL.AS,True,False,NL,Wolters Kluwer
+RDSA.AS,False,False,NL,Shell
+ABN.AS,True,False,NL,ABN AMRO
+KPN.AS,True,False,NL,KPN
+PRX.AS,True,False,NL,Prosus
+SAP.DE,True,False,DE,SAP
+SIE.DE,True,False,DE,Siemens
+ALV.DE,True,False,DE,Allianz
+DTE.DE,True,False,DE,Deutsche Telekom
+BAS.DE,True,False,DE,BASF
+BAYN.DE,True,False,DE,Bayer
+BMW.DE,True,False,DE,BMW
+DAI.DE,True,False,DE,Mercedes-Benz Group
+VOW3.DE,True,False,DE,Volkswagen
+DBK.DE,True,False,DE,Deutsche Bank
+ADS.DE,True,False,DE,Adidas
+HEN3.DE,True,False,DE,Henkel
+MUV2.DE,True,False,DE,Munich Re
+DPW.DE,True,False,DE,Deutsche Post
+LIN.DE,True,False,DE,Linde
+RWE.DE,True,False,DE,RWE
+ENEL.MI,True,False,IT,Enel
+ENI.MI,True,False,IT,Eni
+ISP.MI,True,False,IT,Intesa Sanpaolo
+G.MI,True,False,IT,Generali
+RACE.MI,True,False,IT,Ferrari
+STM.MI,True,False,IT,STMicroelectronics
+UCG.MI,True,False,IT,UniCredit
+TIT.MI,True,False,IT,Telecom Italia
+PIRC.MI,True,False,IT,Pirelli
+TEF.MC,True,False,ES,Telefónica
+BBVA.MC,True,False,ES,BBVA
+SAN.MC,True,False,ES,Banco Santander
+ITX.MC,True,False,ES,Inditex
+IBE.MC,True,False,ES,Iberdrola
+REP.MC,True,False,ES,Repsol
+ACS.MC,True,False,ES,ACS Group
+FER.MC,True,False,ES,Ferrovial
+ABI.BR,True,False,BE,AB InBev
+KBC.BR,True,False,BE,KBC Group
+UCB.BR,True,False,BE,UCB
+SOLB.BR,True,False,BE,Solvay
+NOKIA.HE,True,False,FI,Nokia
+NESTE.HE,True,False,FI,Neste
+KNEBV.HE,True,False,FI,Kone
+SAMPO.HE,True,False,FI,Sampo
+EQNR.OL,True,False,NO,Equinor
+NHY.OL,True,False,NO,Norsk Hydro
+DNB.OL,True,False,NO,DNB Bank
+TEL.OL,True,False,NO,Telenor
+NOVO-B.CO,True,False,DK,Novo Nordisk
+MAERSK-B.CO,True,False,DK,A.P. Moller-Maersk
+CARL-B.CO,True,False,DK,Carlsberg
+ORSTED.CO,True,False,DK,Ørsted
+VWS.CO,True,False,DK,Vestas Wind Systems
+VOLV-B.ST,True,False,SE,Volvo Group
+ATCO-A.ST,True,False,SE,Atlas Copco
+ERIC-B.ST,True,False,SE,Ericsson
+HM-B.ST,True,False,SE,Hennes & Mauritz
+INVE-B.ST,True,False,SE,Investor AB
+NDA-SE.ST,True,False,SE,Nordea Bank
+SAND.ST,True,False,SE,Sandvik
+SEB-A.ST,True,False,SE,SEB
