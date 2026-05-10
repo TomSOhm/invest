@@ -23,7 +23,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   score_lt: {
     label: "Long-Term Score (LT, 0-100)",
-    formula: "score_lt = Σ_k weight_LT[k] · subscore_k  (k ∈ {valuation, profitability, health, earnings_quality, growth, shareholder, risk}, weights from settings.yaml horizons.long_term.weights)",
+    formula: "\\text{score}_{LT} = \\sum_{k} w_{LT,k} \\cdot \\text{subscore}_{k}, \\quad k \\in \\{\\text{val}, \\text{prof}, \\text{health}, \\text{EQ}, \\text{growth}, \\text{share}, \\text{risk}\\}",
     what:
       "Composite score for a buy-and-hold horizon (5+ years). Weighted average of valuation (20%), profitability (25%), financial health (15%), earnings quality (10%), growth (10%), capital allocation (10%) and risk (10%).",
     why:
@@ -37,7 +37,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   score_mt: {
     label: "Medium-Term Score (MT, 0-100)",
-    formula: "score_mt = Σ_k weight_MT[k] · subscore_k  (same categories as LT with horizon-specific weights emphasising momentum)",
+    formula: "\\text{score}_{MT} = \\sum_{k} w_{MT,k} \\cdot \\text{subscore}_{k}",
     what:
       "Composite score for a 6-24 month horizon. Same building blocks as LT but adds 10% weight on momentum and lowers profitability/quality weights.",
     why:
@@ -51,7 +51,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   score_st: {
     label: "Short-Term Score (ST, 0-100)",
-    formula: "score_st = Σ_k weight_ST[k] · subscore_k  (55% momentum, 10% risk, remainder valuation/quality; weights from settings.yaml horizons.short_term.weights)",
+    formula: "\\text{score}_{ST} = \\sum_{k} w_{ST,k} \\cdot \\text{subscore}_{k}",
     what:
       "Composite score for a <6 month horizon. 55% weight on momentum, 10% risk, smaller contributions from valuation/quality. Designed for tactical trades.",
     why:
@@ -117,7 +117,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   dcf_fair_value: {
     label: "DCF Fair Value (low / mid / high)",
-    formula: "Fair Value = Σ_t FCF_t ÷ (1 + WACC)^t + TV ÷ (1 + WACC)^n  |  TV = FCF_5 · (1 + g) ÷ (WACC − g)  (t = 1…5, g = terminal growth rate, n = 5)",
+    formula: "\\text{Fair Value} = \\sum_{t=1}^{n} \\dfrac{FCF_t}{(1+WACC)^t} + \\dfrac{TV}{(1+WACC)^n}, \\quad TV = \\dfrac{FCF_n \\cdot (1+g)}{WACC - g}",
     what:
       "Per-share intrinsic value from a 2-stage DCF (5-year explicit projection + Gordon terminal value), discounted at WACC. Three estimates form a sensitivity range from the WACC ±1pp × terminal-growth ±50bp grid.",
     why:
@@ -131,7 +131,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   dcf_mos: {
     label: "DCF Margin of Safety (MoS)",
-    formula: "MoS = (Fair Value − Price) ÷ Price",
+    formula: "MoS = \\dfrac{\\text{Fair Value} - \\text{Price}}{\\text{Price}}",
     what:
       "Percentage gap between DCF fair value and current price: MoS = (fair_value - price) / price.",
     why:
@@ -145,7 +145,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   wacc_used: {
     label: "WACC (Weighted Average Cost of Capital)",
-    formula: "WACC = (E÷V) · R_e + (D÷V) · R_d · (1 − T_c)  |  R_e = R_f + β · ERP  (CAPM)  |  E = equity market value, D = debt, V = E+D, T_c = corporate tax rate",
+    formula: "WACC = \\dfrac{E}{V} R_e + \\dfrac{D}{V} R_d (1 - T_c), \\quad R_e = R_f + \\beta \\cdot ERP",
     what:
       "Discount rate used in the DCF. WACC = (E/V)·Re + (D/V)·Rd·(1-Tc) where Re comes from CAPM (Rf + Beta·ERP) and Rd is a cost-of-debt assumption.",
     why:
@@ -163,7 +163,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   piotroski_f: {
     label: "Piotroski F-Score (0-9)",
-    formula: "F = Σ_i 1[signal_i triggers]  summed across 9 binary YoY signals: ROA>0, CFO>0, ΔROA>0, CFO>NI, ΔLeverage<0, ΔCurrentRatio>0, Δshares≤+0.5%, ΔGrossMargin>0, ΔAssetTurnover>0",
+    formula: "F = \\sum_{i=1}^{9} \\mathbb{1}[\\text{signal}_i \\text{ triggers}]",
     what:
       "Sum of 9 binary signals derived from year-over-year deltas: ROA>0, CFO>0, ΔROA>0, CFO>NI, ΔLeverage<0, ΔCurrent ratio>0, no dilution (Δshares ≤ +0.5%), ΔGross margin>0, ΔAsset turnover>0.",
     why:
@@ -177,7 +177,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   altman_z: {
     label: "Altman Z'' Score",
-    formula: "Z'' = 6.56·X1 + 3.26·X2 + 6.72·X3 + 1.05·X4  |  X1 = Working Capital÷Total Assets, X2 = Retained Earnings÷Total Assets, X3 = EBIT÷Total Assets, X4 = Book Equity÷Total Liabilities",
+    formula: "Z'' = 6.56\\,X_1 + 3.26\\,X_2 + 6.72\\,X_3 + 1.05\\,X_4",
     what:
       "Bankruptcy-risk score combining working capital, retained earnings, EBIT, equity-to-liabilities. We use the Z'' variant (no asset-turnover X5) for non-manufacturers; classic Z with X5 for manufacturers.",
     why:
@@ -202,7 +202,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   m_score: {
     label: "Beneish M-Score",
-    formula: "M = −4.84 + 0.920·DSRI + 0.528·GMI + 0.404·AQI + 0.892·SGI + 0.115·DEPI − 0.172·SGAI + 4.679·TATA − 0.327·LVGI  |  DSRI = days-sales-in-receivables index, GMI = gross margin index, AQI = asset quality index, SGI = sales growth index, DEPI = depreciation index, SGAI = SG&A index, TATA = total accruals÷total assets, LVGI = leverage index",
+    formula: "M = -4.84 + 0.920\\,DSRI + 0.528\\,GMI + 0.404\\,AQI + 0.892\\,SGI + 0.115\\,DEPI - 0.172\\,SGAI + 4.679\\,TATA - 0.327\\,LVGI",
     what:
       "8-variable model that flags earnings manipulation. Combines days-sales-in-receivables, gross margin, asset quality, sales growth, depreciation, SG&A, leverage, and accruals.",
     why:
@@ -216,7 +216,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   sloan_accruals: {
     label: "Sloan Accruals Ratio",
-    formula: "Sloan Accruals = (Net Income − CFO) ÷ Avg(Total Assets)",
+    formula: "\\text{Sloan Accruals} = \\dfrac{NI - CFO}{\\overline{\\text{Total Assets}}}",
     what:
       "(Net Income - CFO) / Average Total Assets. Measures how much of reported earnings is accrual-based rather than cash.",
     why:
@@ -230,7 +230,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   cash_conversion_ratio_5y: {
     label: "Cash Conversion Ratio (5y avg)",
-    formula: "CCR = mean(FCF_t ÷ NI_t)  averaged over the last 5 fiscal years",
+    formula: "CCR = \\dfrac{1}{5} \\sum_{t=1}^{5} \\dfrac{FCF_t}{NI_t}",
     what:
       "Average of FCF / Net Income over the last 5 years.",
     why:
@@ -244,7 +244,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   graham_number: {
     label: "Graham Number",
-    formula: "Graham Number = √(22.5 · EPS · BVPS)  (BVPS = book value per share)",
+    formula: "\\text{Graham Number} = \\sqrt{22.5 \\cdot EPS \\cdot BVPS}",
     what:
       "Per-share intrinsic value via Benjamin Graham's classic formula: √(22.5 × EPS × BVPS).",
     why:
@@ -258,7 +258,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   graham_mos: {
     label: "Graham Margin of Safety",
-    formula: "Graham MoS = (Graham Number − Price) ÷ Price",
+    formula: "\\text{Graham MoS} = \\dfrac{\\text{Graham Number} - \\text{Price}}{\\text{Price}}",
     what:
       "Percentage gap: (Graham Number / Price - 1).",
     why:
@@ -272,7 +272,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   earnings_quality_score: {
     label: "Earnings Quality Score (0-100)",
-    formula: "EQ Score = Σ_metric weight · sector_relative_percentile(metric)  over {M-Score, Sloan Accruals, CCR_5y}",
+    formula: "\\text{EQ Score} = \\sum_{m} w_m \\cdot \\text{percentile}_{\\text{sector}}(m), \\quad m \\in \\{\\text{M-Score}, \\text{Sloan}, CCR_{5y}\\}",
     what:
       "Sector-relative composite of M-Score, Sloan accruals, and Cash Conversion Ratio. Higher = cleaner earnings.",
     why:
@@ -284,7 +284,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   moat_score: {
     label: "Moat / Competitive Advantage Score (0-100)",
-    formula: "Moat Score = Σ_metric weight · sector_relative_percentile(metric)  over {GP÷TA, 5y-avg ROIC, ROIC stability, OpMargin stability, ROIC−WACC spread, reinvestment efficiency}",
+    formula: "\\text{Moat Score} = \\sum_{m} w_m \\cdot \\text{percentile}_{\\text{sector}}(m), \\quad m \\in \\{GP/TA, \\overline{ROIC}_{5y}, \\sigma(ROIC), \\sigma(OpM), ROIC - WACC\\}",
     what:
       "Sector-relative composite of Gross Profitability (GP/TA), 5y average ROIC, ROIC stability, operating-margin stability, ROIC-WACC spread, and reinvestment efficiency.",
     why:
@@ -300,7 +300,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   risk_score: {
     label: "Risk Score (0-100, higher = safer)",
-    formula: "Risk Score = Σ_metric weight · sector_relative_percentile(metric)  over {RealVol_1y, MaxDD_3y, Net Debt÷EBITDA, Interest Coverage, Altman Z'', Beta_5y}  (inverted so lower risk → higher score)",
+    formula: "\\text{Risk Score} = \\sum_{m} w_m \\cdot (1 - \\text{percentile}_{\\text{sector}}(m)), \\quad m \\in \\{\\text{RealVol}_{1y}, \\text{MaxDD}_{3y}, \\text{ND/EBITDA}, IC, Z'', \\beta_{5y}\\}",
     what:
       "Sector-relative composite of realised volatility (1y), max drawdown (3y), Net Debt / EBITDA, real Interest Coverage, Altman Z'', and 5y monthly Beta.",
     why:
@@ -312,7 +312,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   realized_vol_1y: {
     label: "Realised Volatility (1Y, annualised)",
-    formula: "RealVol_1y = σ(daily log returns over 252 trading days) · √252  |  log return_t = ln(P_t ÷ P_{t−1})",
+    formula: "\\text{RealVol}_{1y} = \\sigma\\left(\\ln \\dfrac{P_t}{P_{t-1}}\\right) \\cdot \\sqrt{252}",
     what:
       "Annualised standard deviation of daily log returns over the past 12 months.",
     why:
@@ -324,7 +324,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   max_drawdown_3y: {
     label: "Max Drawdown (3Y)",
-    formula: "MaxDD_3y = min_t [ (price_t − cummax(price)_t) ÷ cummax(price)_t ]  over the past 756 trading days",
+    formula: "\\text{MaxDD}_{3y} = \\min_{t} \\dfrac{P_t - \\max_{s \\le t} P_s}{\\max_{s \\le t} P_s}, \\quad t \\in [-756, 0]",
     what:
       "Worst peak-to-trough decline experienced by the stock over the past 36 months. Returned as a negative percentage.",
     why:
@@ -336,7 +336,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   net_debt_ebitda: {
     label: "Net Debt / EBITDA",
-    formula: "Net Debt÷EBITDA = (Total Debt − Cash & Equivalents) ÷ EBITDA",
+    formula: "\\dfrac{\\text{Net Debt}}{EBITDA} = \\dfrac{\\text{Total Debt} - \\text{Cash}}{EBITDA}",
     what:
       "(Total Debt - Cash) / EBITDA. How many years of EBITDA it takes to pay off net debt.",
     why:
@@ -350,7 +350,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   interest_coverage: {
     label: "Interest Coverage (EBIT / Interest)",
-    formula: "Interest Coverage = EBIT ÷ |Interest Expense|",
+    formula: "\\text{Interest Coverage} = \\dfrac{EBIT}{|\\text{Interest Expense}|}",
     what:
       "EBIT divided by interest expense. How many times current earnings cover the interest bill.",
     why:
@@ -364,7 +364,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   beta: {
     label: "Beta (5y monthly vs market)",
-    formula: "Beta = Cov(R_stock, R_market) ÷ Var(R_market)  estimated over 5 years of monthly returns",
+    formula: "\\beta = \\dfrac{\\text{Cov}(R_{\\text{stock}},\\, R_{\\text{market}})}{\\text{Var}(R_{\\text{market}})}",
     what:
       "Slope of the stock's monthly returns regressed against the benchmark over 5 years. Measures systematic-risk exposure.",
     why:
@@ -380,7 +380,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   momentum_12_1: {
     label: "12-1 Momentum",
-    formula: "Momentum_12_1 = Price_{t−21} ÷ Price_{t−252} − 1  (skips the most recent month to avoid short-term reversal; t in trading days)",
+    formula: "\\text{Momentum}_{12-1} = \\dfrac{P_{t-21}}{P_{t-252}} - 1",
     what:
       "12-month price return excluding the most recent month: price[t-21] / price[t-252] - 1.",
     why:
@@ -394,7 +394,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   rs_3m: {
     label: "Relative Strength (3-month vs benchmark)",
-    formula: "RS_3m = R_stock(3m) − R_benchmark(3m)  where R(3m) = Price_today ÷ Price_{63 trading days ago} − 1",
+    formula: "RS_{3m} = R_{\\text{stock}}(3m) - R_{\\text{benchmark}}(3m), \\quad R(3m) = \\dfrac{P_t}{P_{t-63}} - 1",
     what:
       "3-month return of the stock minus 3-month return of the benchmark index.",
     why:
@@ -439,7 +439,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   volume_surge: {
     label: "Volume Surge (5d / 90d)",
-    formula: "Volume Surge = mean(Volume over last 5 trading days) ÷ mean(Volume over last 90 trading days)",
+    formula: "\\text{Volume Surge} = \\dfrac{\\overline{V}_{5d}}{\\overline{V}_{90d}}",
     what:
       "5-day average volume divided by 90-day average volume.",
     why:
@@ -451,7 +451,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   eps_revision_30d: {
     label: "EPS Revision (30 days)",
-    formula: "EPS_Rev_30d = EPS_estimate_today ÷ EPS_estimate_{30 days ago} − 1",
+    formula: "\\text{EPS Rev}_{30d} = \\dfrac{EPS^{\\text{est}}_t}{EPS^{\\text{est}}_{t-30d}} - 1",
     what:
       "% change in median consensus EPS estimate over the past 30 days.",
     why:
@@ -463,7 +463,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   eps_revision_90d: {
     label: "EPS Revision (90 days)",
-    formula: "EPS_Rev_90d = EPS_estimate_today ÷ EPS_estimate_{90 days ago} − 1",
+    formula: "\\text{EPS Rev}_{90d} = \\dfrac{EPS^{\\text{est}}_t}{EPS^{\\text{est}}_{t-90d}} - 1",
     what:
       "% change in median consensus EPS estimate over the past 90 days.",
     why:
@@ -475,7 +475,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   sue_z_score: {
     label: "SUE (Standardized Unexpected Earnings)",
-    formula: "SUE = (EPS_actual − EPS_expected) ÷ σ(prior 4 quarters' surprises)",
+    formula: "SUE = \\dfrac{EPS_{\\text{actual}} - EPS_{\\text{expected}}}{\\sigma(\\text{prior 4 quarters})}",
     what:
       "(Reported EPS - Expected EPS) / stddev of prior 4 quarters' surprises. How many standard deviations a beat or miss is.",
     why:
@@ -487,7 +487,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   sentiment_30d: {
     label: "News Sentiment (30 days)",
-    formula: "Sentiment_30d = (positive_headlines ÷ total_headlines) · 100  (headlines classified positive/negative by FinBERT over the past 30 days)",
+    formula: "\\text{Sentiment}_{30d} = \\dfrac{\\#\\,\\text{positive}}{\\#\\,\\text{total}} \\cdot 100",
     what:
       "FinBERT-classified positive/negative news ratio over the past 30 days, mapped to 0-100.",
     why:
@@ -516,7 +516,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   pe: {
     label: "P/E Ratio (Price / Earnings)",
-    formula: "P/E = Price ÷ EPS_TTM  (TTM = trailing twelve months)",
+    formula: "P/E = \\dfrac{\\text{Price}}{EPS_{TTM}}",
     what:
       "Stock price divided by trailing 12-month earnings per share.",
     why:
@@ -530,7 +530,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   forward_pe: {
     label: "Forward P/E (next-year estimate)",
-    formula: "Forward P/E = Price ÷ EPS_estimate_next_fiscal_year  (consensus median estimate)",
+    formula: "\\text{Fwd P/E} = \\dfrac{\\text{Price}}{EPS^{\\text{est}}_{NTM}}",
     what:
       "Price divided by consensus EPS estimate for the next fiscal year.",
     why:
@@ -542,7 +542,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   pb: {
     label: "P/B Ratio (Price / Book)",
-    formula: "P/B = Market Cap ÷ Book Value of Equity  (Book Value = Total Assets − Total Liabilities)",
+    formula: "P/B = \\dfrac{\\text{Market Cap}}{\\text{Book Value of Equity}}",
     what:
       "Market cap divided by shareholders' book equity.",
     why:
@@ -554,7 +554,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   ps: {
     label: "P/S Ratio (Price / Sales)",
-    formula: "P/S = Market Cap ÷ Revenue_TTM",
+    formula: "P/S = \\dfrac{\\text{Market Cap}}{\\text{Revenue}_{TTM}}",
     what:
       "Market cap divided by trailing-12-month revenue.",
     why:
@@ -568,7 +568,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   pfcf: {
     label: "P/FCF Ratio (Price / Free Cash Flow)",
-    formula: "P/FCF = Market Cap ÷ Free Cash Flow_TTM  |  FCF = Operating Cash Flow − Capital Expenditures",
+    formula: "P/FCF = \\dfrac{\\text{Market Cap}}{FCF_{TTM}}, \\quad FCF = CFO - CapEx",
     what:
       "Market cap divided by trailing-12-month free cash flow.",
     why:
@@ -580,7 +580,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   ev_ebitda: {
     label: "EV / EBITDA",
-    formula: "EV÷EBITDA = Enterprise Value ÷ EBITDA  |  EV = Market Cap + Total Debt − Cash",
+    formula: "\\dfrac{EV}{EBITDA} = \\dfrac{\\text{Market Cap} + \\text{Debt} - \\text{Cash}}{EBITDA}",
     what:
       "Enterprise Value (market cap + debt - cash) divided by EBITDA.",
     why:
@@ -592,7 +592,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   ev_sales: {
     label: "EV / Sales",
-    formula: "EV÷Sales = Enterprise Value ÷ Revenue_TTM",
+    formula: "\\dfrac{EV}{\\text{Sales}} = \\dfrac{EV}{\\text{Revenue}_{TTM}}",
     what:
       "Enterprise Value divided by trailing revenue.",
     why:
@@ -604,7 +604,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   peg: {
     label: "PEG Ratio",
-    formula: "PEG = (P÷E) ÷ EPS_growth_rate(%)  where growth rate is the consensus 3-5y forward EPS CAGR",
+    formula: "PEG = \\dfrac{P/E}{g_{EPS}\\,(\\%)}",
     what:
       "P/E divided by expected EPS growth rate.",
     why:
@@ -622,7 +622,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   roe: {
     label: "ROE (Return on Equity)",
-    formula: "ROE = Net Income ÷ Shareholders' Equity",
+    formula: "ROE = \\dfrac{\\text{Net Income}}{\\text{Shareholders' Equity}}",
     what:
       "Net Income divided by shareholders' equity. How efficiently the company turns equity into profit.",
     why:
@@ -636,7 +636,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   roa: {
     label: "ROA (Return on Assets)",
-    formula: "ROA = Net Income ÷ Total Assets",
+    formula: "ROA = \\dfrac{\\text{Net Income}}{\\text{Total Assets}}",
     what:
       "Net Income divided by total assets. Asset-efficiency measure.",
     why:
@@ -650,7 +650,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   roic: {
     label: "ROIC (Return on Invested Capital)",
-    formula: "ROIC = NOPAT ÷ Invested Capital  |  NOPAT = EBIT · (1 − tax_rate)  |  Invested Capital = Equity + Total Debt − Cash",
+    formula: "ROIC = \\dfrac{NOPAT}{\\text{Invested Capital}}, \\quad NOPAT = EBIT \\cdot (1 - t)",
     what:
       "NOPAT (EBIT after tax) divided by invested capital (equity + debt - cash).",
     why:
@@ -662,7 +662,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   gross_margin: {
     label: "Gross Margin",
-    formula: "Gross Margin = (Revenue − COGS) ÷ Revenue",
+    formula: "\\text{Gross Margin} = \\dfrac{\\text{Revenue} - COGS}{\\text{Revenue}}",
     what:
       "(Revenue - COGS) / Revenue. Profit per €1 of revenue before operating expenses.",
     why:
@@ -674,7 +674,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   operating_margin: {
     label: "Operating Margin",
-    formula: "Operating Margin = Operating Income ÷ Revenue",
+    formula: "\\text{Operating Margin} = \\dfrac{\\text{Operating Income}}{\\text{Revenue}}",
     what:
       "Operating Income / Revenue. Margin after operating expenses but before interest and taxes.",
     why:
@@ -686,7 +686,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   net_margin: {
     label: "Net Margin",
-    formula: "Net Margin = Net Income ÷ Revenue",
+    formula: "\\text{Net Margin} = \\dfrac{\\text{Net Income}}{\\text{Revenue}}",
     what:
       "Net Income / Revenue. Bottom-line profitability.",
     why:
@@ -698,7 +698,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   fcf_margin: {
     label: "FCF Margin",
-    formula: "FCF Margin = Free Cash Flow ÷ Revenue",
+    formula: "\\text{FCF Margin} = \\dfrac{FCF}{\\text{Revenue}}",
     what:
       "Free Cash Flow / Revenue. Cash earned per €1 of revenue.",
     why:
@@ -714,7 +714,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   current_ratio: {
     label: "Current Ratio",
-    formula: "Current Ratio = Current Assets ÷ Current Liabilities",
+    formula: "\\text{Current Ratio} = \\dfrac{\\text{Current Assets}}{\\text{Current Liabilities}}",
     what:
       "Current Assets / Current Liabilities. Short-term liquidity check.",
     why:
@@ -728,7 +728,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   debt_equity: {
     label: "Debt / Equity Ratio",
-    formula: "D/E = Total Debt ÷ Shareholders' Equity",
+    formula: "D/E = \\dfrac{\\text{Total Debt}}{\\text{Shareholders' Equity}}",
     what:
       "Total Debt divided by shareholders' equity.",
     why:
@@ -740,7 +740,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   revenue_growth: {
     label: "Revenue Growth (YoY)",
-    formula: "Revenue Growth = Revenue_TTM ÷ Revenue_TTM_prior_year − 1",
+    formula: "\\text{Revenue Growth} = \\dfrac{\\text{Revenue}_{TTM}}{\\text{Revenue}_{TTM,\\,t-1y}} - 1",
     what:
       "Year-over-year change in trailing-12-month revenue.",
     why:
@@ -758,7 +758,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   div_yield: {
     label: "Dividend Yield",
-    formula: "Dividend Yield = Annual Dividend per Share ÷ Price",
+    formula: "\\text{Dividend Yield} = \\dfrac{\\text{Annual DPS}}{\\text{Price}}",
     what:
       "Annual dividend per share divided by stock price.",
     why:
@@ -772,7 +772,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   payout_ratio: {
     label: "Payout Ratio",
-    formula: "Payout Ratio = Dividends Paid ÷ Net Income",
+    formula: "\\text{Payout Ratio} = \\dfrac{\\text{Dividends Paid}}{\\text{Net Income}}",
     what:
       "Dividends paid divided by net income (or by FCF, depending on convention).",
     why:
@@ -788,7 +788,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   sub_valuation: {
     label: "Valuation Sub-Score (0-100)",
-    formula: "sub_valuation = mean(sector_relative_percentile(m))  over {P/E, P/B, P/S, P/FCF, EV÷EBITDA, EV÷Sales}  (lower ratio → higher percentile)",
+    formula: "\\text{sub\\_val} = \\overline{\\text{percentile}_{\\text{sector}}(m)}, \\quad m \\in \\{P/E, P/B, P/S, P/FCF, EV/EBITDA, EV/S\\}",
     what:
       "Sector-relative percentile rank across 6 valuation ratios: P/E, P/B, P/S, P/FCF, EV/EBITDA, EV/Sales. Lower ratios → higher score.",
     why:
@@ -800,7 +800,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   sub_profitability: {
     label: "Profitability Sub-Score (0-100)",
-    formula: "sub_profitability = mean(sector_relative_percentile(m))  over {ROE, ROA, ROIC, GrossMargin, OpMargin, NetMargin, FCFMargin}",
+    formula: "\\text{sub\\_prof} = \\overline{\\text{percentile}_{\\text{sector}}(m)}, \\quad m \\in \\{ROE, ROA, ROIC, GM, OM, NM, FCFM\\}",
     what:
       "Sector-relative composite of ROE, ROA, ROIC, gross/operating/net/FCF margins.",
     why:
@@ -812,7 +812,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   sub_health: {
     label: "Financial Health Sub-Score (0-100)",
-    formula: "sub_health = mean(sector_relative_percentile(m))  over {Current Ratio, D/E, Interest Coverage, Net Debt÷EBITDA}",
+    formula: "\\text{sub\\_health} = \\overline{\\text{percentile}_{\\text{sector}}(m)}, \\quad m \\in \\{CR, D/E, IC, ND/EBITDA\\}",
     what:
       "Sector-relative composite of Current Ratio, D/E, Interest Coverage, Net Debt / EBITDA.",
     why:
@@ -824,7 +824,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   sub_growth: {
     label: "Growth Sub-Score (0-100)",
-    formula: "sub_growth = sector_relative_percentile(Revenue Growth YoY)  (v2; multi-period CAGR planned for M14)",
+    formula: "\\text{sub\\_growth} = \\text{percentile}_{\\text{sector}}(\\text{Revenue Growth}_{YoY})",
     what:
       "Sector-relative ranking of revenue growth (YoY). Limited to one metric in v2; multi-period CAGR is a roadmap item.",
     why:
@@ -836,7 +836,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   sub_shareholder: {
     label: "Shareholder Returns Sub-Score (0-100)",
-    formula: "sub_shareholder = mean(sector_relative_percentile(m))  over {Dividend Yield, Payout Ratio sustainability}",
+    formula: "\\text{sub\\_shareholder} = \\overline{\\text{percentile}_{\\text{sector}}(m)}, \\quad m \\in \\{\\text{Div Yield}, \\text{Payout sust.}\\}",
     what:
       "Sector-relative read on dividend yield + payout-ratio sustainability. Buybacks are tracked separately and not yet folded in.",
     why:
@@ -867,7 +867,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   total_value: {
     label: "Total Portfolio Value",
-    formula: "Total Value = Σ_positions (Quantity_i · Current Price_i)",
+    formula: "\\text{Total Value} = \\sum_{i \\in \\text{positions}} Q_i \\cdot P_i",
     what:
       "Sum of market values across all positions, in EUR (or your reporting currency).",
     why:
@@ -879,7 +879,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   total_gain_loss: {
     label: "Total Gain / Loss",
-    formula: "Total Gain/Loss = Σ_positions (Market Value_i − Cost Basis_i)",
+    formula: "\\text{Total Gain/Loss} = \\sum_{i \\in \\text{positions}} (MV_i - CB_i)",
     what:
       "Current total value minus total cost basis. Cumulative P&L since inception of each position.",
     why:
@@ -891,7 +891,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   avg_score_lt: {
     label: "Average LT Score",
-    formula: "Avg LT Score = mean(score_lt_i)  over all positions with a valid LT score",
+    formula: "\\overline{\\text{score}_{LT}} = \\dfrac{1}{N} \\sum_{i=1}^{N} \\text{score}_{LT,i}",
     what:
       "Mean of the long-term composite scores across all current positions.",
     why:
@@ -903,7 +903,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   weight_pct: {
     label: "Position Weight",
-    formula: "Weight = Position Market Value ÷ Total Portfolio Value",
+    formula: "w_i = \\dfrac{MV_i}{\\sum_{j} MV_j}",
     what:
       "Position market value divided by total portfolio value.",
     why:
@@ -956,7 +956,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   // ============================================================
   market_value: {
     label: "Market Value",
-    formula: "Market Value = Quantity · Current Price",
+    formula: "MV = Q \\cdot P_{\\text{current}}",
     what:
       "Quantity × current price. Today's mark-to-market value of this position.",
     why:
@@ -968,7 +968,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   cost_basis: {
     label: "Cost Basis",
-    formula: "Cost Basis = Quantity · Buy Price (per-share average weighted cost)",
+    formula: "CB = Q \\cdot \\overline{P}_{\\text{buy}}",
     what:
       "Quantity × buy price. Total amount you paid to acquire this position.",
     why:
@@ -980,7 +980,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   gain_loss_pct: {
     label: "Gain / Loss %",
-    formula: "Gain/Loss % = (Market Value − Cost Basis) ÷ Cost Basis",
+    formula: "\\text{Gain/Loss \\%} = \\dfrac{MV - CB}{CB}",
     what:
       "(Market value - cost basis) / cost basis. Total return on this position since purchase.",
     why:
@@ -994,7 +994,7 @@ export const METRIC_DEFINITIONS: Record<string, MetricDef> = {
   },
   fifty_two_week_high_pct: {
     label: "52-Week High (% off)",
-    formula: "52w High % = (Current Price − 52-week High) ÷ 52-week High  (negative value means trading below the high)",
+    formula: "\\text{52w High \\%} = \\dfrac{P_{\\text{current}} - P_{52wH}}{P_{52wH}}",
     what:
       "(Current price - 52w high) / 52w high. How far below this year's peak the stock trades.",
     why:

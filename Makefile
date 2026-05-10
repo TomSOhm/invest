@@ -4,9 +4,10 @@
 
 .PHONY: install setup daily screen test clean backend frontend dev
 
-# Install backend dependencies
+# Install backend dependencies (uses pyproject.toml + uv.lock)
+# Requires uv: `winget install astral-sh.uv` (Windows) / `pipx install uv` (cross-platform)
 install:
-	pip install -r backend/requirements.txt
+	uv sync --group dev
 
 # First-time setup
 setup:
@@ -46,9 +47,12 @@ dashboard:
 # Full-Stack Development
 # ═══════════════════════════════════════════
 
-# Start FastAPI backend (port 8000)
+# Default conda env for FastAPI backend; override with: make backend ENV=<name>
+ENV ?= dev
+
+# Start FastAPI backend (port 8000) inside the chosen conda env
 backend:
-	python -m uvicorn backend.app.main:app --reload --port 8000
+	conda run --no-capture-output -n $(ENV) python -m uvicorn backend.app.main:app --reload --port 8000
 
 # Start Next.js frontend (port 3000)
 frontend:

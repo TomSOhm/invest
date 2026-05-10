@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from "react";
 import Card from "@/components/ui/Card";
+import { MathBlock } from "@/components/ui/MathBlock";
 import { METRIC_DEFINITIONS } from "@/lib/metric-definitions";
 
 // ---------------------------------------------------------------------------
@@ -200,9 +201,7 @@ function MetricCard({
         {def.formula && (
           <div>
             <SectionLabel>Formula</SectionLabel>
-            <code className="block mt-1 font-mono text-xs bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded px-3 py-2 whitespace-pre-wrap leading-relaxed text-slate-800 dark:text-slate-200">
-              {def.formula}
-            </code>
+            <MathBlock formula={def.formula} />
           </div>
         )}
 
