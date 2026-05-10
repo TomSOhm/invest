@@ -75,7 +75,7 @@ export default function MetricInfo({
             role="dialog"
             aria-modal="true"
             aria-labelledby={titleId}
-            className="absolute left-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl text-left"
+            className="absolute left-0 top-full mt-2 w-80 max-w-[calc(100vw-2rem)] z-50 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-xl shadow-2xl text-left whitespace-normal break-words"
           >
             <div className="flex items-start justify-between gap-2 px-4 py-3 border-b border-slate-200 dark:border-slate-800">
               <h3
@@ -120,7 +120,9 @@ function Section({ heading, body }: { heading: string; body: string }) {
       <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-500">
         {heading}
       </p>
-      <p className="mt-0.5 text-slate-700 dark:text-slate-300">{body}</p>
+      <p className="mt-0.5 text-slate-700 dark:text-slate-300 whitespace-normal break-words">
+        {body}
+      </p>
     </div>
   );
 }

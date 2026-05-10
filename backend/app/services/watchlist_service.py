@@ -199,9 +199,9 @@ class WatchlistService:
                 enriched.append({
                     "id": item["id"],
                     "ticker": ticker,
-                    "name": ld.get("Name") or ticker,
-                    "sector": ld.get("Sector") or None,
-                    "country": ld.get("Country") or None,
+                    "name": self._str(ld.get("Name")) or ticker,
+                    "sector": self._str(ld.get("Sector")),
+                    "country": self._str(ld.get("Country")),
                     "added_date": item.get("added_date"),
                     "notes": item.get("notes"),
                     "current_price": current_price,
@@ -273,3 +273,21 @@ class WatchlistService:
             return round(f, 4)
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _str(value: Any) -> Optional[str]:
+        """Coerce a value to str, returning None for NaN/None/empty.
+
+        pandas NaN is a truthy float, so plain ``or`` fallbacks let it through
+        and break Pydantic str validation downstream. ``pd.isna`` catches
+        NaN/NaT/None uniformly.
+        """
+        if value is None:
+            return None
+        try:
+            if pd.isna(value):
+                return None
+        except (TypeError, ValueError):
+            pass
+        s = str(value).strip()
+        return s or None

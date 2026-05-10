@@ -148,6 +148,38 @@ class TestGetWatchlistCacheOnly:
         assert item["score_lt"] is None
         assert item["current_price"] is None
 
+    def test_nan_string_fields_become_none_not_nan(self) -> None:
+        """Name/Sector/Country fields containing NaN must be sanitized to None.
+
+        Bug: `ld.get('Name') or ticker` returns NaN because bool(float('nan'))
+        is True. The dict then fails Pydantic str validation.
+        """
+        from backend.app.models.watchlist import WatchlistResponse
+
+        items = [_make_item("AAPL")]
+        store = _make_store(items)
+        fetcher = _make_fetcher(return_value=_nan_row("AAPL"))
+        scorer = _make_scorer()
+
+        svc = WatchlistService(store=store, fetcher=fetcher, scorer=scorer)
+        result = svc.get_watchlist()
+
+        item = result["items"][0]
+        # NaN must NOT survive into the response dict
+        assert item["sector"] is None or isinstance(item["sector"], str)
+        assert item["country"] is None or isinstance(item["country"], str)
+        assert isinstance(item["name"], str)
+        # No raw NaN floats anywhere in the string fields
+        for field in ("name", "sector", "country"):
+            value = item[field]
+            assert not (isinstance(value, float) and np.isnan(value)), (
+                f"{field} leaked NaN into the response dict"
+            )
+
+        # The full response must validate against the Pydantic schema
+        # (the actual symptom the user hit was a ResponseValidationError here).
+        WatchlistResponse.model_validate(result)
+
     def test_analyst_ratings_not_fetched_in_cache_only_mode(self) -> None:
         """fetch_analyst_ratings must NOT be called from get_watchlist (cache-only)."""
         items = [_make_item("AAPL")]

@@ -48,11 +48,11 @@ class CompanyService:
         # --- Raw metrics ---
         metrics = {
             "ticker": ticker,
-            "name": data.get("Name") or ticker,
-            "sector": data.get("Sector") or None,
-            "industry": data.get("Industry") or None,
-            "country": data.get("Country") or None,
-            "exchange": data.get("Exchange") or None,
+            "name": self._str(data.get("Name")) or ticker,
+            "sector": self._str(data.get("Sector")),
+            "industry": self._str(data.get("Industry")),
+            "country": self._str(data.get("Country")),
+            "exchange": self._str(data.get("Exchange")),
             "price": current_price,
             "market_cap": self._num(data.get("MarketCap")),
             "enterprise_value": self._num(data.get("EV")),
@@ -113,11 +113,11 @@ class CompanyService:
 
         return {
             "ticker": ticker,
-            "name": data.get("Name") or ticker,
-            "sector": data.get("Sector") or None,
-            "industry": data.get("Industry") or None,
-            "country": data.get("Country") or None,
-            "exchange": data.get("Exchange") or None,
+            "name": self._str(data.get("Name")) or ticker,
+            "sector": self._str(data.get("Sector")),
+            "industry": self._str(data.get("Industry")),
+            "country": self._str(data.get("Country")),
+            "exchange": self._str(data.get("Exchange")),
             "pea_eligible": bool(data.get("PEA", False)),
             "pea_pme_eligible": bool(data.get("PEA_PME", False)),
             "price": current_price,
@@ -175,3 +175,20 @@ class CompanyService:
             return round(f, 4)
         except (TypeError, ValueError):
             return None
+
+    @staticmethod
+    def _str(value: Any) -> Optional[str]:
+        """Coerce a value to str, returning None for NaN/None/empty.
+
+        pandas NaN is a truthy float, so plain ``or`` fallbacks let it through
+        and break Pydantic str validation downstream.
+        """
+        if value is None:
+            return None
+        try:
+            if pd.isna(value):
+                return None
+        except (TypeError, ValueError):
+            pass
+        s = str(value).strip()
+        return s or None
