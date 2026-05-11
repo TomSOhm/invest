@@ -5,6 +5,7 @@
 # Claude Code configuration (personal tooling)
 .claude/
 .claire/
+.playwright-mcp/
 
 # Stray root-level npm lockfile (project uses bun in frontend/)
 /package-lock.json
