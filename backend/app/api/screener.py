@@ -95,9 +95,22 @@ def _build_scored_universe() -> pd.DataFrame:
 
 def _val(row: pd.Series, key: str) -> Any:
     v = row.get(key)
-    if v is None or (isinstance(v, float) and np.isnan(v)):
+    if v is None:
         return None
+    try:
+        if pd.isna(v):
+            return None
+    except (TypeError, ValueError):
+        pass
     return v
+
+
+def _str_val(row: pd.Series, key: str) -> Optional[str]:
+    v = _val(row, key)
+    if v is None:
+        return None
+    s = str(v).strip()
+    return s or None
 
 
 def _num(row: pd.Series, key: str) -> Optional[float]:
@@ -159,8 +172,8 @@ def _df_to_results(df: pd.DataFrame, horizon: str = "long_term") -> List[Dict[st
 
         results.append({
             "ticker": str(ticker),
-            "name": _val(row, "Name"),
-            "sector": _val(row, "Sector"),
+            "name": _str_val(row, "Name"),
+            "sector": _str_val(row, "Sector"),
             "pea_eligible": bool(row.get("PEA", False)),
             "score_lt": score_lt,
             "score_mt": score_mt,
