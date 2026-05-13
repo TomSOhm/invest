@@ -244,11 +244,11 @@ class TestQuotaCounter:
             ]
             fmp_fetcher.fetch_quote("AAPL")
 
-        # Post /stable/ migration, fetch_quote pulls from three endpoints:
-        # /quote (base) + /profile (beta, avg volume) + /ratios-ttm (PE).
-        # Each successful call increments the quota tracker by 1.
-        assert quota_tracker.get_count() == initial + 3, (
-            f"Expected count {initial + 3}, got {quota_tracker.get_count()}"
+        # /stable/quote is the single endpoint hit per fetch_quote call.
+        # Beta/PE/avgVolume gaps are filled by yfinance via the hybrid
+        # orchestrator instead of burning extra FMP calls on every refresh.
+        assert quota_tracker.get_count() == initial + 1, (
+            f"Expected count {initial + 1}, got {quota_tracker.get_count()}"
         )
 
     def test_quota_exhausted_skips_fmp(
@@ -262,6 +262,34 @@ class TestQuotaCounter:
 
         with pytest.raises(FMPQuotaExceeded):
             fmp_fetcher.fetch_quote("AAPL")
+
+    @pytest.mark.parametrize(
+        "non_us_ticker",
+        ["MC.PA", "AIR.PA", "ASML.AS", "SAP.DE", "ULVR.L", "ENI.MI", "7203.T", "0700.HK"],
+    )
+    def test_non_us_ticker_skips_fmp(
+        self,
+        fmp_fetcher: FMPDataFetcher,
+        quota_tracker: _QuotaTracker,
+        non_us_ticker: str,
+    ) -> None:
+        """Free FMP only serves US tickers. Non-US ones must short-circuit before
+        any network call so we don't burn quota on guaranteed 402s.
+        """
+        initial = quota_tracker.get_count()
+
+        with patch("backend.app.services.market_data.fmp_fetcher._http_get") as mock_http:
+            with pytest.raises(FMPQuotaExceeded):
+                fmp_fetcher.fetch_quote(non_us_ticker)
+            with pytest.raises(FMPQuotaExceeded):
+                fmp_fetcher.fetch_analyst_targets(non_us_ticker)
+            with pytest.raises(FMPQuotaExceeded):
+                fmp_fetcher.fetch_profile(non_us_ticker)
+            mock_http.assert_not_called()
+
+        assert quota_tracker.get_count() == initial, (
+            f"Quota burned on non-US ticker {non_us_ticker}: {initial} -> {quota_tracker.get_count()}"
+        )
 
     def test_quota_counter_resets_on_new_day(
         self,

@@ -179,6 +179,54 @@ _SUFFIX_MAP: dict[str, str] = {
     # .PA is the same in both -- no mapping needed
 }
 
+# Non-US exchange suffixes. On the FMP free tier these tickers return 402
+# "Premium Query Parameter: Special Endpoint" -- the symbol set is gated to
+# paid plans. We short-circuit the FMP fetcher for them so we don't waste
+# quota or pollute the dashboard with 100%-bad-request noise. Hybrid fetcher
+# catches FMPQuotaExceeded and routes those tickers straight to yfinance.
+_NON_US_SUFFIXES: frozenset[str] = frozenset({
+    ".PA",  # Paris (Euronext)
+    ".AS",  # Amsterdam
+    ".AMS",  # Amsterdam (FMP mapped form)
+    ".BR",  # Brussels
+    ".LS",  # Lisbon
+    ".DE",  # Frankfurt (XETRA)
+    ".F",  # Frankfurt floor
+    ".MI",  # Milan
+    ".MC",  # Madrid
+    ".SW",  # SIX Swiss
+    ".L",  # London (LSE)
+    ".ST",  # Stockholm
+    ".CO",  # Copenhagen
+    ".HE",  # Helsinki
+    ".OL",  # Oslo
+    ".VI",  # Vienna
+    ".IR",  # Dublin
+    ".WA",  # Warsaw
+    ".PR",  # Prague
+    ".AT",  # Athens
+    ".T",  # Tokyo
+    ".HK",  # Hong Kong
+    ".SS",  # Shanghai
+    ".SZ",  # Shenzhen
+    ".AX",  # Sydney (ASX)
+    ".TO",  # Toronto (TSX)
+    ".V",  # Vancouver (TSX-V)
+})
+
+
+def _is_us_ticker(ticker: str) -> bool:
+    """True iff ticker has no recognised non-US exchange suffix.
+
+    FMP free tier (Basic plan) serves only the US sample universe; every
+    non-US ticker returns 402 Premium. Multi-class US tickers like 'BRK.B'
+    correctly stay True because '.B' is not in _NON_US_SUFFIXES.
+    """
+    if "." not in ticker:
+        return True
+    suffix = "." + ticker.rsplit(".", 1)[1].upper()
+    return suffix not in _NON_US_SUFFIXES
+
 
 def _to_fmp_symbol(ticker: str) -> str:
     """Map a yfinance ticker to the best-guess FMP equivalent.
@@ -255,17 +303,48 @@ class FMPDataFetcher:
         if self._quota.get_count() >= self._daily_limit:
             raise FMPQuotaExceeded(f"FMP daily quota exhausted ({self._daily_limit} calls/day)")
 
-    def _get(self, endpoint: str, params: dict[str, Any] | None = None) -> Any:
+    def _skip_if_non_us(self, ticker: str) -> None:
+        """Short-circuit non-US tickers: free FMP only serves the US sample universe.
+
+        Avoids burning the daily quota + cluttering the FMP dashboard with
+        100%-bad-request noise on EU/PEA tickers that always 402. The hybrid
+        fetcher catches FMPQuotaExceeded and falls through to yfinance.
+        """
+        if not _is_us_ticker(ticker):
+            raise FMPQuotaExceeded(f"FMP free tier does not cover non-US ticker {ticker}")
+
+    def _cached_402(self, ticker: str, endpoint: str) -> bool:
+        """Has this (ticker, endpoint) pair already returned 402 today? (defense-in-depth)."""
+        return self._cache.get(f"fmp:402:{ticker}:{endpoint}") is not None
+
+    def _mark_402(self, ticker: str, endpoint: str) -> None:
+        """Remember a 402 verdict for 24h so we don't retry it."""
+        self._cache.set(f"fmp:402:{ticker}:{endpoint}", {"402": True}, ttl_seconds=86400)
+
+    def _get(self, endpoint: str, params: dict[str, Any] | None = None, ticker: str | None = None) -> Any:
         """Build the FMP URL, check quota, increment counter, fire GET request.
+
+        Parameters
+        ----------
+        ticker : optional
+            When provided, enables per-(ticker, endpoint) 402 caching so a
+            single subscription-gate failure isn't re-fired on every refresh
+            within the same day.
 
         Raises
         ------
         FMPQuotaExceeded
-            When quota exhausted, FMP disabled, or the server returns 403/429.
+            When quota exhausted, FMP disabled, the server returns 403/429/402,
+            or a prior 402 verdict for this (ticker, endpoint) is still cached.
         FMPHTTPError
             On 401 (bad key) or 5xx errors.
         """
         self._check_quota()
+
+        # 402 short-circuit: if we've already learned this (ticker, endpoint)
+        # combo is paywalled, don't even hit the network.
+        if ticker is not None and self._cached_402(ticker, endpoint):
+            raise FMPQuotaExceeded(f"cached 402 for {ticker} {endpoint}")
 
         qs_parts = [f"apikey={self._token}"]
         if params:
@@ -287,10 +366,14 @@ class FMPDataFetcher:
                 logger.warning(f"FMP quota/rate-limit error ({exc.status_code}): {exc}")
                 raise FMPQuotaExceeded(str(exc)) from exc
             if exc.status_code == 402:
-                # Endpoint requires a paid plan (e.g. /news/stock on free tier).
-                # Treat like a quota miss so the hybrid fetcher falls through to
-                # the other source without spamming the log on every call.
-                logger.info(f"FMP endpoint requires paid plan (402): {endpoint}")
+                # Endpoint or symbol requires a paid plan (e.g. /news/stock,
+                # or EU tickers on free tier). Cache the verdict so we don't
+                # retry it for 24h. Treat like a quota miss so the hybrid
+                # fetcher falls through to the other source without spamming
+                # the log on every call.
+                logger.info(f"FMP endpoint requires paid plan (402): {endpoint} ticker={ticker}")
+                if ticker is not None:
+                    self._mark_402(ticker, endpoint)
                 raise FMPQuotaExceeded(f"402 paid-plan-only: {endpoint}") from exc
             if exc.status_code == 401:
                 logger.error(f"FMP bad API key (401): {exc}")
@@ -310,6 +393,7 @@ class FMPDataFetcher:
 
     def fetch_quote(self, ticker: str) -> dict[str, Any]:
         """Fetch current market snapshot via ``/stable/quote?symbol={symbol}``."""
+        self._skip_if_non_us(ticker)
         cache_key = f"fmp:quote:{ticker}"
         cached = self._cache.get(cache_key)
         if cached is not None:
@@ -317,7 +401,7 @@ class FMPDataFetcher:
 
         fmp_ticker = _to_fmp_symbol(ticker)
         try:
-            data = self._get("/quote", params={"symbol": fmp_ticker})
+            data = self._get("/quote", params={"symbol": fmp_ticker}, ticker=ticker)
         except FMPHTTPError as exc:
             if exc.status_code == 404:
                 logger.debug(f"FMP quote: ticker {ticker} (mapped={fmp_ticker}) not found")
@@ -329,35 +413,22 @@ class FMPDataFetcher:
 
         q = data[0]
 
-        # /stable/quote is slimmer than v3/quote -- it omits beta, averageVolume,
-        # enterpriseValue, sharesOutstanding, pe. Pull the rest from /stable/profile
-        # (single extra call, cached for the same 5 min). PE comes from /stable/ratios-ttm.
-        prof: dict[str, Any] = {}
-        try:
-            prof_data = self._get("/profile", params={"symbol": fmp_ticker})
-            if isinstance(prof_data, list) and prof_data:
-                prof = prof_data[0]
-        except (FMPHTTPError, FMPQuotaExceeded):
-            pass
-
-        ratios: dict[str, Any] = {}
-        try:
-            ratios_data = self._get("/ratios-ttm", params={"symbol": fmp_ticker})
-            if isinstance(ratios_data, list) and ratios_data:
-                ratios = ratios_data[0]
-        except (FMPHTTPError, FMPQuotaExceeded):
-            pass
-
+        # /stable/quote on free tier is slimmer than the legacy /v3/quote:
+        # it carries Price, MarketCap, yearHigh, yearLow, change, volume.
+        # Beta, EV, Shares, AvgVolume, PE are gated to paid endpoints
+        # (/stable/profile, /stable/ratios-ttm). We leave them NaN here and
+        # let HybridDataFetcher fall through to yfinance for those fields --
+        # saves two FMP calls per ticker per refresh.
         result = {
-            "Price": q.get("price", prof.get("price", np.nan)),
-            "MarketCap": q.get("marketCap", prof.get("marketCap", np.nan)),
-            "EV": np.nan,  # not on free /stable/; hybrid will let yfinance fill
-            "Shares": np.nan,  # not on free /stable/; hybrid will let yfinance fill
-            "Beta": prof.get("beta", np.nan),
-            "AvgVolume": prof.get("averageVolume", np.nan),
+            "Price": q.get("price", np.nan),
+            "MarketCap": q.get("marketCap", np.nan),
+            "EV": np.nan,
+            "Shares": np.nan,
+            "Beta": np.nan,
+            "AvgVolume": np.nan,
             "FiftyTwoWeekHigh": q.get("yearHigh", np.nan),
             "FiftyTwoWeekLow": q.get("yearLow", np.nan),
-            "PE": ratios.get("priceToEarningsRatioTTM", np.nan),
+            "PE": np.nan,
         }
         result = {k: (v if v is not None else np.nan) for k, v in result.items()}
         self._cache.set(cache_key, result, ttl_seconds=300)
@@ -374,6 +445,7 @@ class FMPDataFetcher:
         ----------
         period: ``"annual"`` or ``"quarter"``
         """
+        self._skip_if_non_us(ticker)
         fmp_ticker = _to_fmp_symbol(ticker)
         ttl = 86400 if period == "annual" else 21600
         cache_key = f"fmp:fundamentals_{period}:{ticker}"
@@ -392,7 +464,11 @@ class FMPDataFetcher:
         frames: list[pd.DataFrame] = []
         for ep in endpoints:
             try:
-                data = self._get(ep, params={"symbol": fmp_ticker, "period": period, "limit": 5})
+                data = self._get(
+                    ep,
+                    params={"symbol": fmp_ticker, "period": period, "limit": 5},
+                    ticker=ticker,
+                )
             except FMPHTTPError as exc:
                 if exc.status_code == 404:
                     logger.debug(f"FMP {ep} 404 for {ticker}")
@@ -446,6 +522,7 @@ class FMPDataFetcher:
 
     def fetch_price_history(self, ticker: str, period: str = "5y") -> pd.DataFrame:
         """Fetch OHLCV via ``/stable/historical-price-eod/full?symbol={symbol}``."""
+        self._skip_if_non_us(ticker)
         cache_key = f"fmp:price_history:{ticker}:{period}"
         cached = self._cache.get(cache_key)
         if cached is not None:
@@ -481,6 +558,7 @@ class FMPDataFetcher:
                     "from": start_date.isoformat(),
                     "to": end_date.isoformat(),
                 },
+                ticker=ticker,
             )
         except FMPHTTPError as exc:
             if exc.status_code == 404:
@@ -526,6 +604,7 @@ class FMPDataFetcher:
 
     def fetch_eps_estimates(self, ticker: str) -> pd.DataFrame | None:
         """Fetch analyst EPS estimates via ``/stable/analyst-estimates?symbol={symbol}``."""
+        self._skip_if_non_us(ticker)
         cache_key = f"fmp:eps_estimates:{ticker}"
         cached = self._cache.get(cache_key)
         if cached is not None:
@@ -539,6 +618,7 @@ class FMPDataFetcher:
             data = self._get(
                 "/analyst-estimates",
                 params={"symbol": fmp_ticker, "period": "annual", "limit": 10},
+                ticker=ticker,
             )
         except FMPHTTPError as exc:
             if exc.status_code == 404:
@@ -565,6 +645,7 @@ class FMPDataFetcher:
         Uses ``/stable/grades-historical?symbol={symbol}`` -- the current
         free-tier replacement for the legacy /v3/upgrades-downgrades endpoint.
         """
+        self._skip_if_non_us(ticker)
         cache_key = f"fmp:eps_revisions:{ticker}"
         cached = self._cache.get(cache_key)
         if cached is not None:
@@ -578,6 +659,7 @@ class FMPDataFetcher:
             data = self._get(
                 "/grades-historical",
                 params={"symbol": fmp_ticker, "limit": 50},
+                ticker=ticker,
             )
         except FMPHTTPError as exc:
             if exc.status_code == 404:
@@ -600,6 +682,7 @@ class FMPDataFetcher:
 
     def fetch_analyst_targets(self, ticker: str) -> dict[str, Any] | None:
         """Fetch consensus price targets via ``/stable/price-target-consensus?symbol={symbol}``."""
+        self._skip_if_non_us(ticker)
         cache_key = f"fmp:analyst_targets:{ticker}"
         cached = self._cache.get(cache_key)
         if cached is not None:
@@ -610,6 +693,7 @@ class FMPDataFetcher:
             data = self._get(
                 "/price-target-consensus",
                 params={"symbol": fmp_ticker},
+                ticker=ticker,
             )
         except FMPHTTPError as exc:
             if exc.status_code == 404:
@@ -641,6 +725,7 @@ class FMPDataFetcher:
         raises FMPQuotaExceeded (402 → mapped) and the hybrid fetcher falls
         back to yfinance news.
         """
+        self._skip_if_non_us(ticker)
         cache_key = f"fmp:news:{ticker}:{limit}"
         cached = self._cache.get(cache_key)
         if cached is not None:
@@ -651,6 +736,7 @@ class FMPDataFetcher:
             data = self._get(
                 "/news/stock",
                 params={"symbols": fmp_ticker, "limit": limit},
+                ticker=ticker,
             )
         except FMPHTTPError as exc:
             if exc.status_code == 404:
@@ -685,6 +771,7 @@ class FMPDataFetcher:
 
     def fetch_profile(self, ticker: str) -> dict[str, Any]:
         """Fetch company profile via ``/stable/profile?symbol={symbol}``."""
+        self._skip_if_non_us(ticker)
         cache_key = f"fmp:profile:{ticker}"
         cached = self._cache.get(cache_key)
         if cached is not None:
@@ -695,6 +782,7 @@ class FMPDataFetcher:
             data = self._get(
                 "/profile",
                 params={"symbol": fmp_ticker},
+                ticker=ticker,
             )
         except FMPHTTPError as exc:
             if exc.status_code == 404:
