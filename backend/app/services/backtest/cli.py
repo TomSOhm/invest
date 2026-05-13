@@ -14,12 +14,12 @@ recorded data gaps.
 
 Live mode is opt-in via ``--live`` (default = cached fetcher only).
 """
+
 from __future__ import annotations
 
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 import numpy as np
 import pandas as pd
@@ -32,24 +32,69 @@ from backend.app.services.backtest.walk_forward import (
     WalkForwardBacktest,
 )
 
-
 # Curated S&P 500 sample (top ~50 by market cap, frozen for backtest reproducibility).
-SP500_SAMPLE_50: List[str] = [
-    "AAPL", "MSFT", "NVDA", "GOOGL", "AMZN", "META", "BRK-B", "LLY", "AVGO", "TSLA",
-    "JPM", "WMT", "XOM", "V", "MA", "UNH", "PG", "JNJ", "HD", "COST",
-    "ORCL", "ABBV", "BAC", "MRK", "KO", "CVX", "ADBE", "PEP", "CRM", "AMD",
-    "TMO", "MCD", "ACN", "NFLX", "WFC", "LIN", "DHR", "CSCO", "DIS", "ABT",
-    "VZ", "TXN", "QCOM", "IBM", "INTC", "PM", "PFE", "AMGN", "NKE", "CAT",
+SP500_SAMPLE_50: list[str] = [
+    "AAPL",
+    "MSFT",
+    "NVDA",
+    "GOOGL",
+    "AMZN",
+    "META",
+    "BRK-B",
+    "LLY",
+    "AVGO",
+    "TSLA",
+    "JPM",
+    "WMT",
+    "XOM",
+    "V",
+    "MA",
+    "UNH",
+    "PG",
+    "JNJ",
+    "HD",
+    "COST",
+    "ORCL",
+    "ABBV",
+    "BAC",
+    "MRK",
+    "KO",
+    "CVX",
+    "ADBE",
+    "PEP",
+    "CRM",
+    "AMD",
+    "TMO",
+    "MCD",
+    "ACN",
+    "NFLX",
+    "WFC",
+    "LIN",
+    "DHR",
+    "CSCO",
+    "DIS",
+    "ABT",
+    "VZ",
+    "TXN",
+    "QCOM",
+    "IBM",
+    "INTC",
+    "PM",
+    "PFE",
+    "AMGN",
+    "NKE",
+    "CAT",
 ]
 
 
-def _resolve_pea_universe() -> List[str]:
+def _resolve_pea_universe() -> list[str]:
     """Load tickers from the bundled PEA sample universe."""
     from src.data.sample_universe import SAMPLE_UNIVERSE
+
     return [row["Ticker"] for row in SAMPLE_UNIVERSE]
 
 
-def _resolve_universe_for_preset(preset: str) -> tuple[List[str], str]:
+def _resolve_universe_for_preset(preset: str) -> tuple[list[str], str]:
     """Pick universe + benchmark based on the preset's region."""
     pea_presets = {
         "LT_QUALITY_COMPOUNDER",
@@ -62,9 +107,7 @@ def _resolve_universe_for_preset(preset: str) -> tuple[List[str], str]:
     return SP500_SAMPLE_50, "^GSPC"
 
 
-def _build_universe_df(
-    tickers: List[str], fetcher, live: bool = False
-) -> pd.DataFrame:
+def _build_universe_df(tickers: list[str], fetcher, live: bool = False) -> pd.DataFrame:
     """Assemble a fundamentals DataFrame indexed by ticker.
 
     In *live* mode each ticker is resolved through ``fetcher.fetch_quote`` /
@@ -74,6 +117,7 @@ def _build_universe_df(
     filters mostly skip them, which is the desired conservative behaviour).
     """
     from src.data.sample_universe import SAMPLE_UNIVERSE
+
     sample_by_ticker = {row["Ticker"]: row for row in SAMPLE_UNIVERSE}
 
     rows = []
@@ -221,9 +265,7 @@ def _format_data_gaps(result: BacktestResult, max_rows: int = 15) -> str:
         return "_No data gaps recorded._"
     lines = ["| Ticker | Window | Issue |", "|--------|--------|-------|"]
     for g in result.data_gaps[:max_rows]:
-        lines.append(
-            f"| {g.get('ticker', '-')} | {g.get('window', '-')} | {g.get('issue', '-')} |"
-        )
+        lines.append(f"| {g.get('ticker', '-')} | {g.get('window', '-')} | {g.get('issue', '-')} |")
     if len(result.data_gaps) > max_rows:
         lines.append(f"| ... | ({len(result.data_gaps) - max_rows} more) | ... |")
     return "\n".join(lines)
@@ -278,16 +320,12 @@ See `docs/backtests/methodology.md` for the full caveat list.
     return body
 
 
-def write_report(result: BacktestResult, output_dir: Optional[Path] = None) -> Path:
+def write_report(result: BacktestResult, output_dir: Path | None = None) -> Path:
     """Write the markdown report and return its path."""
     cfg = result.config
     out_dir = output_dir or (PROJECT_ROOT / "docs" / "backtests")
     out_dir.mkdir(parents=True, exist_ok=True)
-    fname = (
-        f"{cfg.preset_name}_"
-        f"{cfg.start.date().isoformat()}_to_"
-        f"{cfg.end.date().isoformat()}.md"
-    )
+    fname = f"{cfg.preset_name}_{cfg.start.date().isoformat()}_to_{cfg.end.date().isoformat()}.md"
     path = out_dir / fname
     path.write_text(render_markdown_report(result), encoding="utf-8")
     logger.info(f"backtest report written to {path}")
@@ -318,14 +356,12 @@ def _build_arg_parser() -> argparse.ArgumentParser:
     p.add_argument(
         "--live",
         action="store_true",
-        help=(
-            "Use the live HybridDataFetcher (slow). Default: cached/synthetic only."
-        ),
+        help=("Use the live HybridDataFetcher (slow). Default: cached/synthetic only."),
     )
     return p
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     args = _build_arg_parser().parse_args(argv)
 
     # Resolve fetcher: prefer hybrid in live mode, otherwise a cached-only

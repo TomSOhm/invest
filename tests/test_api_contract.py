@@ -18,37 +18,35 @@ Test coverage:
   - PRESET_REGISTRY read-only: KeyError raised for unknown preset names
   - legacy fields ABSENT: composite_score / signal NOT present on models
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 import pytest
 from pydantic import ValidationError
 
-# ── models under test ──────────────────────────────────────────────────────
+from backend.app.models.company import CompanyDetail
 
+# ── models under test ──────────────────────────────────────────────────────
 from backend.app.models.horizons import (
     DCFValuation,
     HorizonScoring,
-    MomentumSignals,
     QualitySignals,
-    RiskSignals,
     SubScores,
-)
-from backend.app.models.company import AnalystRatings, CompanyDetail, CompanyMetrics
-from backend.app.models.screener import (
-    ScreenerRequest,
-    ScreenerResponse,
-    ScreenerResultItem,
-    ScreenerSummary,
 )
 from backend.app.models.portfolio import (
     PortfolioPosition,
     PortfolioResponse,
     PortfolioSummary,
 )
+from backend.app.models.screener import (
+    ScreenerRequest,
+    ScreenerResponse,
+    ScreenerResultItem,
+    ScreenerSummary,
+)
 from backend.app.models.watchlist import WatchlistItem, WatchlistResponse
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Shared fixture builders
@@ -60,7 +58,7 @@ def _horizon_scoring_dict(
     signal: str = "Buy",
     passes_gates: bool = True,
     recommended_account: Any = None,
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     return {
         "score": score,
         "signal": signal,
@@ -70,7 +68,7 @@ def _horizon_scoring_dict(
     }
 
 
-def _three_horizons_dict() -> Dict[str, Any]:
+def _three_horizons_dict() -> dict[str, Any]:
     return {
         "long_term": _horizon_scoring_dict(72.5, "Buy", True, None),
         "medium_term": _horizon_scoring_dict(65.0, "Hold", True, None),
@@ -78,7 +76,7 @@ def _three_horizons_dict() -> Dict[str, Any]:
     }
 
 
-def _dcf_dict() -> Dict[str, Any]:
+def _dcf_dict() -> dict[str, Any]:
     return {
         "fair_value_low": 120.0,
         "fair_value_mid": 145.0,
@@ -91,7 +89,7 @@ def _dcf_dict() -> Dict[str, Any]:
     }
 
 
-def _quality_dict() -> Dict[str, Any]:
+def _quality_dict() -> dict[str, Any]:
     return {
         "piotroski_f": 7,
         "altman_z": 3.45,
@@ -106,7 +104,7 @@ def _quality_dict() -> Dict[str, Any]:
     }
 
 
-def _risk_dict() -> Dict[str, Any]:
+def _risk_dict() -> dict[str, Any]:
     return {
         "risk_score": 61.0,
         "realized_vol_1y": 0.22,
@@ -117,7 +115,7 @@ def _risk_dict() -> Dict[str, Any]:
     }
 
 
-def _momentum_dict() -> Dict[str, Any]:
+def _momentum_dict() -> dict[str, Any]:
     return {
         "momentum_12_1": 0.18,
         "rs_3m": 0.05,
@@ -133,7 +131,7 @@ def _momentum_dict() -> Dict[str, Any]:
     }
 
 
-def _sub_scores_dict() -> Dict[str, Any]:
+def _sub_scores_dict() -> dict[str, Any]:
     return {
         "valuation": 62.0,
         "health": 78.0,
@@ -144,7 +142,7 @@ def _sub_scores_dict() -> Dict[str, Any]:
     }
 
 
-def _metrics_dict(ticker: str = "MC.PA") -> Dict[str, Any]:
+def _metrics_dict(ticker: str = "MC.PA") -> dict[str, Any]:
     return {
         "ticker": ticker,
         "name": "LVMH Moet Hennessy Louis Vuitton SE",
@@ -187,7 +185,7 @@ def _metrics_dict(ticker: str = "MC.PA") -> Dict[str, Any]:
     }
 
 
-def _full_company_detail_dict(ticker: str = "MC.PA") -> Dict[str, Any]:
+def _full_company_detail_dict(ticker: str = "MC.PA") -> dict[str, Any]:
     return {
         "ticker": ticker,
         "name": "LVMH Moet Hennessy Louis Vuitton SE",
@@ -213,7 +211,7 @@ def _full_company_detail_dict(ticker: str = "MC.PA") -> Dict[str, Any]:
     }
 
 
-def _screener_result_item_dict(ticker: str = "MC.PA") -> Dict[str, Any]:
+def _screener_result_item_dict(ticker: str = "MC.PA") -> dict[str, Any]:
     return {
         "ticker": ticker,
         "name": "LVMH",
@@ -467,7 +465,7 @@ class TestScreenerResponse:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _portfolio_position_dict(ticker: str = "TTE.PA") -> Dict[str, Any]:
+def _portfolio_position_dict(ticker: str = "TTE.PA") -> dict[str, Any]:
     return {
         "id": "pos-001",
         "ticker": ticker,
@@ -585,7 +583,7 @@ class TestPortfolioResponse:
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-def _watchlist_item_dict(ticker: str = "AIR.PA") -> Dict[str, Any]:
+def _watchlist_item_dict(ticker: str = "AIR.PA") -> dict[str, Any]:
     return {
         "id": "wl-001",
         "ticker": ticker,
@@ -655,21 +653,25 @@ class TestWatchlistResponse:
 
 class TestPresetRegistry:
     def test_known_preset_accessible(self) -> None:
-        from src.strategy.horizon_presets import get_preset, PRESET_REGISTRY
+        from src.strategy.horizon_presets import get_preset
+
         preset = get_preset("LT_QUALITY_COMPOUNDER")
         assert preset["horizon"] == "long_term"
 
     def test_unknown_preset_raises_key_error(self) -> None:
         from src.strategy.horizon_presets import get_preset
+
         with pytest.raises(KeyError):
             get_preset("NONEXISTENT_PRESET")
 
     def test_nine_presets_registered(self) -> None:
         from src.strategy.horizon_presets import PRESET_REGISTRY
+
         assert len(PRESET_REGISTRY) == 9
 
     def test_st_presets_have_recommended_account(self) -> None:
         from src.strategy.horizon_presets import PRESET_REGISTRY
+
         st_presets = [v for v in PRESET_REGISTRY.values() if v["horizon"] == "short_term"]
         assert len(st_presets) == 3
         for p in st_presets:
@@ -677,12 +679,14 @@ class TestPresetRegistry:
 
     def test_lt_presets_no_recommended_account(self) -> None:
         from src.strategy.horizon_presets import PRESET_REGISTRY
+
         lt_presets = [v for v in PRESET_REGISTRY.values() if v["horizon"] == "long_term"]
         for p in lt_presets:
             assert p.get("recommended_account", "") != "CTO"
 
     def test_list_presets_returns_9_entries(self) -> None:
         from src.strategy.horizon_presets import list_presets
+
         entries = list_presets()
         assert len(entries) == 9
         for e in entries:
@@ -698,16 +702,20 @@ class TestPresetRegistry:
 
 class TestScreenerServicePreset:
     def test_unknown_preset_raises_key_error(self) -> None:
-        from backend.app.services.screener_service import ScreenerService
         import pandas as pd
+
+        from backend.app.services.screener_service import ScreenerService
+
         svc = ScreenerService()
         with pytest.raises(KeyError):
             svc.run_preset(pd.DataFrame(), "FAKE_PRESET_DELETE_ME")
 
     def test_known_preset_does_not_raise_on_empty_df(self) -> None:
         """An empty DataFrame should return an empty result, not an exception."""
-        from backend.app.services.screener_service import ScreenerService
         import pandas as pd
+
+        from backend.app.services.screener_service import ScreenerService
+
         svc = ScreenerService()
         # An empty df returns an empty filtered result without errors
         result = svc.run_preset(pd.DataFrame(), "LT_QUALITY_COMPOUNDER")
@@ -722,10 +730,12 @@ class TestScreenerServicePreset:
 class TestHorizonToggle:
     def test_score_lt_is_default_sort_column(self) -> None:
         from backend.app.services.screener_service import _HORIZON_SCORE_COL
+
         assert _HORIZON_SCORE_COL["long_term"] == "score_lt"
 
     def test_horizon_col_mapping_complete(self) -> None:
         from backend.app.services.screener_service import _HORIZON_SCORE_COL
+
         assert set(_HORIZON_SCORE_COL.keys()) == {"long_term", "medium_term", "short_term"}
         assert _HORIZON_SCORE_COL["medium_term"] == "score_mt"
         assert _HORIZON_SCORE_COL["short_term"] == "score_st"

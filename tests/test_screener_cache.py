@@ -1,10 +1,10 @@
 """Tests for the screener cache module."""
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -84,9 +84,7 @@ class TestRefresh:
         )
         scorer = MagicMock()
         scorer.score_dataframe.return_value = _scored_df(["MC.PA", "TTE.PA"])
-        with patch.object(
-            screener_cache, "load_pea_universe", return_value=["MC.PA", "TTE.PA"]
-        ):
+        with patch.object(screener_cache, "load_pea_universe", return_value=["MC.PA", "TTE.PA"]):
             screener_cache.refresh(fetcher, scorer, use_yfinance_holdings=False)
 
         row = screener_cache.lookup("MC.PA")
@@ -95,7 +93,10 @@ class TestRefresh:
         # Unknown ticker:
         assert screener_cache.lookup("UNKNOWN.XX") is None
 
-    def test_persists_to_disk_and_rehydrates(self, tmp_path: Path) -> None:
+    def test_persists_to_disk_and_rehydrates(self, tmp_path: Path, monkeypatch) -> None:
+        # Redirect the module-level cache path into the test tmp_path so the
+        # parquet round-trip is isolated and CI-friendly.
+        monkeypatch.setattr(screener_cache, "_CACHE_PATH", tmp_path / "screener_scored.parquet")
         fetcher = MagicMock()
         fetcher.fetch_batch.return_value = pd.DataFrame(
             {"Price": [100.0]},
@@ -103,9 +104,7 @@ class TestRefresh:
         )
         scorer = MagicMock()
         scorer.score_dataframe.return_value = _scored_df(["MC.PA"])
-        with patch.object(
-            screener_cache, "load_pea_universe", return_value=["MC.PA"]
-        ):
+        with patch.object(screener_cache, "load_pea_universe", return_value=["MC.PA"]):
             screener_cache.refresh(fetcher, scorer, use_yfinance_holdings=False)
 
         # Reset in-memory state — disk should still hold the parquet
@@ -118,17 +117,13 @@ class TestRefresh:
         fetcher = MagicMock()
         fetcher.fetch_batch.return_value = pd.DataFrame()
         scorer = MagicMock()
-        with patch.object(
-            screener_cache, "load_pea_universe", return_value=["MC.PA"]
-        ):
+        with patch.object(screener_cache, "load_pea_universe", return_value=["MC.PA"]):
             with pytest.raises(RuntimeError, match="empty DataFrame"):
                 screener_cache.refresh(fetcher, scorer, use_yfinance_holdings=False)
 
     def test_empty_universe_raises(self) -> None:
         fetcher = MagicMock()
         scorer = MagicMock()
-        with patch.object(
-            screener_cache, "load_pea_universe", return_value=[]
-        ):
+        with patch.object(screener_cache, "load_pea_universe", return_value=[]):
             with pytest.raises(RuntimeError, match="no tickers"):
                 screener_cache.refresh(fetcher, scorer, use_yfinance_holdings=False)

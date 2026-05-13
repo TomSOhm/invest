@@ -12,7 +12,6 @@ import {
   formatLargeNumber,
 } from "@/lib/formatters";
 import { scoreToColor } from "@/lib/constants";
-import SignalBadge from "@/components/ui/SignalBadge";
 import PeaBadge from "@/components/ui/PeaBadge";
 import Card from "@/components/ui/Card";
 import Spinner from "@/components/ui/Spinner";

@@ -28,14 +28,15 @@ Caching (per-endpoint TTLs):
 Cache keys use the format  fmp:{endpoint_tag}:{original_ticker}
 (original ticker, not FMP-mapped, so cache invalidation is consistent).
 """
+
 from __future__ import annotations
 
 import json
 import os
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -49,9 +50,11 @@ from backend.app.services.cache_service import CacheService
 # ---------------------------------------------------------------------------
 try:
     import httpx  # type: ignore
+
     _HTTP_BACKEND = "httpx"
 except ImportError:
     import requests as httpx_compat  # type: ignore  # noqa: F401
+
     _HTTP_BACKEND = "requests"
 
 
@@ -67,6 +70,7 @@ def _http_get(url: str, timeout: int = 15) -> Any:
         resp = httpx.get(url, timeout=timeout)
     else:
         import requests
+
         resp = requests.get(url, timeout=timeout)
 
     if resp.status_code == 404:
@@ -88,6 +92,7 @@ def _http_get(url: str, timeout: int = 15) -> Any:
 # ---------------------------------------------------------------------------
 # Exceptions
 # ---------------------------------------------------------------------------
+
 
 class FMPHTTPError(Exception):
     """Wraps an HTTP error from the FMP API."""
@@ -125,9 +130,9 @@ class _QuotaTracker:
         self._path.parent.mkdir(parents=True, exist_ok=True)
 
     def _today(self) -> str:
-        return datetime.now(tz=timezone.utc).strftime("%Y-%m-%d")
+        return datetime.now(tz=UTC).strftime("%Y-%m-%d")
 
-    def _load(self) -> Dict[str, Any]:
+    def _load(self) -> dict[str, Any]:
         if not self._path.exists():
             return {"date": self._today(), "count": 0}
         try:
@@ -138,7 +143,7 @@ class _QuotaTracker:
         except (json.JSONDecodeError, OSError):
             return {"date": self._today(), "count": 0}
 
-    def _save(self, data: Dict[str, Any]) -> None:
+    def _save(self, data: dict[str, Any]) -> None:
         tmp = self._path.with_suffix(".tmp")
         tmp.write_text(json.dumps(data), encoding="utf-8")
         os.replace(tmp, self._path)
@@ -164,13 +169,13 @@ class _QuotaTracker:
 
 # Known suffix translations yfinance → FMP.
 # When FMP returns 404 for a mapped symbol we surface it as "unsupported".
-_SUFFIX_MAP: Dict[str, str] = {
-    ".AS": ".AMS",   # Euronext Amsterdam
-    ".DE": ".F",     # Frankfurt (XETRA)  -- .DEX also tried
-    ".SW": ".SW",    # SIX Swiss (same)
-    ".L": ".L",      # London (usually same)
-    ".MI": ".MI",    # Milan (same)
-    ".MC": ".MC",    # Madrid (same)
+_SUFFIX_MAP: dict[str, str] = {
+    ".AS": ".AMS",  # Euronext Amsterdam
+    ".DE": ".F",  # Frankfurt (XETRA)  -- .DEX also tried
+    ".SW": ".SW",  # SIX Swiss (same)
+    ".L": ".L",  # London (usually same)
+    ".MI": ".MI",  # Milan (same)
+    ".MC": ".MC",  # Madrid (same)
     # .PA is the same in both -- no mapping needed
 }
 
@@ -201,6 +206,7 @@ def _to_fmp_symbol(ticker: str) -> str:
 # FMPDataFetcher
 # ---------------------------------------------------------------------------
 
+
 class FMPDataFetcher:
     """Implements the MarketDataSource Protocol against the FMP REST API.
 
@@ -222,10 +228,10 @@ class FMPDataFetcher:
 
     def __init__(
         self,
-        token: Optional[str] = None,
-        cache: Optional[CacheService] = None,
-        daily_limit: Optional[int] = None,
-        enabled: Optional[bool] = None,
+        token: str | None = None,
+        cache: CacheService | None = None,
+        daily_limit: int | None = None,
+        enabled: bool | None = None,
     ) -> None:
         self._token = token or os.getenv("FMP_TOKEN", "")
         self._cache = cache or CacheService()
@@ -244,11 +250,9 @@ class FMPDataFetcher:
         if not self._token:
             raise FMPQuotaExceeded("FMP_TOKEN not set -- FMP fetcher disabled")
         if self._quota.get_count() >= self._daily_limit:
-            raise FMPQuotaExceeded(
-                f"FMP daily quota exhausted ({self._daily_limit} calls/day)"
-            )
+            raise FMPQuotaExceeded(f"FMP daily quota exhausted ({self._daily_limit} calls/day)")
 
-    def _get(self, endpoint: str, params: Optional[Dict[str, Any]] = None) -> Any:
+    def _get(self, endpoint: str, params: dict[str, Any] | None = None) -> Any:
         """Build the FMP URL, check quota, increment counter, fire GET request.
 
         Raises
@@ -291,7 +295,7 @@ class FMPDataFetcher:
     # Protocol: fetch_quote
     # ------------------------------------------------------------------
 
-    def fetch_quote(self, ticker: str) -> Dict[str, Any]:
+    def fetch_quote(self, ticker: str) -> dict[str, Any]:
         """Fetch current market snapshot via ``/v3/quote/{symbol}``."""
         cache_key = f"fmp:quote:{ticker}"
         cached = self._cache.get(cache_key)
@@ -353,7 +357,7 @@ class FMPDataFetcher:
             f"/v3/balance-sheet-statement/{fmp_ticker}",
             f"/v3/cash-flow-statement/{fmp_ticker}",
         ]
-        frames: List[pd.DataFrame] = []
+        frames: list[pd.DataFrame] = []
         for ep in endpoints:
             try:
                 data = self._get(ep, params={"period": period, "limit": 5})
@@ -365,14 +369,22 @@ class FMPDataFetcher:
             if not data or not isinstance(data, list):
                 continue
             # Each element is one period's statement; pivot to rows=metrics, cols=dates
-            records: Dict[str, Dict[str, Any]] = {}
+            records: dict[str, dict[str, Any]] = {}
             for record in data:
                 date_str = str(record.get("date", record.get("period", "")))
                 for field_name, val in record.items():
-                    if field_name in ("date", "symbol", "reportedCurrency",
-                                      "cik", "fillingDate", "acceptedDate",
-                                      "calendarYear", "period", "link",
-                                      "finalLink"):
+                    if field_name in (
+                        "date",
+                        "symbol",
+                        "reportedCurrency",
+                        "cik",
+                        "fillingDate",
+                        "acceptedDate",
+                        "calendarYear",
+                        "period",
+                        "link",
+                        "finalLink",
+                    ):
                         continue
                     if field_name not in records:
                         records[field_name] = {}
@@ -414,13 +426,18 @@ class FMPDataFetcher:
                 pass
 
         # Compute date range from period string
-        end_date = datetime.now(tz=timezone.utc).date()
+        end_date = datetime.now(tz=UTC).date()
         period_days = {
-            "1y": 365, "2y": 730, "3y": 1095, "5y": 1825, "10y": 3650,
+            "1y": 365,
+            "2y": 730,
+            "3y": 1095,
+            "5y": 1825,
+            "10y": 3650,
         }
         days = period_days.get(period, 1825)
         start_ts = end_date.toordinal() - days
         from datetime import date as _date
+
         start_date = _date.fromordinal(max(start_ts, _date(2000, 1, 1).toordinal()))
 
         fmp_ticker = _to_fmp_symbol(ticker)
@@ -448,8 +465,11 @@ class FMPDataFetcher:
 
         # Normalise column names to match yfinance convention
         col_map = {
-            "open": "Open", "high": "High", "low": "Low",
-            "close": "Close", "volume": "Volume",
+            "open": "Open",
+            "high": "High",
+            "low": "Low",
+            "close": "Close",
+            "volume": "Volume",
         }
         df.rename(columns=col_map, inplace=True)
 
@@ -464,7 +484,7 @@ class FMPDataFetcher:
     # Protocol: fetch_eps_estimates
     # ------------------------------------------------------------------
 
-    def fetch_eps_estimates(self, ticker: str) -> Optional[pd.DataFrame]:
+    def fetch_eps_estimates(self, ticker: str) -> pd.DataFrame | None:
         """Fetch analyst EPS estimates via ``/v3/analyst-estimates/{symbol}``."""
         cache_key = f"fmp:eps_estimates:{ticker}"
         cached = self._cache.get(cache_key)
@@ -496,7 +516,7 @@ class FMPDataFetcher:
     # Protocol: fetch_eps_revisions
     # ------------------------------------------------------------------
 
-    def fetch_eps_revisions(self, ticker: str) -> Optional[pd.DataFrame]:
+    def fetch_eps_revisions(self, ticker: str) -> pd.DataFrame | None:
         """Fetch upgrade/downgrade data as EPS revision proxy.
 
         Uses ``/v3/upgrades-downgrades/{symbol}`` -- the best free-tier
@@ -532,7 +552,7 @@ class FMPDataFetcher:
     # Protocol: fetch_analyst_targets
     # ------------------------------------------------------------------
 
-    def fetch_analyst_targets(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def fetch_analyst_targets(self, ticker: str) -> dict[str, Any] | None:
         """Fetch consensus price targets via ``/v3/price-target-consensus/{symbol}``."""
         cache_key = f"fmp:analyst_targets:{ticker}"
         cached = self._cache.get(cache_key)
@@ -551,7 +571,7 @@ class FMPDataFetcher:
             return None
 
         item = data[0]
-        result: Dict[str, Any] = {
+        result: dict[str, Any] = {
             "target_low": item.get("targetLow"),
             "target_mean": item.get("targetConsensus"),
             "target_high": item.get("targetHigh"),
@@ -565,7 +585,7 @@ class FMPDataFetcher:
     # Protocol: fetch_news
     # ------------------------------------------------------------------
 
-    def fetch_news(self, ticker: str, limit: int = 20) -> Optional[List[Dict[str, Any]]]:
+    def fetch_news(self, ticker: str, limit: int = 20) -> list[dict[str, Any]] | None:
         """Fetch news via ``/v3/stock_news?tickers={symbol}&limit={limit}``."""
         cache_key = f"fmp:news:{ticker}:{limit}"
         cached = self._cache.get(cache_key)
@@ -609,7 +629,7 @@ class FMPDataFetcher:
     # Protocol: fetch_profile
     # ------------------------------------------------------------------
 
-    def fetch_profile(self, ticker: str) -> Dict[str, Any]:
+    def fetch_profile(self, ticker: str) -> dict[str, Any]:
         """Fetch company profile via ``/v3/profile/{symbol}``."""
         cache_key = f"fmp:profile:{ticker}"
         cached = self._cache.get(cache_key)
@@ -622,15 +642,23 @@ class FMPDataFetcher:
         except FMPHTTPError as exc:
             if exc.status_code == 404:
                 return {
-                    "Name": ticker, "Sector": "", "Industry": "",
-                    "Country": "", "Exchange": "", "FirstTradeDate": None,
+                    "Name": ticker,
+                    "Sector": "",
+                    "Industry": "",
+                    "Country": "",
+                    "Exchange": "",
+                    "FirstTradeDate": None,
                 }
             raise
 
         if not data or not isinstance(data, list) or len(data) == 0:
             return {
-                "Name": ticker, "Sector": "", "Industry": "",
-                "Country": "", "Exchange": "", "FirstTradeDate": None,
+                "Name": ticker,
+                "Sector": "",
+                "Industry": "",
+                "Country": "",
+                "Exchange": "",
+                "FirstTradeDate": None,
             }
 
         p = data[0]
@@ -649,7 +677,7 @@ class FMPDataFetcher:
     # Convenience: extract a scoring row from FMP fundamentals
     # ------------------------------------------------------------------
 
-    def extract_scoring_fields(self, ticker: str) -> Dict[str, Any]:
+    def extract_scoring_fields(self, ticker: str) -> dict[str, Any]:
         """Pull the FMP fundamental fields that map directly to SCORING_COLUMNS.
 
         Returns a partial dict -- only fields FMP can supply. The hybrid
@@ -661,7 +689,7 @@ class FMPDataFetcher:
         CurrentRatio_PriorYear, GrossMargin_PriorYear, Revenue_PriorYear,
         TotalAssets_PriorYear).
         """
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
         try:
             ann = self.fetch_fundamentals_annual(ticker)
         except (FMPQuotaExceeded, FMPHTTPError):
@@ -679,7 +707,7 @@ class FMPDataFetcher:
                 return np.nan
             row = ann.loc[fmp_name]
             cols = list(row.index)
-            finite_vals: List[float] = []
+            finite_vals: list[float] = []
             for col in cols:
                 val = row[col]
                 try:
@@ -765,11 +793,7 @@ class FMPDataFetcher:
         # when FMP returns no `returnOnAssets` historical row.
         ni_prior = _nth_finite("netIncome", n=1)
         ta_prior = result.get("TotalAssets_PriorYear", np.nan)
-        if (
-            np.isfinite(ni_prior)
-            and np.isfinite(ta_prior)
-            and float(ta_prior) > 0
-        ):
+        if np.isfinite(ni_prior) and np.isfinite(ta_prior) and float(ta_prior) > 0:
             result["ROA_PriorYear"] = float(ni_prior) / float(ta_prior)
 
         # GrossMargin_PriorYear: prefer FMP's grossProfitRatio prior year,
@@ -780,21 +804,13 @@ class FMPDataFetcher:
         else:
             gp_prior = _nth_finite("grossProfit", n=1)
             rev_prior = result.get("Revenue_PriorYear", np.nan)
-            if (
-                np.isfinite(gp_prior)
-                and np.isfinite(rev_prior)
-                and float(rev_prior) > 0
-            ):
+            if np.isfinite(gp_prior) and np.isfinite(rev_prior) and float(rev_prior) > 0:
                 result["GrossMargin_PriorYear"] = float(gp_prior) / float(rev_prior)
 
         # CurrentRatio_PriorYear = CA_prior / CL_prior
         ca_prior = _nth_finite("totalCurrentAssets", n=1)
         cl_prior = _nth_finite("totalCurrentLiabilities", n=1)
-        if (
-            np.isfinite(ca_prior)
-            and np.isfinite(cl_prior)
-            and float(cl_prior) != 0
-        ):
+        if np.isfinite(ca_prior) and np.isfinite(cl_prior) and float(cl_prior) != 0:
             result["CurrentRatio_PriorYear"] = float(ca_prior) / float(cl_prior)
 
         # ------------------------------------------------------------------
@@ -816,12 +832,12 @@ class FMPDataFetcher:
         # ------------------------------------------------------------------
         # M5: 5y / 3y history arrays for Moat + Earnings Quality modules
         # ------------------------------------------------------------------
-        def _get_history(fmp_name: str, n: int) -> List[float]:
+        def _get_history(fmp_name: str, n: int) -> list[float]:
             """Extract the n most-recent finite values for fmp_name."""
             if fmp_name not in ann.index:
                 return []
             row = ann.loc[fmp_name]
-            out: List[float] = []
+            out: list[float] = []
             for col in list(row.index)[:n]:
                 try:
                     fval = float(row[col])
@@ -836,9 +852,9 @@ class FMPDataFetcher:
         result["OperatingMargin_History_5y"] = _get_history("operatingIncomeRatio", 5)
 
         # ROIC history: derive from operatingIncome and (equity + debt - cash) per year.
-        roic_hist: List[float] = []
-        ic_hist: List[float] = []
-        ebit_hist: List[float] = []
+        roic_hist: list[float] = []
+        ic_hist: list[float] = []
+        ebit_hist: list[float] = []
         if "operatingIncome" in ann.index:
             opi = ann.loc["operatingIncome"]
             eq = ann.loc["totalStockholdersEquity"] if "totalStockholdersEquity" in ann.index else None

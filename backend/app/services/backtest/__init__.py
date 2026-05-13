@@ -19,11 +19,7 @@ Limitations (v0)
 - Transaction costs are a flat **10 bp round-trip**; no slippage / spread.
 - Sized for cached data only -- no live FMP/yfinance calls in the test path.
 """
-from backend.app.services.backtest.walk_forward import (  # noqa: F401
-    BacktestConfig,
-    BacktestResult,
-    WalkForwardBacktest,
-)
+
 from backend.app.services.backtest.metrics import (  # noqa: F401
     alpha_beta,
     cagr,
@@ -32,6 +28,11 @@ from backend.app.services.backtest.metrics import (  # noqa: F401
     max_drawdown,
     sharpe_ratio,
     total_return,
+)
+from backend.app.services.backtest.walk_forward import (  # noqa: F401
+    BacktestConfig,
+    BacktestResult,
+    WalkForwardBacktest,
 )
 
 __all__ = [

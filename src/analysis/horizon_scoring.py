@@ -30,9 +30,10 @@ after M3/M5/M9 wiring):
     earnings_quality  -> EarningsQuality_Score (M5)
     momentum          -> Momentum_Score      (M9; NaN if no price_history_map)
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -49,7 +50,7 @@ __all__ = [
 
 # Canonical category -> column-name mapping. Used as the default when
 # callers don't supply one explicitly.
-DEFAULT_SUB_SCORE_COLUMNS: Dict[str, str] = {
+DEFAULT_SUB_SCORE_COLUMNS: dict[str, str] = {
     "valuation": "Valuation_Score",
     "profitability": "Profitability_Score",
     "health": "Health_Score",
@@ -77,8 +78,8 @@ def _is_finite(val: Any) -> bool:
 
 def _renormalised_weighted_mean(
     row: pd.Series,
-    weights: Dict[str, float],
-    sub_score_columns: Dict[str, str],
+    weights: dict[str, float],
+    sub_score_columns: dict[str, str],
 ) -> float:
     """Weighted sum across categories, renormalising over the present-only set.
 
@@ -107,9 +108,9 @@ def _renormalised_weighted_mean(
 
 def _check_gates(
     row: pd.Series,
-    gates: Dict[str, Any],
+    gates: dict[str, Any],
     require_momentum: bool = False,
-) -> List[str]:
+) -> list[str]:
     """Evaluate every gate; return the list of *failing* gate keys.
 
     The list is empty when all gates pass. Gates whose required input is
@@ -136,7 +137,7 @@ def _check_gates(
         ST scores collapse to mostly-noise when momentum is absent, so we
         block rather than score it.
     """
-    blockers: List[str] = []
+    blockers: list[str] = []
 
     # data_completeness gate
     if "min_data_completeness" in gates:
@@ -208,9 +209,9 @@ def _check_gates(
 
 def _score_one_horizon(
     df: pd.DataFrame,
-    weights: Dict[str, float],
-    gates: Dict[str, Any],
-    sub_score_columns: Dict[str, str],
+    weights: dict[str, float],
+    gates: dict[str, Any],
+    sub_score_columns: dict[str, str],
     horizon_suffix: str,
     require_momentum: bool = False,
 ) -> pd.DataFrame:
@@ -235,10 +236,10 @@ def _score_one_horizon(
             ],
         )
 
-    scores: List[float] = []
-    signals: List[str] = []
-    passes: List[bool] = []
-    blockers_per_row: List[List[str]] = []
+    scores: list[float] = []
+    signals: list[str] = []
+    passes: list[bool] = []
+    blockers_per_row: list[list[str]] = []
 
     has_dcf_mid = "DCF_MoS_Mid" in df.columns
 
@@ -272,9 +273,9 @@ def _score_one_horizon(
 
 def score_long_term(
     df: pd.DataFrame,
-    weights: Dict[str, float],
-    gates: Dict[str, Any],
-    sub_score_columns: Optional[Dict[str, str]] = None,
+    weights: dict[str, float],
+    gates: dict[str, Any],
+    sub_score_columns: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Long-term composite + signal + investability gates.
 
@@ -306,16 +307,14 @@ def score_long_term(
         Defaults to ``DEFAULT_SUB_SCORE_COLUMNS``.
     """
     sub = sub_score_columns or DEFAULT_SUB_SCORE_COLUMNS
-    return _score_one_horizon(
-        df, weights, gates, sub, horizon_suffix="lt", require_momentum=False
-    )
+    return _score_one_horizon(df, weights, gates, sub, horizon_suffix="lt", require_momentum=False)
 
 
 def score_medium_term(
     df: pd.DataFrame,
-    weights: Dict[str, float],
-    gates: Dict[str, Any],
-    sub_score_columns: Optional[Dict[str, str]] = None,
+    weights: dict[str, float],
+    gates: dict[str, Any],
+    sub_score_columns: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Medium-term composite + signal + gates.
 
@@ -326,16 +325,14 @@ def score_medium_term(
     keys; ``min_years_listed`` is dropped by the default settings.
     """
     sub = sub_score_columns or DEFAULT_SUB_SCORE_COLUMNS
-    return _score_one_horizon(
-        df, weights, gates, sub, horizon_suffix="mt", require_momentum=False
-    )
+    return _score_one_horizon(df, weights, gates, sub, horizon_suffix="mt", require_momentum=False)
 
 
 def score_short_term(
     df: pd.DataFrame,
-    weights: Dict[str, float],
-    gates: Dict[str, Any],
-    sub_score_columns: Optional[Dict[str, str]] = None,
+    weights: dict[str, float],
+    gates: dict[str, Any],
+    sub_score_columns: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Short-term composite + signal + gates.
 
@@ -350,9 +347,7 @@ def score_short_term(
     rather than letting an unmoored composite slip through.
     """
     sub = sub_score_columns or DEFAULT_SUB_SCORE_COLUMNS
-    return _score_one_horizon(
-        df, weights, gates, sub, horizon_suffix="st", require_momentum=True
-    )
+    return _score_one_horizon(df, weights, gates, sub, horizon_suffix="st", require_momentum=True)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -362,8 +357,8 @@ def score_short_term(
 
 def score_three_horizons(
     df: pd.DataFrame,
-    settings_block: Dict[str, Any],
-    sub_score_columns: Optional[Dict[str, str]] = None,
+    settings_block: dict[str, Any],
+    sub_score_columns: dict[str, str] | None = None,
 ) -> pd.DataFrame:
     """Compute LT/MT/ST horizon scores in one pass and join them onto ``df``.
 

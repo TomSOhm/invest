@@ -16,17 +16,19 @@ Each per-row function is NaN-safe: missing inputs return NaN (the aggregator
 skips NaNs when normalising). The aggregator falls back to z-score normalisation
 when the M3 sector-relative percentile module is unavailable.
 """
+
 from __future__ import annotations
 
-from typing import Any, List, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _is_finite(val: Any) -> bool:
     """True iff val is a finite numeric (rejects None, NaN, Inf, non-numeric)."""
@@ -78,6 +80,7 @@ def _zscore_norm(series: pd.Series, higher_is_better: bool = True) -> pd.Series:
 # ---------------------------------------------------------------------------
 # Beneish M-Score (1999)
 # ---------------------------------------------------------------------------
+
 
 def beneish_m_score(row: pd.Series) -> float:
     """Beneish M-Score -- 8-variable manipulation flag.
@@ -136,11 +139,28 @@ def beneish_m_score(row: pd.Series) -> float:
     cl_p = _as_float(row.get("CurrentLiabilities_PriorYear"))
 
     inputs = [
-        recv_t, recv_p, sales_t, sales_p, gm_t, gm_p,
-        ta_t, ta_p, ca_t, ca_p, ppe_t, ppe_p,
-        da_t, da_p, sga_t, sga_p,
-        ni_t, cfo_t,
-        ltd_t, ltd_p, cl_t, cl_p,
+        recv_t,
+        recv_p,
+        sales_t,
+        sales_p,
+        gm_t,
+        gm_p,
+        ta_t,
+        ta_p,
+        ca_t,
+        ca_p,
+        ppe_t,
+        ppe_p,
+        da_t,
+        da_p,
+        sga_t,
+        sga_p,
+        ni_t,
+        cfo_t,
+        ltd_t,
+        ltd_p,
+        cl_t,
+        cl_p,
     ]
     if not all(np.isfinite(x) for x in inputs):
         return float("nan")
@@ -206,6 +226,7 @@ def beneish_m_score(row: pd.Series) -> float:
 # Sloan Accruals (1996)
 # ---------------------------------------------------------------------------
 
+
 def sloan_accruals(row: pd.Series) -> float:
     """Sloan accruals = (NetIncome - CFO) / Average(TotalAssets_t, TotalAssets_t-1).
 
@@ -232,10 +253,11 @@ def sloan_accruals(row: pd.Series) -> float:
 # Cash Conversion Ratio (5y average)
 # ---------------------------------------------------------------------------
 
+
 def cash_conversion_ratio_5y(
     row: pd.Series,
-    fcf_history: Optional[Sequence[float]] = None,
-    ni_history: Optional[Sequence[float]] = None,
+    fcf_history: Sequence[float] | None = None,
+    ni_history: Sequence[float] | None = None,
 ) -> float:
     """Mean of FCF_t / NetIncome_t over the supplied 5-year history.
 
@@ -266,7 +288,7 @@ def cash_conversion_ratio_5y(
         return float("nan")
 
     n = min(len(fcf_list), len(ni_list))
-    ratios: List[float] = []
+    ratios: list[float] = []
     for i in range(n):
         fcf_i = _as_float(fcf_list[i])
         ni_i = _as_float(ni_list[i])
@@ -282,7 +304,7 @@ def cash_conversion_ratio_5y(
     return float(np.mean(ratios))
 
 
-def _to_list(seq: Any) -> List[Any]:
+def _to_list(seq: Any) -> list[Any]:
     """Best-effort coerce a column value to a list of scalars (None on failure)."""
     if seq is None:
         return []
@@ -298,6 +320,7 @@ def _to_list(seq: Any) -> List[Any]:
     if isinstance(seq, str):
         try:
             import json
+
             data = json.loads(seq)
             if isinstance(data, list):
                 return data
@@ -309,6 +332,7 @@ def _to_list(seq: Any) -> List[Any]:
 # ---------------------------------------------------------------------------
 # Aggregator -- earnings_quality_score (0..100, sector-relative)
 # ---------------------------------------------------------------------------
+
 
 def earnings_quality_score(df: pd.DataFrame) -> pd.Series:
     """Sector-relative composite of M-Score (low=good), Sloan accruals (low=good),
@@ -336,6 +360,7 @@ def earnings_quality_score(df: pd.DataFrame) -> pd.Series:
     # metric, inverse=...)). Fall back to z-score normalisation if missing.
     try:
         from src.analysis.sector_percentile import score_sector_relative  # type: ignore
+
         sectors = df.get("Sector", pd.Series(["" for _ in range(len(df))], index=df.index))
         tmp = pd.DataFrame({"m": m_scores, "sloan": sloan_vals, "ccr": ccr_vals, "Sector": sectors}, index=df.index)
         m_norm = score_sector_relative(tmp, "m", inverse=True)

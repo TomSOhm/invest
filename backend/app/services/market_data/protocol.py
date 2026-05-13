@@ -9,10 +9,11 @@ Design notes:
 - FetchedField carries both the value and its provenance so callers can build
   the per-field coverage matrix required by M2 and M5.
 """
+
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
+from dataclasses import dataclass
+from typing import Any, Protocol, runtime_checkable
 
 import pandas as pd
 
@@ -53,7 +54,7 @@ class MarketDataSource(Protocol):
     # Quote / price data
     # ------------------------------------------------------------------
 
-    def fetch_quote(self, ticker: str) -> Dict[str, Any]:
+    def fetch_quote(self, ticker: str) -> dict[str, Any]:
         """Fetch current market snapshot for *ticker*.
 
         Returns a flat dict containing at minimum:
@@ -93,7 +94,7 @@ class MarketDataSource(Protocol):
         """
         ...
 
-    def fetch_eps_estimates(self, ticker: str) -> Optional[pd.DataFrame]:
+    def fetch_eps_estimates(self, ticker: str) -> pd.DataFrame | None:
         """Fetch analyst EPS estimates.
 
         Returns a DataFrame or ``None`` if not available. Sources that do not
@@ -101,7 +102,7 @@ class MarketDataSource(Protocol):
         """
         ...
 
-    def fetch_eps_revisions(self, ticker: str) -> Optional[pd.DataFrame]:
+    def fetch_eps_revisions(self, ticker: str) -> pd.DataFrame | None:
         """Fetch EPS revision history (upgrade/downgrade data).
 
         Returns a DataFrame or ``None``. Sources lacking this signal must
@@ -109,7 +110,7 @@ class MarketDataSource(Protocol):
         """
         ...
 
-    def fetch_analyst_targets(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def fetch_analyst_targets(self, ticker: str) -> dict[str, Any] | None:
         """Fetch consensus analyst price targets.
 
         Returns a dict with keys ``target_low``, ``target_mean``,
@@ -118,9 +119,7 @@ class MarketDataSource(Protocol):
         """
         ...
 
-    def fetch_news(
-        self, ticker: str, limit: int = 20
-    ) -> Optional[List[Dict[str, Any]]]:
+    def fetch_news(self, ticker: str, limit: int = 20) -> list[dict[str, Any]] | None:
         """Fetch recent news headlines.
 
         Returns a list of dicts with keys ``title``, ``publishedAt``,
@@ -129,7 +128,7 @@ class MarketDataSource(Protocol):
         """
         ...
 
-    def fetch_profile(self, ticker: str) -> Dict[str, Any]:
+    def fetch_profile(self, ticker: str) -> dict[str, Any]:
         """Fetch company profile / identification data.
 
         Returns a dict containing at minimum:

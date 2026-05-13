@@ -9,9 +9,10 @@ horizon (METHODOLOGY_v2.md).
 The bulk variant ``revisions_signals_df`` is the column block joined back
 onto the scoring universe in ``score_universe``.
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -31,7 +32,7 @@ _EPS_AVG_COLUMNS = (
 _DATE_COLUMNS = ("date", "Date", "reportDate", "calendarYear")
 
 
-def _find_first_column(df: pd.DataFrame, candidates) -> Optional[str]:
+def _find_first_column(df: pd.DataFrame, candidates) -> str | None:
     for c in candidates:
         if c in df.columns:
             return c
@@ -128,7 +129,7 @@ def sue_z_score(reported_eps: float, expected_eps: float, prior_surprises_std: f
 
 def revisions_score(
     eps_estimates: pd.DataFrame,
-    latest_surprise: Optional[Dict[str, Any]] = None,
+    latest_surprise: dict[str, Any] | None = None,
 ) -> float:
     """0-100 composite of revision-momentum signals.
 
@@ -181,8 +182,8 @@ def revisions_score(
 
 
 def revisions_signals_df(
-    estimates_map: Dict[str, pd.DataFrame],
-    surprises_map: Optional[Dict[str, Dict[str, Any]]] = None,
+    estimates_map: dict[str, pd.DataFrame],
+    surprises_map: dict[str, dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
     """Compute the revisions signal block for a universe.
 
@@ -202,7 +203,7 @@ def revisions_signals_df(
         EPS_Rev_30d, EPS_Rev_90d, EPS_Rev_180d, SUE, Revisions_Score
     """
     surprises_map = surprises_map or {}
-    rows: List[Dict[str, Any]] = []
+    rows: list[dict[str, Any]] = []
     for ticker, df in estimates_map.items():
         surprise = surprises_map.get(ticker)
         sue = float("nan")
@@ -212,16 +213,16 @@ def revisions_signals_df(
                 surprise.get("expected_eps", float("nan")),
                 surprise.get("prior_surprises_std", float("nan")),
             )
-        rows.append({
-            "Ticker": ticker,
-            "EPS_Rev_30d": eps_revision_change(df, 30),
-            "EPS_Rev_90d": eps_revision_change(df, 90),
-            "EPS_Rev_180d": eps_revision_change(df, 180),
-            "SUE": sue,
-            "Revisions_Score": revisions_score(df, surprise),
-        })
-    if not rows:
-        return pd.DataFrame(
-            columns=["EPS_Rev_30d", "EPS_Rev_90d", "EPS_Rev_180d", "SUE", "Revisions_Score"]
+        rows.append(
+            {
+                "Ticker": ticker,
+                "EPS_Rev_30d": eps_revision_change(df, 30),
+                "EPS_Rev_90d": eps_revision_change(df, 90),
+                "EPS_Rev_180d": eps_revision_change(df, 180),
+                "SUE": sue,
+                "Revisions_Score": revisions_score(df, surprise),
+            }
         )
+    if not rows:
+        return pd.DataFrame(columns=["EPS_Rev_30d", "EPS_Rev_90d", "EPS_Rev_180d", "SUE", "Revisions_Score"])
     return pd.DataFrame(rows).set_index("Ticker")

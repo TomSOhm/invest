@@ -15,10 +15,11 @@ Design
 Public surface matches the legacy DataFetcher so ``data_fetcher.py`` can
 delegate without changing ``dependencies.py``.
 """
+
 from __future__ import annotations
 
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -44,31 +45,58 @@ from backend.app.services.market_data.yfinance_fetcher import (
 # Source attribution: "fmp" if FMP returned a finite value, "yfinance" if yfinance
 # filled it in, "missing" if both failed.
 _FMP_SUPPLIED_FIELDS = {
-    "Revenue", "EBITDA", "EBIT", "NetIncome",
-    "OperatingCashflow", "FCF", "CapEx",
-    "TotalAssets", "TotalEquity", "TotalDebt", "Cash",
-    "CurrentAssets", "CurrentLiabilities", "RetainedEarnings",
-    "GrossMargin", "OperatingMargin", "NetMargin", "RevenueGrowth",
-    "ROE", "ROA",
+    "Revenue",
+    "EBITDA",
+    "EBIT",
+    "NetIncome",
+    "OperatingCashflow",
+    "FCF",
+    "CapEx",
+    "TotalAssets",
+    "TotalEquity",
+    "TotalDebt",
+    "Cash",
+    "CurrentAssets",
+    "CurrentLiabilities",
+    "RetainedEarnings",
+    "GrossMargin",
+    "OperatingMargin",
+    "NetMargin",
+    "RevenueGrowth",
+    "ROE",
+    "ROA",
     # M4 — Year-over-Year prior-period inputs for Piotroski deltas
-    "LongTermDebt", "LongTermDebt_PriorYear",
-    "ROA_PriorYear", "OperatingCashflow_PriorYear",
-    "CurrentRatio_PriorYear", "GrossMargin_PriorYear",
-    "Revenue_PriorYear", "TotalAssets_PriorYear",
+    "LongTermDebt",
+    "LongTermDebt_PriorYear",
+    "ROA_PriorYear",
+    "OperatingCashflow_PriorYear",
+    "CurrentRatio_PriorYear",
+    "GrossMargin_PriorYear",
+    "Revenue_PriorYear",
+    "TotalAssets_PriorYear",
     # M5 — Beneish prior-year inputs (scalars)
-    "Receivables", "Receivables_PriorYear",
-    "CurrentAssets_PriorYear", "CurrentLiabilities_PriorYear",
-    "PPE", "PPE_PriorYear",
-    "DepreciationAmortization", "DepreciationAmortization_PriorYear",
-    "SGA", "SGA_PriorYear",
-    "COGS", "InterestExpense",
+    "Receivables",
+    "Receivables_PriorYear",
+    "CurrentAssets_PriorYear",
+    "CurrentLiabilities_PriorYear",
+    "PPE",
+    "PPE_PriorYear",
+    "DepreciationAmortization",
+    "DepreciationAmortization_PriorYear",
+    "SGA",
+    "SGA_PriorYear",
+    "COGS",
+    "InterestExpense",
 }
 
 # M5: list-valued history columns that override scalars-only `_is_valid` checks.
 _FMP_SUPPLIED_HISTORY_FIELDS = {
-    "FCF_History_5y", "NetIncome_History_5y",
-    "ROIC_History_5y", "OperatingMargin_History_5y",
-    "EBIT_History_3y", "InvestedCapital_History_3y",
+    "FCF_History_5y",
+    "NetIncome_History_5y",
+    "ROIC_History_5y",
+    "OperatingMargin_History_5y",
+    "EBIT_History_3y",
+    "InvestedCapital_History_3y",
 }
 
 
@@ -101,7 +129,7 @@ class HybridDataFetcher:
     # Public API (matches legacy DataFetcher surface)
     # ------------------------------------------------------------------
 
-    def fetch_single(self, ticker: str, cache_only: bool = False) -> Dict[str, Any]:
+    def fetch_single(self, ticker: str, cache_only: bool = False) -> dict[str, Any]:
         """Fetch a complete scoring row for *ticker*.
 
         Parameters
@@ -133,7 +161,7 @@ class HybridDataFetcher:
         6. Record provenance in ``field_sources``.
         """
         # Lazy import to avoid circular dependency at module load time
-        from backend.app.services.data_fetcher import SCORING_COLUMNS, EXTRA_FIELDS
+        from backend.app.services.data_fetcher import EXTRA_FIELDS, SCORING_COLUMNS
 
         cache_key = f"hybrid:{ticker}"
         cached = self._cache.get(cache_key)
@@ -145,11 +173,9 @@ class HybridDataFetcher:
         # without firing any FMP or yfinance calls.
         if cache_only:
             logger.debug(f"cache_only=True, cache miss for {ticker}: returning NaN row")
-            nan_row: Dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
+            nan_row: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
             nan_row["Ticker"] = ticker
-            nan_row["field_sources"] = {
-                col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS
-            }
+            nan_row["field_sources"] = {col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS}
             nan_row["data_completeness"] = 0.0
             # Set boolean fields to safe defaults
             nan_row["PEA"] = False
@@ -161,15 +187,15 @@ class HybridDataFetcher:
         # ------------------------------------------------------------------
         # Step 1: yfinance full row as base (always)
         # ------------------------------------------------------------------
-        yf_row: Dict[str, Any] = {}
+        yf_row: dict[str, Any] = {}
         try:
             yf_row = self._yf.fetch_full_row(ticker)
         except Exception as exc:
             logger.warning(f"yfinance fetch_full_row failed for {ticker}: {exc}")
 
-        result: Dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
+        result: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
         result["Ticker"] = ticker
-        field_sources: Dict[str, str] = {col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS}
+        field_sources: dict[str, str] = {col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS}
 
         # Apply yfinance values
         for k, v in yf_row.items():
@@ -179,15 +205,14 @@ class HybridDataFetcher:
                     field_sources[k] = "yfinance" if self._is_valid(v) else "missing"
 
         # Populate identification fields (always from yfinance/yf_row)
-        for id_field in ("Name", "Sector", "Industry", "Country", "Exchange",
-                         "PEA", "PEA_PME"):
+        for id_field in ("Name", "Sector", "Industry", "Country", "Exchange", "PEA", "PEA_PME"):
             if id_field in yf_row:
                 result[id_field] = yf_row[id_field]
 
         # ------------------------------------------------------------------
         # Step 2: FMP overlay for fundamental fields
         # ------------------------------------------------------------------
-        fmp_fields: Dict[str, Any] = {}
+        fmp_fields: dict[str, Any] = {}
         try:
             fmp_fields = self._fmp.extract_scoring_fields(ticker)
         except FMPQuotaExceeded as exc:
@@ -228,7 +253,7 @@ class HybridDataFetcher:
         # ------------------------------------------------------------------
         # Step 3: FMP quote overlay for price/market data
         # ------------------------------------------------------------------
-        fmp_quote: Dict[str, Any] = {}
+        fmp_quote: dict[str, Any] = {}
         try:
             fmp_quote = self._fmp.fetch_quote(ticker)
         except FMPQuotaExceeded:
@@ -278,21 +303,38 @@ class HybridDataFetcher:
         #     `data_completeness` ratio stays comparable across milestones.
         #     M7 will redefine completeness with the new categories included.
         _COMPLETENESS_EXCLUDE = {
-            "Name", "Sector", "Industry", "Country", "Exchange",
-            "PEA", "PEA_PME",
+            "Name",
+            "Sector",
+            "Industry",
+            "Country",
+            "Exchange",
+            "PEA",
+            "PEA_PME",
             # M5 additions (excluded to keep completeness stable across milestones)
-            "FCF_History_5y", "NetIncome_History_5y",
-            "ROIC_History_5y", "OperatingMargin_History_5y",
-            "EBIT_History_3y", "InvestedCapital_History_3y",
-            "Receivables", "Receivables_PriorYear",
-            "Revenue_PriorYear", "GrossMargin_PriorYear",
-            "TotalAssets_PriorYear", "CurrentAssets_PriorYear",
-            "PPE", "PPE_PriorYear",
-            "DepreciationAmortization", "DepreciationAmortization_PriorYear",
-            "SGA", "SGA_PriorYear",
-            "LongTermDebt", "LongTermDebt_PriorYear",
+            "FCF_History_5y",
+            "NetIncome_History_5y",
+            "ROIC_History_5y",
+            "OperatingMargin_History_5y",
+            "EBIT_History_3y",
+            "InvestedCapital_History_3y",
+            "Receivables",
+            "Receivables_PriorYear",
+            "Revenue_PriorYear",
+            "GrossMargin_PriorYear",
+            "TotalAssets_PriorYear",
+            "CurrentAssets_PriorYear",
+            "PPE",
+            "PPE_PriorYear",
+            "DepreciationAmortization",
+            "DepreciationAmortization_PriorYear",
+            "SGA",
+            "SGA_PriorYear",
+            "LongTermDebt",
+            "LongTermDebt_PriorYear",
             "CurrentLiabilities_PriorYear",
-            "COGS", "InterestExpense", "WACC",
+            "COGS",
+            "InterestExpense",
+            "WACC",
         }
         numeric_cols = [c for c in SCORING_COLUMNS if c not in _COMPLETENESS_EXCLUDE]
         n_present = sum(1 for c in numeric_cols if self._is_valid(result.get(c)))
@@ -303,11 +345,11 @@ class HybridDataFetcher:
         self._cache.set(cache_key, result, ttl_seconds=14400)
         return result
 
-    def fetch_batch(self, tickers: List[str]) -> pd.DataFrame:
+    def fetch_batch(self, tickers: list[str]) -> pd.DataFrame:
         """Fetch multiple tickers and return a DataFrame indexed by Ticker."""
         from backend.app.services.data_fetcher import SCORING_COLUMNS
 
-        rows: List[Dict[str, Any]] = []
+        rows: list[dict[str, Any]] = []
         for i, ticker in enumerate(tickers):
             data = self.fetch_single(ticker)
             data["Ticker"] = ticker
@@ -322,10 +364,10 @@ class HybridDataFetcher:
         df.set_index("Ticker", inplace=True)
         return df
 
-    def fetch_analyst_ratings(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def fetch_analyst_ratings(self, ticker: str) -> dict[str, Any] | None:
         """Fetch analyst ratings -- FMP first, yfinance fallback."""
         # Try FMP consensus targets first
-        fmp_targets: Optional[Dict[str, Any]] = None
+        fmp_targets: dict[str, Any] | None = None
         try:
             fmp_targets = self._fmp.fetch_analyst_targets(ticker)
         except (FMPQuotaExceeded, FMPHTTPError):
@@ -359,9 +401,7 @@ class HybridDataFetcher:
         """True iff val is a finite number."""
         return _is_finite_number(val)
 
-    def _recompute_derived(
-        self, result: Dict[str, Any], sources: Dict[str, str]
-    ) -> None:
+    def _recompute_derived(self, result: dict[str, Any], sources: dict[str, str]) -> None:
         """Re-derive ratio fields from whatever inputs are now available.
 
         This is idempotent -- it overwrites stale computed values with fresher
@@ -381,18 +421,17 @@ class HybridDataFetcher:
         # EV/EBITDA
         if self._is_valid(ev) and self._is_valid(ebitda):
             result["EV_EBITDA"] = _safe_div(ev, ebitda)
-            fmp_used = (sources.get("EV") == "fmp" or sources.get("EBITDA") == "fmp")
+            fmp_used = sources.get("EV") == "fmp" or sources.get("EBITDA") == "fmp"
             sources["EV_EBITDA"] = "fmp" if fmp_used else "yfinance"
 
         # EV/Sales
         if self._is_valid(ev) and self._is_valid(rev):
             result["EV_Sales"] = _safe_div(ev, rev)
-            fmp_used = (sources.get("EV") == "fmp" or sources.get("Revenue") == "fmp")
+            fmp_used = sources.get("EV") == "fmp" or sources.get("Revenue") == "fmp"
             sources["EV_Sales"] = "fmp" if fmp_used else "yfinance"
 
         # P/FCF
-        if (self._is_valid(fcf) and fcf > 0 and
-                self._is_valid(shares) and shares > 0 and self._is_valid(price)):
+        if self._is_valid(fcf) and fcf > 0 and self._is_valid(shares) and shares > 0 and self._is_valid(price):
             fcf_per_share = float(fcf) / float(shares)
             if fcf_per_share > 0:
                 result["PFCF"] = float(price) / fcf_per_share
@@ -410,9 +449,7 @@ class HybridDataFetcher:
             invested_capital = float(equity) + float(debt) - float(cash)
             if invested_capital > 0:
                 result["ROIC"] = (float(ebit) * 0.75) / invested_capital
-                fmp_used = any(
-                    sources.get(f) == "fmp" for f in ("EBIT", "TotalEquity", "TotalDebt", "Cash")
-                )
+                fmp_used = any(sources.get(f) == "fmp" for f in ("EBIT", "TotalEquity", "TotalDebt", "Cash"))
                 sources["ROIC"] = "fmp" if fmp_used else "yfinance"
             else:
                 result.setdefault("ROIC", np.nan)

@@ -14,22 +14,20 @@ Coverage:
   - test_field_sources_populated
   - test_data_completeness_computed
 """
+
 from __future__ import annotations
 
-import json
 import math
 from pathlib import Path
-from typing import Any, Dict
-from unittest.mock import MagicMock, patch
+from typing import Any
+from unittest.mock import patch
 
 import numpy as np
-import pandas as pd
 import pytest
 
 from backend.app.services.cache_service import CacheService
 from backend.app.services.market_data.fmp_fetcher import (
     FMPDataFetcher,
-    FMPHTTPError,
     FMPQuotaExceeded,
     _QuotaTracker,
     _to_fmp_symbol,
@@ -37,10 +35,10 @@ from backend.app.services.market_data.fmp_fetcher import (
 from backend.app.services.market_data.hybrid_fetcher import HybridDataFetcher
 from backend.app.services.market_data.yfinance_fetcher import YFinanceDataFetcher
 
-
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture
 def tmp_cache(tmp_path: Path) -> CacheService:
@@ -77,7 +75,7 @@ def hybrid(
 
 
 # Minimal yfinance full_row that provides enough fields to not crash
-_MINIMAL_YF_ROW: Dict[str, Any] = {
+_MINIMAL_YF_ROW: dict[str, Any] = {
     "Name": "Test Corp",
     "Sector": "Technology",
     "Industry": "Software",
@@ -140,30 +138,47 @@ _MINIMAL_YF_ROW: Dict[str, Any] = {
 # Tests
 # ---------------------------------------------------------------------------
 
+
 class TestFMPSuppliesField:
     """FMP returns a valid EBIT; hybrid should use it with source='fmp'."""
 
-    def test_fmp_supplies_ebit_when_available(
-        self, hybrid: HybridDataFetcher
-    ) -> None:
+    def test_fmp_supplies_ebit_when_available(self, hybrid: HybridDataFetcher) -> None:
         fmp_ebit_value = 85_000_000.0
 
-        fmp_fields = {**{k: np.nan for k in ["Revenue", "EBITDA", "NetIncome",
-                                               "OperatingCashflow", "FCF", "CapEx",
-                                               "TotalAssets", "TotalEquity", "TotalDebt", "Cash",
-                                               "CurrentAssets", "CurrentLiabilities", "RetainedEarnings",
-                                               "GrossMargin", "OperatingMargin", "NetMargin",
-                                               "RevenueGrowth", "ROE", "ROA"]},
-                       "EBIT": fmp_ebit_value}
+        fmp_fields = {
+            **{
+                k: np.nan
+                for k in [
+                    "Revenue",
+                    "EBITDA",
+                    "NetIncome",
+                    "OperatingCashflow",
+                    "FCF",
+                    "CapEx",
+                    "TotalAssets",
+                    "TotalEquity",
+                    "TotalDebt",
+                    "Cash",
+                    "CurrentAssets",
+                    "CurrentLiabilities",
+                    "RetainedEarnings",
+                    "GrossMargin",
+                    "OperatingMargin",
+                    "NetMargin",
+                    "RevenueGrowth",
+                    "ROE",
+                    "ROA",
+                ]
+            },
+            "EBIT": fmp_ebit_value,
+        }
 
         with patch.object(hybrid._fmp, "extract_scoring_fields", return_value=fmp_fields):
             with patch.object(hybrid._fmp, "fetch_quote", return_value={}):
                 with patch.object(hybrid._yf, "fetch_full_row", return_value=_MINIMAL_YF_ROW):
                     result = hybrid.fetch_single("AAPL")
 
-        assert abs(result["EBIT"] - fmp_ebit_value) < 1, (
-            f"Expected EBIT={fmp_ebit_value}, got {result['EBIT']}"
-        )
+        assert abs(result["EBIT"] - fmp_ebit_value) < 1, f"Expected EBIT={fmp_ebit_value}, got {result['EBIT']}"
         assert result["field_sources"]["EBIT"] == "fmp", (
             f"Expected source='fmp', got '{result['field_sources']['EBIT']}'"
         )
@@ -172,21 +187,15 @@ class TestFMPSuppliesField:
 class TestFallThroughOnFMP404:
     """FMP raises FMPHTTPError(404); hybrid should use yfinance value."""
 
-    def test_yfinance_used_when_fmp_returns_empty(
-        self, hybrid: HybridDataFetcher
-    ) -> None:
+    def test_yfinance_used_when_fmp_returns_empty(self, hybrid: HybridDataFetcher) -> None:
         # FMP extract_scoring_fields returns an empty dict (simulating 404)
         with patch.object(hybrid._fmp, "extract_scoring_fields", return_value={}):
             with patch.object(hybrid._fmp, "fetch_quote", return_value={}):
-                with patch.object(
-                    hybrid._yf, "fetch_full_row", return_value=_MINIMAL_YF_ROW
-                ):
+                with patch.object(hybrid._yf, "fetch_full_row", return_value=_MINIMAL_YF_ROW):
                     result = hybrid.fetch_single("MC.PA")
 
         # yfinance EBIT should be used
-        assert abs(result["EBIT"] - _MINIMAL_YF_ROW["EBIT"]) < 1, (
-            f"Expected yfinance EBIT, got {result['EBIT']}"
-        )
+        assert abs(result["EBIT"] - _MINIMAL_YF_ROW["EBIT"]) < 1, f"Expected yfinance EBIT, got {result['EBIT']}"
         assert result["field_sources"]["EBIT"] == "yfinance", (
             f"Expected source='yfinance', got '{result['field_sources']['EBIT']}'"
         )
@@ -195,16 +204,12 @@ class TestFallThroughOnFMP404:
 class TestFallThroughToNaNWhenBothMissing:
     """Both FMP and yfinance fail for a field; value must be NaN, source='missing'."""
 
-    def test_nan_when_both_sources_missing(
-        self, hybrid: HybridDataFetcher
-    ) -> None:
+    def test_nan_when_both_sources_missing(self, hybrid: HybridDataFetcher) -> None:
         yf_row_no_ebit = {**_MINIMAL_YF_ROW, "EBIT": np.nan}
 
         with patch.object(hybrid._fmp, "extract_scoring_fields", return_value={}):
             with patch.object(hybrid._fmp, "fetch_quote", return_value={}):
-                with patch.object(
-                    hybrid._yf, "fetch_full_row", return_value=yf_row_no_ebit
-                ):
+                with patch.object(hybrid._yf, "fetch_full_row", return_value=yf_row_no_ebit):
                     result = hybrid.fetch_single("UNKNOWN.PA")
 
         assert math.isnan(result["EBIT"]), f"Expected NaN for EBIT, got {result['EBIT']}"
@@ -225,9 +230,17 @@ class TestQuotaCounter:
 
         with patch("backend.app.services.market_data.fmp_fetcher._http_get") as mock_http:
             mock_http.return_value = [
-                {"price": 100, "marketCap": 1e9, "sharesOutstanding": 1e7,
-                 "avgVolume": 5e5, "beta": 1.0, "yearHigh": 120, "yearLow": 80,
-                 "pe": 20, "enterpriseValue": 9e8}
+                {
+                    "price": 100,
+                    "marketCap": 1e9,
+                    "sharesOutstanding": 1e7,
+                    "avgVolume": 5e5,
+                    "beta": 1.0,
+                    "yearHigh": 120,
+                    "yearLow": 80,
+                    "pe": 20,
+                    "enterpriseValue": 9e8,
+                }
             ]
             fmp_fetcher.fetch_quote("AAPL")
 
@@ -273,10 +286,7 @@ class TestQuotaCounter:
         assert abs(result["Price"] - _MINIMAL_YF_ROW["Price"]) < 0.01
         # All fundamental fields should be "yfinance" or "missing" (not "fmp")
         for col, src in result["field_sources"].items():
-            assert src != "fmp", (
-                f"Field {col} should not come from FMP when quota is exhausted, "
-                f"but got source='{src}'"
-            )
+            assert src != "fmp", f"Field {col} should not come from FMP when quota is exhausted, but got source='{src}'"
 
 
 class TestTickerSymbolMapping:
@@ -308,46 +318,34 @@ class TestTickerSymbolMapping:
 class TestFieldSourcesPopulated:
     """field_sources dict is populated for all SCORING_COLUMNS."""
 
-    def test_all_scoring_columns_have_source(
-        self, hybrid: HybridDataFetcher
-    ) -> None:
+    def test_all_scoring_columns_have_source(self, hybrid: HybridDataFetcher) -> None:
         from backend.app.services.data_fetcher import SCORING_COLUMNS
 
         with patch.object(hybrid._fmp, "extract_scoring_fields", return_value={}):
             with patch.object(hybrid._fmp, "fetch_quote", return_value={}):
-                with patch.object(
-                    hybrid._yf, "fetch_full_row", return_value=_MINIMAL_YF_ROW
-                ):
+                with patch.object(hybrid._yf, "fetch_full_row", return_value=_MINIMAL_YF_ROW):
                     result = hybrid.fetch_single("AAPL")
 
         sources = result["field_sources"]
         for col in SCORING_COLUMNS:
             assert col in sources, f"field_sources missing entry for SCORING_COLUMN '{col}'"
-            assert sources[col] in ("fmp", "yfinance", "missing"), (
-                f"Invalid source '{sources[col]}' for column '{col}'"
-            )
+            assert sources[col] in ("fmp", "yfinance", "missing"), f"Invalid source '{sources[col]}' for column '{col}'"
 
 
 class TestDataCompleteness:
     """data_completeness is a float in [0,1] based on finite SCORING_COLUMNS."""
 
-    def test_completeness_between_zero_and_one(
-        self, hybrid: HybridDataFetcher
-    ) -> None:
+    def test_completeness_between_zero_and_one(self, hybrid: HybridDataFetcher) -> None:
         with patch.object(hybrid._fmp, "extract_scoring_fields", return_value={}):
             with patch.object(hybrid._fmp, "fetch_quote", return_value={}):
-                with patch.object(
-                    hybrid._yf, "fetch_full_row", return_value=_MINIMAL_YF_ROW
-                ):
+                with patch.object(hybrid._yf, "fetch_full_row", return_value=_MINIMAL_YF_ROW):
                     result = hybrid.fetch_single("AAPL")
 
         dc = result["data_completeness"]
         assert isinstance(dc, float), f"Expected float, got {type(dc)}"
         assert 0.0 <= dc <= 1.0, f"data_completeness out of range: {dc}"
 
-    def test_completeness_zero_when_all_nan(
-        self, hybrid: HybridDataFetcher
-    ) -> None:
+    def test_completeness_zero_when_all_nan(self, hybrid: HybridDataFetcher) -> None:
         # Return empty row from yfinance (all NaN)
         with patch.object(hybrid._fmp, "extract_scoring_fields", return_value={}):
             with patch.object(hybrid._fmp, "fetch_quote", return_value={}):
@@ -358,29 +356,53 @@ class TestDataCompleteness:
             f"Expected 0.0 completeness for empty row, got {result['data_completeness']}"
         )
 
-    def test_completeness_higher_with_fmp_overlay(
-        self, hybrid: HybridDataFetcher
-    ) -> None:
+    def test_completeness_higher_with_fmp_overlay(self, hybrid: HybridDataFetcher) -> None:
         # yfinance-only row: all NaN except identification
         yf_row_sparse = {
-            "Name": "Sparse Corp", "Sector": "", "Industry": "",
-            "Country": "US", "Exchange": "NMS", "PEA": False, "PEA_PME": False,
+            "Name": "Sparse Corp",
+            "Sector": "",
+            "Industry": "",
+            "Country": "US",
+            "Exchange": "NMS",
+            "PEA": False,
+            "PEA_PME": False,
         }
         # FMP provides fundamentals
         fmp_fields = {
-            "Revenue": 500e6, "EBIT": 80e6, "NetIncome": 55e6,
-            "TotalAssets": 800e6, "TotalEquity": 300e6, "TotalDebt": 150e6,
-            "Cash": 80e6, "CurrentAssets": 200e6, "CurrentLiabilities": 100e6,
-            "RetainedEarnings": 120e6, "GrossMargin": 0.55, "OperatingMargin": 0.16,
-            "NetMargin": 0.11, "RevenueGrowth": 0.08, "ROE": 0.18, "ROA": 0.07,
-            "FCF": 45e6, "OperatingCashflow": 70e6, "CapEx": 25e6,
+            "Revenue": 500e6,
+            "EBIT": 80e6,
+            "NetIncome": 55e6,
+            "TotalAssets": 800e6,
+            "TotalEquity": 300e6,
+            "TotalDebt": 150e6,
+            "Cash": 80e6,
+            "CurrentAssets": 200e6,
+            "CurrentLiabilities": 100e6,
+            "RetainedEarnings": 120e6,
+            "GrossMargin": 0.55,
+            "OperatingMargin": 0.16,
+            "NetMargin": 0.11,
+            "RevenueGrowth": 0.08,
+            "ROE": 0.18,
+            "ROA": 0.07,
+            "FCF": 45e6,
+            "OperatingCashflow": 70e6,
+            "CapEx": 25e6,
             "EBITDA": 95e6,
         }
         with patch.object(hybrid._fmp, "extract_scoring_fields", return_value=fmp_fields):
-            with patch.object(hybrid._fmp, "fetch_quote", return_value={
-                "Price": 120.0, "MarketCap": 2e9, "EV": 2.1e9,
-                "Shares": 1.6e7, "Beta": 1.2, "AvgVolume": 8e5,
-            }):
+            with patch.object(
+                hybrid._fmp,
+                "fetch_quote",
+                return_value={
+                    "Price": 120.0,
+                    "MarketCap": 2e9,
+                    "EV": 2.1e9,
+                    "Shares": 1.6e7,
+                    "Beta": 1.2,
+                    "AvgVolume": 8e5,
+                },
+            ):
                 with patch.object(hybrid._yf, "fetch_full_row", return_value=yf_row_sparse):
                     result_with_fmp = hybrid.fetch_single("SPARSE")
 

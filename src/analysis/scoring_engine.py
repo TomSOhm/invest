@@ -14,33 +14,40 @@ existing callers keep working unchanged.
 M5: informational sector-relative aggregators (Earnings Quality, Moat,
 Risk_v2) re-exported here.
 """
+
 from __future__ import annotations
 
-import pandas as pd
+from typing import Any
+
 import numpy as np
-from typing import Any, Dict, List, Optional, Set, Tuple
+import pandas as pd
 
-from src.analysis.sector_percentile import score_sector_relative
-
-# M4: real Piotroski / Altman / Graham primitives delegated to quality_signals.
-from src.analysis.quality_signals import (
-    altman_z_classic,        # re-exported for callers that want classic Z directly
-    altman_z_double_prime,   # re-exported for callers that want Z'' directly
-    altman_z_select,         # re-exported (returns score + variant tuple)
-    altman_z_score as _altman_z_score_impl,
-    graham_number as _graham_number_impl,
-    piotroski_f_score as _piotroski_f_score_impl,
-)
+# M6: two-stage DCF with sensitivity grid. Activates SIGNAL_THRESHOLDS'
+# previously-dead price-to-intrinsic ratios via generate_signal(composite, mos).
+from src.analysis.dcf import dcf_with_sensitivity
 
 # M5 informational aggregators (sector-relative). Composite weighting unchanged
 # in M5 (M7 owns reshuffling); these are exposed as new columns only.
 from src.analysis.earnings_quality import earnings_quality_score  # noqa: F401
 from src.analysis.quality_moat import moat_score  # noqa: F401
-from src.analysis.risk_metrics import risk_score_real  # noqa: F401
 
-# M6: two-stage DCF with sensitivity grid. Activates SIGNAL_THRESHOLDS'
-# previously-dead price-to-intrinsic ratios via generate_signal(composite, mos).
-from src.analysis.dcf import dcf_with_sensitivity
+# M4: real Piotroski / Altman / Graham primitives delegated to quality_signals.
+from src.analysis.quality_signals import (
+    altman_z_classic,  # re-exported for callers that want classic Z directly
+    altman_z_double_prime,  # re-exported for callers that want Z'' directly
+    altman_z_select,  # re-exported (returns score + variant tuple)
+)
+from src.analysis.quality_signals import (
+    altman_z_score as _altman_z_score_impl,
+)
+from src.analysis.quality_signals import (
+    graham_number as _graham_number_impl,
+)
+from src.analysis.quality_signals import (
+    piotroski_f_score as _piotroski_f_score_impl,
+)
+from src.analysis.risk_metrics import risk_score_real  # noqa: F401
+from src.analysis.sector_percentile import score_sector_relative
 
 # M7: three-horizon composite scoring (LT / MT / ST). The horizon module
 # imports back from this one (it needs ``generate_signal``), so importing
@@ -92,10 +99,10 @@ SCORING_WEIGHTS = {
 }
 
 SIGNAL_THRESHOLDS = {
-    "strong_buy":  {"min_score": 80, "max_price_ratio": 0.70},
-    "buy":         {"min_score": 65, "max_price_ratio": 0.85},
-    "hold":        {"min_score": 40, "max_score": 65},
-    "sell":        {"max_score": 40, "min_price_ratio": 1.30},
+    "strong_buy": {"min_score": 80, "max_price_ratio": 0.70},
+    "buy": {"min_score": 65, "max_price_ratio": 0.85},
+    "hold": {"min_score": 40, "max_score": 65},
+    "sell": {"max_score": 40, "min_price_ratio": 1.30},
     "strong_sell": {"max_score": 25, "min_price_ratio": 1.50},
 }
 
@@ -111,7 +118,6 @@ _NEGATIVE_PE_PENALTY: float = 10.0
 # the global universe. Below this threshold, the sector falls through to
 # the global rank — see sector_percentile.score_sector_relative.
 _DEFAULT_MIN_PEERS: int = 5
-
 
 
 def _is_finite(val: Any) -> bool:
@@ -131,7 +137,7 @@ def _is_finite(val: Any) -> bool:
 # ══════════════════════════════════════════════════════════════
 
 
-def _ensure_columns(df: pd.DataFrame, names: List[str]) -> pd.DataFrame:
+def _ensure_columns(df: pd.DataFrame, names: list[str]) -> pd.DataFrame:
     """Return a DataFrame guaranteed to contain ``names``; missing become NaN."""
     out = df.copy()
     for n in names:
@@ -222,18 +228,10 @@ def financial_health_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS)
 
     parts = pd.concat(
         [
-            score_sector_relative(df, "CurrentRatio", inverse=False, min_n=min_n).rename(
-                "CurrentRatio"
-            ),
-            score_sector_relative(df, "DebtEquity", inverse=True, min_n=min_n).rename(
-                "DebtEquity"
-            ),
-            score_sector_relative(df, "InterestCoverage", inverse=False, min_n=min_n).rename(
-                "InterestCoverage"
-            ),
-            score_sector_relative(df, "_ND_EBITDA", inverse=True, min_n=min_n).rename(
-                "ND_EBITDA"
-            ),
+            score_sector_relative(df, "CurrentRatio", inverse=False, min_n=min_n).rename("CurrentRatio"),
+            score_sector_relative(df, "DebtEquity", inverse=True, min_n=min_n).rename("DebtEquity"),
+            score_sector_relative(df, "InterestCoverage", inverse=False, min_n=min_n).rename("InterestCoverage"),
+            score_sector_relative(df, "_ND_EBITDA", inverse=True, min_n=min_n).rename("ND_EBITDA"),
         ],
         axis=1,
     )
@@ -249,8 +247,12 @@ def profitability_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS) ->
     df = _ensure_columns(
         df,
         [
-            "ROE", "ROA", "ROIC",
-            "OperatingMargin", "NetMargin", "FCFMargin",
+            "ROE",
+            "ROA",
+            "ROIC",
+            "OperatingMargin",
+            "NetMargin",
+            "FCFMargin",
             "Sector",
         ],
     )
@@ -259,9 +261,7 @@ def profitability_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS) ->
             score_sector_relative(df, "ROE", inverse=False, min_n=min_n).rename("ROE"),
             score_sector_relative(df, "ROA", inverse=False, min_n=min_n).rename("ROA"),
             score_sector_relative(df, "ROIC", inverse=False, min_n=min_n).rename("ROIC"),
-            score_sector_relative(df, "OperatingMargin", inverse=False, min_n=min_n).rename(
-                "OperatingMargin"
-            ),
+            score_sector_relative(df, "OperatingMargin", inverse=False, min_n=min_n).rename("OperatingMargin"),
             score_sector_relative(df, "NetMargin", inverse=False, min_n=min_n).rename("NetMargin"),
             score_sector_relative(df, "FCFMargin", inverse=False, min_n=min_n).rename("FCFMargin"),
         ],
@@ -276,9 +276,7 @@ def growth_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS) -> pd.Ser
     return score_sector_relative(df, "RevenueGrowth", inverse=False, min_n=min_n)
 
 
-def shareholder_return_score_df(
-    df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS
-) -> pd.Series:
+def shareholder_return_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS) -> pd.Series:
     """Sector-relative shareholder-return score (0-100).
 
     Components:
@@ -329,9 +327,7 @@ def risk_score_df(df: pd.DataFrame, min_n: int = _DEFAULT_MIN_PEERS) -> pd.Serie
     parts = pd.concat(
         [
             score_sector_relative(df, "Beta", inverse=True, min_n=min_n).rename("Beta"),
-            score_sector_relative(df, "InterestCoverage", inverse=False, min_n=min_n).rename(
-                "InterestCoverage"
-            ),
+            score_sector_relative(df, "InterestCoverage", inverse=False, min_n=min_n).rename("InterestCoverage"),
         ],
         axis=1,
     )
@@ -376,7 +372,7 @@ def _single_row_df(row: pd.Series) -> pd.DataFrame:
     return df
 
 
-def valuation_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+def valuation_score(row: pd.Series, peers: pd.DataFrame | None = None) -> float:
     """Per-row valuation score; uses ``peers`` as the peer universe if given."""
     df = peers if peers is not None else _single_row_df(row)
     if peers is not None and (row.name not in df.index):
@@ -387,35 +383,35 @@ def valuation_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> flo
     return float(score_series.loc[row.name if row.name is not None else "_"])
 
 
-def financial_health_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+def financial_health_score(row: pd.Series, peers: pd.DataFrame | None = None) -> float:
     df = peers if peers is not None else _single_row_df(row)
     if peers is not None and (row.name not in df.index):
         df = pd.concat([df, _single_row_df(row)])
     return float(financial_health_score_df(df).loc[row.name if row.name is not None else "_"])
 
 
-def profitability_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+def profitability_score(row: pd.Series, peers: pd.DataFrame | None = None) -> float:
     df = peers if peers is not None else _single_row_df(row)
     if peers is not None and (row.name not in df.index):
         df = pd.concat([df, _single_row_df(row)])
     return float(profitability_score_df(df).loc[row.name if row.name is not None else "_"])
 
 
-def growth_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+def growth_score(row: pd.Series, peers: pd.DataFrame | None = None) -> float:
     df = peers if peers is not None else _single_row_df(row)
     if peers is not None and (row.name not in df.index):
         df = pd.concat([df, _single_row_df(row)])
     return float(growth_score_df(df).loc[row.name if row.name is not None else "_"])
 
 
-def shareholder_return_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+def shareholder_return_score(row: pd.Series, peers: pd.DataFrame | None = None) -> float:
     df = peers if peers is not None else _single_row_df(row)
     if peers is not None and (row.name not in df.index):
         df = pd.concat([df, _single_row_df(row)])
     return float(shareholder_return_score_df(df).loc[row.name if row.name is not None else "_"])
 
 
-def risk_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
+def risk_score(row: pd.Series, peers: pd.DataFrame | None = None) -> float:
     df = peers if peers is not None else _single_row_df(row)
     if peers is not None and (row.name not in df.index):
         df = pd.concat([df, _single_row_df(row)])
@@ -424,8 +420,8 @@ def risk_score(row: pd.Series, peers: Optional[pd.DataFrame] = None) -> float:
 
 def compute_composite_score(
     row: pd.Series,
-    peers: Optional[pd.DataFrame] = None,
-) -> Dict[str, float]:
+    peers: pd.DataFrame | None = None,
+) -> dict[str, float]:
     """Calculate full composite score with category breakdown.
 
     Without ``peers``, ranks against a 1-row universe (degenerate but
@@ -467,9 +463,7 @@ def _nan_to_neutral(val: float) -> float:
     return float(val)
 
 
-def compute_composite_score_with_peers(
-    row: pd.Series, peers: pd.DataFrame
-) -> Dict[str, float]:
+def compute_composite_score_with_peers(row: pd.Series, peers: pd.DataFrame) -> dict[str, float]:
     """Convenience: ``compute_composite_score`` requiring an explicit peer DF."""
     return compute_composite_score(row, peers=peers)
 
@@ -511,9 +505,11 @@ def generate_signal(composite_score: float, mos: float = float("nan")) -> str:
     str
         One of: "Strong Buy", "Buy", "Hold", "Sell", "Strong Sell".
     """
-    has_mos = isinstance(mos, (int, float, np.floating)) and not (
-        isinstance(mos, float) and np.isnan(mos)
-    ) and np.isfinite(mos)
+    has_mos = (
+        isinstance(mos, (int, float, np.floating))
+        and not (isinstance(mos, float) and np.isnan(mos))
+        and np.isfinite(mos)
+    )
 
     # ---- Two-criterion path (composite + MoS both required to upgrade) ----
     if has_mos:
@@ -583,32 +579,58 @@ def graham_number(row: pd.Series) -> float:
 # + Graham. ~25 entries. Used to compute `data_completeness ∈ [0, 1]` per row,
 # which is exposed in `score_universe` output for the audit trail. Not added to
 # the public API schema yet -- M10 promotes it.
-_SCORING_INPUT_FIELDS: Tuple[str, ...] = (
+_SCORING_INPUT_FIELDS: tuple[str, ...] = (
     # Valuation
-    "PE", "PB", "PS", "PFCF", "EV_EBITDA", "EV_Sales",
+    "PE",
+    "PB",
+    "PS",
+    "PFCF",
+    "EV_EBITDA",
+    "EV_Sales",
     # Health
-    "CurrentRatio", "DebtEquity", "InterestCoverage",
-    "EBITDA", "TotalDebt", "Cash",
+    "CurrentRatio",
+    "DebtEquity",
+    "InterestCoverage",
+    "EBITDA",
+    "TotalDebt",
+    "Cash",
     # Profitability
-    "ROE", "ROA", "ROIC",
-    "OperatingMargin", "NetMargin", "FCFMargin",
+    "ROE",
+    "ROA",
+    "ROIC",
+    "OperatingMargin",
+    "NetMargin",
+    "FCFMargin",
     # Growth
     "RevenueGrowth",
     # Shareholder
-    "DivYield", "PayoutRatio",
+    "DivYield",
+    "PayoutRatio",
     # Risk
     "Beta",
     # Piotroski / Altman / Graham (extra fields not already listed)
-    "OperatingCashflow", "NetIncome", "GrossMargin",
-    "TotalAssets", "TotalEquity", "Revenue",
-    "Shares", "Shares_PriorYear",
-    "EBIT", "MarketCap",
-    "CurrentAssets", "CurrentLiabilities", "RetainedEarnings",
+    "OperatingCashflow",
+    "NetIncome",
+    "GrossMargin",
+    "TotalAssets",
+    "TotalEquity",
+    "Revenue",
+    "Shares",
+    "Shares_PriorYear",
+    "EBIT",
+    "MarketCap",
+    "CurrentAssets",
+    "CurrentLiabilities",
+    "RetainedEarnings",
     # M4 -- YoY inputs for Piotroski 2000 deltas
-    "ROA_PriorYear", "OperatingCashflow_PriorYear",
-    "LongTermDebt", "LongTermDebt_PriorYear",
-    "CurrentRatio_PriorYear", "GrossMargin_PriorYear",
-    "Revenue_PriorYear", "TotalAssets_PriorYear",
+    "ROA_PriorYear",
+    "OperatingCashflow_PriorYear",
+    "LongTermDebt",
+    "LongTermDebt_PriorYear",
+    "CurrentRatio_PriorYear",
+    "GrossMargin_PriorYear",
+    "Revenue_PriorYear",
+    "TotalAssets_PriorYear",
 )
 
 
@@ -629,7 +651,7 @@ def data_completeness(row: pd.Series) -> float:
 # ══════════════════════════════════════════════════════════════
 
 
-def _compute_dcf_for_row(row: pd.Series) -> Dict[str, Any]:
+def _compute_dcf_for_row(row: pd.Series) -> dict[str, Any]:
     """Run dcf_with_sensitivity on a single Series; never raises.
 
     Wraps the pure-function DCF in a try/except so a single ticker with
@@ -658,11 +680,11 @@ def _compute_dcf_for_row(row: pd.Series) -> Dict[str, Any]:
         }
 
 
-_DCF_SETTINGS_CACHE: Optional[Dict[str, Any]] = None
-_HORIZONS_SETTINGS_CACHE: Optional[Dict[str, Any]] = None
+_DCF_SETTINGS_CACHE: dict[str, Any] | None = None
+_HORIZONS_SETTINGS_CACHE: dict[str, Any] | None = None
 
 
-def _load_horizons_settings_once() -> Dict[str, Any]:
+def _load_horizons_settings_once() -> dict[str, Any]:
     """Lazily resolve the ``horizons:`` block from settings.yaml.
 
     Mirrors :func:`_load_dcf_settings_once`: prefers the backend AppConfig
@@ -685,7 +707,7 @@ def _load_horizons_settings_once() -> Dict[str, Any]:
         return {}
 
 
-def _load_dcf_settings_once() -> Optional[Dict[str, Any]]:
+def _load_dcf_settings_once() -> dict[str, Any] | None:
     """Lazily resolve ``valuation.dcf`` settings, with backend AppConfig as the
     preferred source. Falls back to None (then the DCF module's defaults
     apply) when import fails — keeps ``src/analysis`` decoupled from the
@@ -705,9 +727,7 @@ def _load_dcf_settings_once() -> Optional[Dict[str, Any]]:
             # tax_rate_default lives in raw block (not yet promoted to a
             # property accessor — read it directly).
             "tax_rate_default": float(
-                _app_settings.raw.get("valuation", {})
-                .get("dcf", {})
-                .get("tax_rate_default", 0.25)
+                _app_settings.raw.get("valuation", {}).get("dcf", {}).get("tax_rate_default", 0.25)
             ),
         }
         _DCF_SETTINGS_CACHE = block
@@ -724,11 +744,11 @@ def _load_dcf_settings_once() -> Optional[Dict[str, Any]]:
 
 def score_dataframe(
     df: pd.DataFrame,
-    price_history_map: Optional[Dict[str, pd.DataFrame]] = None,
-    market_history: Optional[pd.DataFrame] = None,
-    news_map: Optional[Dict[str, List[Dict[str, Any]]]] = None,
-    estimates_map: Optional[Dict[str, pd.DataFrame]] = None,
-    surprises_map: Optional[Dict[str, Dict[str, Any]]] = None,
+    price_history_map: dict[str, pd.DataFrame] | None = None,
+    market_history: pd.DataFrame | None = None,
+    news_map: dict[str, list[dict[str, Any]]] | None = None,
+    estimates_map: dict[str, pd.DataFrame] | None = None,
+    surprises_map: dict[str, dict[str, Any]] | None = None,
 ) -> pd.DataFrame:
     """Score the entire universe in one vectorised pass and append columns.
 
@@ -801,7 +821,7 @@ def score_dataframe(
 
     # Signal: feed both composite and DCF mid-MoS to the signal generator.
     signals = pd.Series(
-        [generate_signal(c, m) for c, m in zip(composite.values, dcf_mos_mid.values)],
+        [generate_signal(c, m) for c, m in zip(composite.values, dcf_mos_mid.values, strict=False)],
         index=composite.index,
     )
 
@@ -862,14 +882,17 @@ def score_dataframe(
     # ---- M9: optional momentum / revisions / sentiment column blocks ----
     if price_history_map:
         from src.analysis.momentum import momentum_signals_df
+
         mom_df = momentum_signals_df(price_history_map, market_history)
         out = out.join(mom_df, how="left")
     if estimates_map:
         from src.analysis.revisions import revisions_signals_df
+
         rev_df = revisions_signals_df(estimates_map, surprises_map)
         out = out.join(rev_df, how="left")
     if news_map:
         from src.analysis.sentiment import sentiment_signals_df
+
         sent_df = sentiment_signals_df(news_map)
         out = out.join(sent_df, how="left")
 
@@ -883,6 +906,7 @@ def score_dataframe(
     horizons_block = _load_horizons_settings_once()
     if horizons_block:
         from src.analysis.horizon_scoring import score_three_horizons
+
         out = score_three_horizons(out, horizons_block)
 
     # Legacy aliases: keep `Composite_Score` and `Signal` pointing at the
@@ -920,5 +944,6 @@ score_universe = score_dataframe
 def __getattr__(name: str):
     if name in ("score_three_horizons", "score_long_term", "score_medium_term", "score_short_term"):
         from src.analysis import horizon_scoring as _hz
+
         return getattr(_hz, name)
     raise AttributeError(f"module 'scoring_engine' has no attribute {name!r}")

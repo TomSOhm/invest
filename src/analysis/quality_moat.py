@@ -17,13 +17,14 @@ available; otherwise falls back to a default cost-of-equity of 9% (settings
 override possible via the ``moat_default_wacc`` setting). M6 will populate
 real WACC; for M5 the placeholder column is set to NaN by the data fetcher.
 """
+
 from __future__ import annotations
 
-from typing import Any, List, Optional, Sequence
+from collections.abc import Sequence
+from typing import Any
 
 import numpy as np
 import pandas as pd
-
 
 _DEFAULT_WACC = 0.09  # 9% cost of equity, used when WACC column missing
 
@@ -31,6 +32,7 @@ _DEFAULT_WACC = 0.09  # 9% cost of equity, used when WACC column missing
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _is_finite(val: Any) -> bool:
     try:
@@ -48,7 +50,7 @@ def _as_float(val: Any) -> float:
     return f if np.isfinite(f) else float("nan")
 
 
-def _to_list(seq: Any) -> List[Any]:
+def _to_list(seq: Any) -> list[Any]:
     if seq is None:
         return []
     if isinstance(seq, (list, tuple)):
@@ -62,6 +64,7 @@ def _to_list(seq: Any) -> List[Any]:
     if isinstance(seq, str):
         try:
             import json
+
             data = json.loads(seq)
             if isinstance(data, list):
                 return data
@@ -70,9 +73,9 @@ def _to_list(seq: Any) -> List[Any]:
     return []
 
 
-def _finite_floats(seq: Any) -> List[float]:
+def _finite_floats(seq: Any) -> list[float]:
     """Return only the finite-numeric entries of seq."""
-    out: List[float] = []
+    out: list[float] = []
     for v in _to_list(seq):
         f = _as_float(v)
         if np.isfinite(f):
@@ -98,6 +101,7 @@ def _zscore_norm(series: pd.Series, higher_is_better: bool = True) -> pd.Series:
 # Per-row functions
 # ---------------------------------------------------------------------------
 
+
 def gross_profitability(row: pd.Series) -> float:
     """Novy-Marx 2013: GP / TA = (Revenue - COGS) / TotalAssets.
 
@@ -119,7 +123,7 @@ def gross_profitability(row: pd.Series) -> float:
 
 def roic_5y_avg(
     row: pd.Series,
-    roic_history: Optional[Sequence[float]] = None,
+    roic_history: Sequence[float] | None = None,
 ) -> float:
     """5y average ROIC. Reads ``ROIC_History_5y`` from the row when no override given.
 
@@ -134,7 +138,7 @@ def roic_5y_avg(
 
 def roic_stability(
     row: pd.Series,
-    roic_history: Optional[Sequence[float]] = None,
+    roic_history: Sequence[float] | None = None,
 ) -> float:
     """Inverse stddev of ROIC: higher = more stable. NaN if < 3 years.
 
@@ -152,14 +156,10 @@ def roic_stability(
 
 def operating_margin_stability(
     row: pd.Series,
-    op_margin_history: Optional[Sequence[float]] = None,
+    op_margin_history: Sequence[float] | None = None,
 ) -> float:
     """Inverse-stddev of operating margins. Same shape as ``roic_stability``."""
-    seq = (
-        op_margin_history
-        if op_margin_history is not None
-        else row.get("OperatingMargin_History_5y")
-    )
+    seq = op_margin_history if op_margin_history is not None else row.get("OperatingMargin_History_5y")
     vals = _finite_floats(seq)
     if len(vals) < 3:
         return float("nan")
@@ -211,6 +211,7 @@ def reinvestment_efficiency(row: pd.Series) -> float:
 # Aggregator
 # ---------------------------------------------------------------------------
 
+
 def moat_score(df: pd.DataFrame) -> pd.Series:
     """Sector-relative composite of GP/TA, ROIC 5y avg, ROIC stability,
     OpMargin stability, ROIC-WACC spread, and reinvestment efficiency.
@@ -250,6 +251,7 @@ def moat_score(df: pd.DataFrame) -> pd.Series:
         def _norm(metric: str, higher_is_better: bool) -> pd.Series:
             return score_sector_relative(tmp, metric, inverse=not higher_is_better)
     except (ImportError, AttributeError, TypeError):
+
         def _norm(metric: str, higher_is_better: bool) -> pd.Series:
             return _zscore_norm(tmp[metric], higher_is_better=higher_is_better)
 

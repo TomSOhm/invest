@@ -6,9 +6,10 @@ CRUD operations and live-data refresh for portfolio positions.
 in the summary (default: long_term). All three horizon scores are always
 present on every PortfolioPosition regardless of the horizon param.
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
@@ -32,7 +33,7 @@ async def get_portfolio(
         description="Horizon for signal_distribution in summary: long_term | medium_term | short_term",
     ),
     svc: PortfolioService = Depends(get_portfolio_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return the full portfolio with cached data, three-horizon scoring, and P&L.
 
     This endpoint is cache-only: no live FMP/yfinance calls are made.
@@ -46,8 +47,7 @@ async def get_portfolio(
     if horizon not in _VALID_HORIZONS:
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid horizon '{horizon}'. "
-                   f"Must be one of: {sorted(_VALID_HORIZONS)}",
+            detail=f"Invalid horizon '{horizon}'. Must be one of: {sorted(_VALID_HORIZONS)}",
         )
     return svc.get_portfolio(horizon=horizon)
 
@@ -56,7 +56,7 @@ async def get_portfolio(
 async def add_position(
     req: AddPositionRequest,
     svc: PortfolioService = Depends(get_portfolio_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Add a new position to the portfolio.
 
     Triggers a live fetch for the new ticker only. Returns 200 even if both
@@ -71,7 +71,7 @@ async def update_position(
     position_id: str,
     req: UpdatePositionRequest,
     svc: PortfolioService = Depends(get_portfolio_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Update an existing position.
 
     If the ticker is unchanged, re-fetches live data for that ticker only.
@@ -86,7 +86,7 @@ async def update_position(
 async def remove_position(
     position_id: str,
     svc: PortfolioService = Depends(get_portfolio_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Remove a position from the portfolio."""
     removed = svc.remove_position(position_id)
     if not removed:
@@ -98,7 +98,7 @@ async def remove_position(
 async def refresh_portfolio(
     horizon: str = Query("long_term", description="Horizon for summary signal_distribution"),
     svc: PortfolioService = Depends(get_portfolio_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Force-refresh all live data for the portfolio.
 
     Invalidates the cache for every stored ticker and re-fetches live data
@@ -107,7 +107,6 @@ async def refresh_portfolio(
     if horizon not in _VALID_HORIZONS:
         raise HTTPException(
             status_code=422,
-            detail=f"Invalid horizon '{horizon}'. "
-                   f"Must be one of: {sorted(_VALID_HORIZONS)}",
+            detail=f"Invalid horizon '{horizon}'. Must be one of: {sorted(_VALID_HORIZONS)}",
         )
     return svc.refresh(horizon=horizon)

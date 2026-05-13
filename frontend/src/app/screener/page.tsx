@@ -212,6 +212,7 @@ export default function ScreenerPage() {
     if (!iso) return "never";
     const ts = new Date(iso).getTime();
     if (Number.isNaN(ts)) return iso;
+    // eslint-disable-next-line react-hooks/purity -- Date.now() is intentional for relative-time display
     const deltaSec = Math.max(0, Math.floor((Date.now() - ts) / 1000));
     if (deltaSec < 60) return `${deltaSec}s ago`;
     if (deltaSec < 3600) return `${Math.floor(deltaSec / 60)}m ago`;

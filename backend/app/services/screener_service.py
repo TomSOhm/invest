@@ -8,23 +8,23 @@ Key changes vs M9:
 - run_screen accepts horizon to determine the sort column
 - get_presets returns the 9 M8 preset metadata dicts
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import pandas as pd
-from loguru import logger
 
-from src.strategy.screener import apply_filters
 from src.strategy.horizon_presets import (
     PRESET_REGISTRY,
     list_presets,
     screen_horizon_preset,
 )
+from src.strategy.screener import apply_filters
 
 # Horizon -> score column mapping (these columns are emitted by score_dataframe
 # when M7 is active; fall back to Composite_Score for legacy DataFrames).
-_HORIZON_SCORE_COL: Dict[str, str] = {
+_HORIZON_SCORE_COL: dict[str, str] = {
     "long_term": "score_lt",
     "medium_term": "score_mt",
     "short_term": "score_st",
@@ -37,7 +37,7 @@ class ScreenerService:
     def run_screen(
         self,
         df: pd.DataFrame,
-        filters: Dict[str, Any],
+        filters: dict[str, Any],
         horizon: str = "long_term",
         pea_only: bool = False,
         sort_by: str = "score",
@@ -75,7 +75,7 @@ class ScreenerService:
         result = apply_filters(df, filters, pea_only=pea_only)
 
         # Map sort key to DataFrame column
-        sort_map: Dict[str, str] = {
+        sort_map: dict[str, str] = {
             "score": _HORIZON_SCORE_COL.get(horizon, "score_lt"),
             "pe": "PE",
             "roe": "ROE",
@@ -118,10 +118,7 @@ class ScreenerService:
             Max results
         """
         if preset_name not in PRESET_REGISTRY:
-            raise KeyError(
-                f"Unknown preset '{preset_name}'. "
-                f"Valid names: {sorted(PRESET_REGISTRY.keys())}"
-            )
+            raise KeyError(f"Unknown preset '{preset_name}'. Valid names: {sorted(PRESET_REGISTRY.keys())}")
 
         result = screen_horizon_preset(df, preset_name)
 
@@ -132,12 +129,13 @@ class ScreenerService:
         return result.head(limit)
 
     @staticmethod
-    def get_presets() -> List[Dict[str, Any]]:
+    def get_presets() -> list[dict[str, Any]]:
         """Return the 9 M8 preset metadata dicts (name, horizon, description, ...)."""
         return list_presets()
 
     @staticmethod
-    def get_summary(df: pd.DataFrame) -> Dict[str, Any]:
+    def get_summary(df: pd.DataFrame) -> dict[str, Any]:
         """Generate summary statistics for a screened DataFrame."""
         from src.strategy.screener import generate_screening_summary
+
         return generate_screening_summary(df)

@@ -5,6 +5,7 @@ analytic answer; ``dcf_with_sensitivity`` is tested end-to-end on
 AAPL-like and Atos-like (distressed) inputs to verify both happy-path
 fair-value bracketing and NaN-safe degradation.
 """
+
 from __future__ import annotations
 
 import math
@@ -12,7 +13,6 @@ import sys
 from pathlib import Path
 
 import numpy as np
-import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 for p in (PROJECT_ROOT, PROJECT_ROOT / "src"):
@@ -27,7 +27,6 @@ from src.analysis.dcf import (  # noqa: E402
     project_fcf,
     terminal_value,
 )
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # compute_wacc
@@ -55,8 +54,11 @@ def test_compute_wacc_aapl_like_in_expected_range() -> None:
 def test_compute_wacc_zero_debt() -> None:
     """All-equity firm: WACC = Re exactly."""
     wacc = compute_wacc(
-        beta=1.2, market_cap=10e9, total_debt=0,
-        risk_free_rate=0.03, equity_risk_premium=0.055,
+        beta=1.2,
+        market_cap=10e9,
+        total_debt=0,
+        risk_free_rate=0.03,
+        equity_risk_premium=0.055,
     )
     expected_re = 0.03 + 1.2 * 0.055
     assert math.isclose(wacc, expected_re, rel_tol=1e-9)
@@ -65,11 +67,16 @@ def test_compute_wacc_zero_debt() -> None:
 def test_compute_wacc_high_leverage() -> None:
     """Heavily-levered firm: WACC pulled down toward after-tax cost of debt."""
     wacc_lev = compute_wacc(
-        beta=1.0, market_cap=10e9, total_debt=40e9,
-        cost_of_debt=0.05, tax_rate=0.25,
+        beta=1.0,
+        market_cap=10e9,
+        total_debt=40e9,
+        cost_of_debt=0.05,
+        tax_rate=0.25,
     )
     wacc_unlev = compute_wacc(
-        beta=1.0, market_cap=10e9, total_debt=0,
+        beta=1.0,
+        market_cap=10e9,
+        total_debt=0,
     )
     assert wacc_lev < wacc_unlev
 
@@ -235,7 +242,10 @@ def test_intrinsic_value_per_share_subtracts_net_debt() -> None:
 def test_intrinsic_value_per_share_nan_when_shares_zero() -> None:
     iv = intrinsic_value_per_share(
         fcf_proj=np.array([100.0] * 5),
-        tv=1000.0, wacc=0.10, shares_out=0.0, net_debt=0.0,
+        tv=1000.0,
+        wacc=0.10,
+        shares_out=0.0,
+        net_debt=0.0,
     )
     assert math.isnan(iv)
 
@@ -243,7 +253,10 @@ def test_intrinsic_value_per_share_nan_when_shares_zero() -> None:
 def test_intrinsic_value_per_share_nan_when_fcf_proj_has_nan() -> None:
     iv = intrinsic_value_per_share(
         fcf_proj=np.array([100.0, float("nan"), 100.0, 100.0, 100.0]),
-        tv=1000.0, wacc=0.10, shares_out=1.0, net_debt=0.0,
+        tv=1000.0,
+        wacc=0.10,
+        shares_out=1.0,
+        net_debt=0.0,
     )
     assert math.isnan(iv)
 
@@ -264,8 +277,8 @@ def _aapl_like_inputs() -> dict:
         "Revenue": 4.51e11,
         "FCF": 1.01e11,
         "FCFMargin": 0.224,
-        "RevenueGrowth": 0.10,   # blend of 5y CAGR + recent
-        "Price": 190.0,          # consensus zone in 2026
+        "RevenueGrowth": 0.10,  # blend of 5y CAGR + recent
+        "Price": 190.0,  # consensus zone in 2026
     }
 
 
@@ -287,9 +300,7 @@ def test_dcf_aapl_like_mos_within_sensible_range() -> None:
     """At a $190 price the MoS_Mid should fall inside [-0.50, +0.70]."""
     out = dcf_with_sensitivity(_aapl_like_inputs())
     assert not math.isnan(out["mos_mid"])
-    assert -0.50 <= out["mos_mid"] <= 0.70, (
-        f"AAPL-like mos_mid out of band: {out['mos_mid']:.3f}"
-    )
+    assert -0.50 <= out["mos_mid"] <= 0.70, f"AAPL-like mos_mid out of band: {out['mos_mid']:.3f}"
 
 
 def test_dcf_grid_low_mid_high_ordering() -> None:
@@ -304,9 +315,15 @@ def test_dcf_grid_has_nine_cells() -> None:
     out = dcf_with_sensitivity(_aapl_like_inputs())
     assert len(out["scenarios"]) == 9
     expected_keys = {
-        "wacc-tgr-", "wacc-tgr", "wacc-tgr+",
-        "wacctgr-", "wacctgr", "wacctgr+",
-        "wacc+tgr-", "wacc+tgr", "wacc+tgr+",
+        "wacc-tgr-",
+        "wacc-tgr",
+        "wacc-tgr+",
+        "wacctgr-",
+        "wacctgr",
+        "wacctgr+",
+        "wacc+tgr-",
+        "wacc+tgr",
+        "wacc+tgr+",
     }
     assert set(out["scenarios"].keys()) == expected_keys
 
@@ -349,9 +366,7 @@ def test_dcf_atos_like_distressed_warns_or_returns_negative() -> None:
     assert out["warnings"], "expected at least one warning for distressed inputs"
     # Either NaN or sharply negative MoS — both are acceptable signal values
     if not math.isnan(out["mos_mid"]):
-        assert out["mos_mid"] <= 0.0, (
-            f"distressed mos_mid should be <=0, got {out['mos_mid']}"
-        )
+        assert out["mos_mid"] <= 0.0, f"distressed mos_mid should be <=0, got {out['mos_mid']}"
 
 
 def test_dcf_returns_nan_when_market_cap_missing() -> None:
@@ -409,7 +424,7 @@ def test_dcf_settings_override() -> None:
         settings={
             "projection_years": 5,
             "terminal_growth_rate": 0.025,
-            "risk_free_rate": 0.01,        # 100bp lower than default 3%
+            "risk_free_rate": 0.01,  # 100bp lower than default 3%
             "equity_risk_premium": 0.055,
             "tax_rate_default": 0.25,
         },
@@ -451,8 +466,8 @@ def test_generate_signal_strong_sell_when_overvalued_regardless_of_score() -> No
 def test_generate_signal_sell_when_score_low_or_overvalued() -> None:
     from src.analysis.scoring_engine import generate_signal
 
-    assert generate_signal(35, 0.05) == "Sell"        # low score
-    assert generate_signal(70, -0.20) == "Sell"       # overvalued
+    assert generate_signal(35, 0.05) == "Sell"  # low score
+    assert generate_signal(70, -0.20) == "Sell"  # overvalued
 
 
 def test_generate_signal_legacy_fallback_when_mos_missing() -> None:

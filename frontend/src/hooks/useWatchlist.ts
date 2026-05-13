@@ -82,10 +82,8 @@ export function useWatchlist() {
   }, []);
 
   // Mount-once. Add/remove/horizon flips never refetch.
-  useEffect(() => {
-    fetch();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
+  useEffect(() => { fetch(); }, []);
 
   return {
     data,

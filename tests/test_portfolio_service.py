@@ -8,26 +8,26 @@ Verifies:
 - add_position() triggers exactly one fetch_single(ticker, cache_only=False).
 - refresh() calls fetch_single with cache_only=False for all stored tickers.
 """
+
 from __future__ import annotations
 
 import uuid
-from typing import Any, Dict, List, Optional
-from unittest.mock import MagicMock, call
+from typing import Any
+from unittest.mock import MagicMock
 
 import numpy as np
-import pytest
 
-from backend.app.models.portfolio import AddPositionRequest, UpdatePositionRequest
+from backend.app.models.portfolio import AddPositionRequest
 from backend.app.services.portfolio_service import PortfolioService
 from backend.app.services.scoring_service import ScoringService
 from backend.app.storage.portfolio_store import PortfolioStore
-
 
 # ---------------------------------------------------------------------------
 # Helpers / minimal fakes
 # ---------------------------------------------------------------------------
 
-def _make_position(ticker: str, quantity: float = 10.0, buy_price: float = 100.0) -> Dict[str, Any]:
+
+def _make_position(ticker: str, quantity: float = 10.0, buy_price: float = 100.0) -> dict[str, Any]:
     return {
         "id": str(uuid.uuid4()),
         "ticker": ticker,
@@ -39,10 +39,11 @@ def _make_position(ticker: str, quantity: float = 10.0, buy_price: float = 100.0
     }
 
 
-def _nan_row(ticker: str) -> Dict[str, Any]:
+def _nan_row(ticker: str) -> dict[str, Any]:
     """Minimal NaN row as returned by fetch_single(cache_only=True) on cache miss."""
-    from backend.app.services.data_fetcher import SCORING_COLUMNS, EXTRA_FIELDS
-    row: Dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
+    from backend.app.services.data_fetcher import EXTRA_FIELDS, SCORING_COLUMNS
+
+    row: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
     row["Ticker"] = ticker
     row["field_sources"] = {col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS}
     row["data_completeness"] = 0.0
@@ -51,7 +52,7 @@ def _nan_row(ticker: str) -> Dict[str, Any]:
     return row
 
 
-def _make_store(positions: List[Dict[str, Any]]) -> PortfolioStore:
+def _make_store(positions: list[dict[str, Any]]) -> PortfolioStore:
     store = MagicMock(spec=PortfolioStore)
     store.get_positions.return_value = positions
     return store
@@ -115,9 +116,7 @@ class TestGetPortfolioCacheOnly:
 
         for c in fetcher.fetch_single.call_args_list:
             _, kwargs = c
-            assert kwargs.get("cache_only") is True, (
-                f"Expected cache_only=True, got {kwargs}"
-            )
+            assert kwargs.get("cache_only") is True, f"Expected cache_only=True, got {kwargs}"
 
     def test_returns_degraded_rows_on_cache_miss(self) -> None:
         """When fetch_single returns NaN row, scores and price should be null."""
@@ -241,9 +240,7 @@ class TestAddPosition:
         scorer = _make_scorer()
 
         svc = PortfolioService(store=store, fetcher=fetcher, scorer=scorer)
-        req = AddPositionRequest(
-            ticker="NVDA", quantity=5.0, buy_price=800.0, account_type="cto"
-        )
+        req = AddPositionRequest(ticker="NVDA", quantity=5.0, buy_price=800.0, account_type="cto")
         result = svc.add_position(req)
 
         fetcher.fetch_single.assert_called_once_with("NVDA", cache_only=False)
@@ -258,9 +255,7 @@ class TestAddPosition:
         scorer = _make_scorer()
 
         svc = PortfolioService(store=store, fetcher=fetcher, scorer=scorer)
-        req = AddPositionRequest(
-            ticker="GHOST", quantity=1.0, buy_price=50.0, account_type="pea"
-        )
+        req = AddPositionRequest(ticker="GHOST", quantity=1.0, buy_price=50.0, account_type="pea")
         result = svc.add_position(req)
 
         assert result == stored_pos
@@ -298,9 +293,7 @@ class TestRefresh:
 
         for c in fetcher.fetch_single.call_args_list:
             _, kwargs = c
-            assert kwargs.get("cache_only") is False, (
-                f"Expected cache_only=False in refresh, got {kwargs}"
-            )
+            assert kwargs.get("cache_only") is False, f"Expected cache_only=False in refresh, got {kwargs}"
 
     def test_refresh_fetches_analyst_ratings(self) -> None:
         positions = [_make_position("AAPL")]

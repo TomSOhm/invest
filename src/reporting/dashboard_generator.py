@@ -2,17 +2,25 @@
 Invest Solo — Interactive HTML Dashboard Generator
 Creates a self-contained HTML file with all charts and data.
 """
-import sys, os
+
+import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pandas as pd
-import numpy as np
 from datetime import datetime
-from src.data.sample_universe import get_universe_dataframe
+
+import numpy as np
+import pandas as pd
+
 from src.analysis.scoring_engine import score_universe
+from src.data.sample_universe import get_universe_dataframe
 from src.strategy.screener import (
-    screen_pea_value, screen_pea_quality, screen_dividend_income,
-    screen_global_best, generate_screening_summary
+    generate_screening_summary,
+    screen_dividend_income,
+    screen_global_best,
+    screen_pea_quality,
+    screen_pea_value,
 )
 
 
@@ -33,10 +41,7 @@ def score_to_color(score, alpha=1.0):
 
 
 def signal_badge(signal):
-    colors = {
-        "Strong Buy": "#059669", "Buy": "#10b981",
-        "Hold": "#f59e0b", "Sell": "#ef4444", "Strong Sell": "#991b1b"
-    }
+    colors = {"Strong Buy": "#059669", "Buy": "#10b981", "Hold": "#f59e0b", "Sell": "#ef4444", "Strong Sell": "#991b1b"}
     c = colors.get(signal, "#6b7280")
     return f'<span style="background:{c};color:#fff;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600">{signal}</span>'
 
@@ -46,66 +51,73 @@ def pea_badge(is_pea, is_pme=False):
         return '<span style="background:#7c3aed;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PME</span>'
     if is_pea:
         return '<span style="background:#2563eb;color:#fff;padding:1px 6px;border-radius:8px;font-size:10px">PEA</span>'
-    return ''
+    return ""
 
 
 def generate_dashboard(scored_df: pd.DataFrame, output_path: str):
     """Generate the full interactive HTML dashboard."""
     now = datetime.now().strftime("%Y-%m-%d %H:%M")
-    
+
     # Strategy screens
     pea_val = screen_pea_value(scored_df)
     pea_qual = screen_pea_quality(scored_df)
     div_inc = screen_dividend_income(scored_df)
     glob_best = screen_global_best(scored_df)
-    
+
     # Build table rows for main scoreboard
     table_rows = ""
-    for i, (ticker, row) in enumerate(scored_df.iterrows()):
+    for _i, (ticker, row) in enumerate(scored_df.iterrows()):
         cs = row.get("Composite_Score", 0)
         bg = score_to_color(cs, 0.12)
         bar_w = max(2, cs)
-        
+
         # Score breakdown mini-bars
         def mini_bar(val, label):
             c = score_to_color(val, 0.9)
             w = max(2, val)
             return f'<div style="display:flex;align-items:center;gap:4px"><div style="width:{w}px;height:6px;background:{c};border-radius:3px"></div><span style="font-size:10px;color:#888">{val:.0f}</span></div>'
-        
-        graham_val = row.get("Graham_Number", np.nan)
+
+        row.get("Graham_Number", np.nan)
         mos = row.get("Graham_MoS", np.nan)
-        mos_str = f'{mos:+.0f}%' if pd.notna(mos) else '—'
-        mos_color = '#059669' if pd.notna(mos) and mos > 0 else '#ef4444' if pd.notna(mos) else '#999'
-        
+        mos_str = f"{mos:+.0f}%" if pd.notna(mos) else "—"
+        mos_color = "#059669" if pd.notna(mos) and mos > 0 else "#ef4444" if pd.notna(mos) else "#999"
+
         table_rows += f"""
-        <tr style="background:{bg}" class="data-row" data-sector="{row.get('Sector','')}" data-country="{row.get('Country','')}" data-signal="{row.get('Signal','')}">
+        <tr style="background:{bg}" class="data-row" data-sector="{row.get("Sector", "")}" data-country="{row.get("Country", "")}" data-signal="{row.get("Signal", "")}">
             <td style="font-weight:700;font-family:monospace">{ticker}</td>
-            <td>{row.get('Name','')[:28]}</td>
-            <td><span style="font-size:11px">{row.get('Sector','')[:18]}</span></td>
-            <td>{row.get('Country','')}</td>
-            <td style="text-align:right">€{row.get('Price',0):,.2f}</td>
+            <td>{row.get("Name", "")[:28]}</td>
+            <td><span style="font-size:11px">{row.get("Sector", "")[:18]}</span></td>
+            <td>{row.get("Country", "")}</td>
+            <td style="text-align:right">€{row.get("Price", 0):,.2f}</td>
             <td style="text-align:center">
                 <div style="display:flex;align-items:center;gap:4px">
                     <div style="width:{bar_w}px;height:14px;background:{score_to_color(cs, 0.85)};border-radius:4px"></div>
                     <strong>{cs:.1f}</strong>
                 </div>
             </td>
-            <td style="text-align:center">{signal_badge(row.get('Signal',''))}</td>
-            <td style="text-align:center">{mini_bar(row.get('Valuation_Score',0), 'V')}</td>
-            <td style="text-align:center">{mini_bar(row.get('Health_Score',0), 'H')}</td>
-            <td style="text-align:center">{mini_bar(row.get('Profitability_Score',0), 'P')}</td>
-            <td style="text-align:right">{row.get('PE',0):.1f}</td>
-            <td style="text-align:right">{row.get('ROE',0)*100:.1f}%</td>
-            <td style="text-align:right">{row.get('DivYield',0)*100:.1f}%</td>
-            <td style="text-align:center;font-weight:600">{row.get('Piotroski_F',0)}/9</td>
-            <td style="text-align:right">{row.get('Altman_Z',0):.2f}</td>
+            <td style="text-align:center">{signal_badge(row.get("Signal", ""))}</td>
+            <td style="text-align:center">{mini_bar(row.get("Valuation_Score", 0), "V")}</td>
+            <td style="text-align:center">{mini_bar(row.get("Health_Score", 0), "H")}</td>
+            <td style="text-align:center">{mini_bar(row.get("Profitability_Score", 0), "P")}</td>
+            <td style="text-align:right">{row.get("PE", 0):.1f}</td>
+            <td style="text-align:right">{row.get("ROE", 0) * 100:.1f}%</td>
+            <td style="text-align:right">{row.get("DivYield", 0) * 100:.1f}%</td>
+            <td style="text-align:center;font-weight:600">{row.get("Piotroski_F", 0)}/9</td>
+            <td style="text-align:right">{row.get("Altman_Z", 0):.2f}</td>
             <td style="text-align:right;color:{mos_color};font-weight:600">{mos_str}</td>
-            <td style="text-align:center">{pea_badge(row.get('PEA',False), row.get('PEA_PME',False))}</td>
+            <td style="text-align:center">{pea_badge(row.get("PEA", False), row.get("PEA_PME", False))}</td>
         </tr>"""
 
     # Build heatmap data for category scores
     heatmap_data = []
-    categories = ["Valuation_Score", "Health_Score", "Profitability_Score", "Growth_Score", "Shareholder_Score", "Risk_Score"]
+    categories = [
+        "Valuation_Score",
+        "Health_Score",
+        "Profitability_Score",
+        "Growth_Score",
+        "Shareholder_Score",
+        "Risk_Score",
+    ]
     cat_labels = ["Valuation", "Health", "Profitability", "Growth", "Shareholder", "Risk"]
     for _, row in scored_df.head(20).iterrows():
         cells = []
@@ -119,35 +131,54 @@ def generate_dashboard(scored_df: pd.DataFrame, output_path: str):
         cells_html = ""
         for cell in item["cells"]:
             cells_html += f'<td style="background:{cell["color"]};text-align:center;font-weight:600;font-size:12px;padding:6px">{cell["value"]:.0f}</td>'
-        heatmap_rows += f'<tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">{item["name"]}</td>{cells_html}</tr>'
+        heatmap_rows += (
+            f'<tr><td style="font-size:12px;padding:4px 8px;white-space:nowrap">{item["name"]}</td>{cells_html}</tr>'
+        )
 
     # Sector distribution
     sector_counts = scored_df["Sector"].value_counts()
     sector_bars = ""
     max_count = sector_counts.max()
-    colors_palette = ["#3b82f6","#ef4444","#10b981","#f59e0b","#8b5cf6","#ec4899","#14b8a6","#f97316","#6366f1","#84cc16"]
+    colors_palette = [
+        "#3b82f6",
+        "#ef4444",
+        "#10b981",
+        "#f59e0b",
+        "#8b5cf6",
+        "#ec4899",
+        "#14b8a6",
+        "#f97316",
+        "#6366f1",
+        "#84cc16",
+    ]
     for i, (sector, count) in enumerate(sector_counts.items()):
         w = int(count / max_count * 100)
         c = colors_palette[i % len(colors_palette)]
-        sector_bars += f'''<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
+        sector_bars += f"""<div style="display:flex;align-items:center;gap:8px;margin:4px 0">
             <span style="width:140px;font-size:12px;text-align:right">{sector}</span>
             <div style="width:{w}%;height:18px;background:{c};border-radius:4px;min-width:20px"></div>
             <span style="font-size:12px;font-weight:600">{count}</span>
-        </div>'''
+        </div>"""
 
     # Signal distribution
     signal_counts = scored_df["Signal"].value_counts()
     signal_bars_html = ""
-    signal_colors = {"Strong Buy":"#059669","Buy":"#10b981","Hold":"#f59e0b","Sell":"#ef4444","Strong Sell":"#991b1b"}
-    for sig in ["Strong Buy","Buy","Hold","Sell","Strong Sell"]:
+    signal_colors = {
+        "Strong Buy": "#059669",
+        "Buy": "#10b981",
+        "Hold": "#f59e0b",
+        "Sell": "#ef4444",
+        "Strong Sell": "#991b1b",
+    }
+    for sig in ["Strong Buy", "Buy", "Hold", "Sell", "Strong Sell"]:
         cnt = signal_counts.get(sig, 0)
         w = int(cnt / len(scored_df) * 100) if len(scored_df) > 0 else 0
         c = signal_colors.get(sig, "#999")
-        signal_bars_html += f'''<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
+        signal_bars_html += f"""<div style="display:flex;align-items:center;gap:8px;margin:3px 0">
             <span style="width:80px;font-size:12px;text-align:right">{sig}</span>
             <div style="width:{w}%;height:16px;background:{c};border-radius:3px;min-width:4px"></div>
             <span style="font-size:12px;font-weight:600">{cnt}</span>
-        </div>'''
+        </div>"""
 
     # Strategy cards
     strats = [
@@ -161,53 +192,53 @@ def generate_dashboard(scored_df: pd.DataFrame, output_path: str):
         summary = generate_screening_summary(df_strat)
         top3 = ""
         for _, r in df_strat.head(3).iterrows():
-            top3 += f'<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>{r.get("Name","")[:20]}</span><span style="font-weight:700">{r.get("Composite_Score",0):.0f}</span></div>'
-        strategy_cards += f'''
+            top3 += f'<div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid rgba(255,255,255,0.1)"><span>{r.get("Name", "")[:20]}</span><span style="font-weight:700">{r.get("Composite_Score", 0):.0f}</span></div>'
+        strategy_cards += f"""
         <div style="background:linear-gradient(135deg,{color}22,{color}08);border:1px solid {color}44;border-radius:12px;padding:16px;min-width:220px">
             <div style="font-weight:700;font-size:15px;margin-bottom:8px">{name}</div>
-            <div style="font-size:28px;font-weight:800;color:{color}">{summary.get('count',0)}</div>
-            <div style="font-size:11px;color:#888;margin-bottom:8px">stocks passed | avg score {summary.get('avg_composite','—')}</div>
+            <div style="font-size:28px;font-weight:800;color:{color}">{summary.get("count", 0)}</div>
+            <div style="font-size:11px;color:#888;margin-bottom:8px">stocks passed | avg score {summary.get("avg_composite", "—")}</div>
             <div style="font-size:12px">{top3 if top3 else '<span style="color:#888">No matches</span>'}</div>
-        </div>'''
+        </div>"""
 
     # Top 5 picks detail cards
     top5_cards = ""
     for _, row in scored_df.head(5).iterrows():
         cs = row.get("Composite_Score", 0)
         mos = row.get("Graham_MoS", np.nan)
-        mos_str = f'{mos:+.1f}%' if pd.notna(mos) else '—'
-        top5_cards += f'''
+        mos_str = f"{mos:+.1f}%" if pd.notna(mos) else "—"
+        top5_cards += f"""
         <div style="background:#1a1a2e;border:1px solid #333;border-radius:12px;padding:16px;min-width:200px">
             <div style="display:flex;justify-content:space-between;align-items:center">
-                <span style="font-weight:700;font-size:16px">{row.get("Name","")[:22]}</span>
-                {signal_badge(row.get("Signal",""))}
+                <span style="font-weight:700;font-size:16px">{row.get("Name", "")[:22]}</span>
+                {signal_badge(row.get("Signal", ""))}
             </div>
-            <div style="font-size:11px;color:#888;margin:4px 0">{row.get("Sector","")} · {row.get("Country","")}</div>
+            <div style="font-size:11px;color:#888;margin:4px 0">{row.get("Sector", "")} · {row.get("Country", "")}</div>
             <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:10px;font-size:12px">
                 <div>Score <strong style="color:{score_to_color(cs)}">{cs:.0f}</strong></div>
-                <div>P/E <strong>{row.get("PE",0):.1f}</strong></div>
-                <div>ROE <strong>{row.get("ROE",0)*100:.1f}%</strong></div>
-                <div>Div <strong>{row.get("DivYield",0)*100:.1f}%</strong></div>
-                <div>F-Score <strong>{row.get("Piotroski_F",0)}/9</strong></div>
-                <div>Graham MoS <strong style="color:{'#10b981' if pd.notna(mos) and mos > 0 else '#ef4444'}">{mos_str}</strong></div>
+                <div>P/E <strong>{row.get("PE", 0):.1f}</strong></div>
+                <div>ROE <strong>{row.get("ROE", 0) * 100:.1f}%</strong></div>
+                <div>Div <strong>{row.get("DivYield", 0) * 100:.1f}%</strong></div>
+                <div>F-Score <strong>{row.get("Piotroski_F", 0)}/9</strong></div>
+                <div>Graham MoS <strong style="color:{"#10b981" if pd.notna(mos) and mos > 0 else "#ef4444"}">{mos_str}</strong></div>
             </div>
-        </div>'''
+        </div>"""
 
     # Score distribution histogram (CSS-only)
     scores = scored_df["Composite_Score"].dropna().values
-    bins = np.histogram(scores, bins=[0,20,30,40,50,55,60,65,70,75,80,100])
+    bins = np.histogram(scores, bins=[0, 20, 30, 40, 50, 55, 60, 65, 70, 75, 80, 100])
     max_bin = max(bins[0]) if max(bins[0]) > 0 else 1
     hist_bars = ""
-    bin_labels = ["0-20","20-30","30-40","40-50","50-55","55-60","60-65","65-70","70-75","75-80","80+"]
+    bin_labels = ["0-20", "20-30", "30-40", "40-50", "50-55", "55-60", "60-65", "65-70", "70-75", "75-80", "80+"]
     for i, count in enumerate(bins[0]):
         h = int(count / max_bin * 120)
-        mid = (bins[1][i] + bins[1][i+1]) / 2
+        mid = (bins[1][i] + bins[1][i + 1]) / 2
         c = score_to_color(mid, 0.85)
-        hist_bars += f'''<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+        hist_bars += f"""<div style="display:flex;flex-direction:column;align-items:center;gap:2px">
             <span style="font-size:10px;font-weight:600">{count}</span>
             <div style="width:28px;height:{h}px;background:{c};border-radius:4px 4px 0 0"></div>
             <span style="font-size:9px;color:#888">{bin_labels[i]}</span>
-        </div>'''
+        </div>"""
 
     html = f"""<!DOCTYPE html>
 <html lang="en">
@@ -259,9 +290,9 @@ def generate_dashboard(scored_df: pd.DataFrame, output_path: str):
   </div>
   <div class="stats">
     <div class="stat"><div class="stat-value">{len(scored_df)}</div><div class="stat-label">Universe</div></div>
-    <div class="stat"><div class="stat-value">{len(scored_df[scored_df['Signal'].isin(['Buy','Strong Buy'])])}</div><div class="stat-label">Buy Signals</div></div>
-    <div class="stat"><div class="stat-value">{scored_df['Composite_Score'].mean():.0f}</div><div class="stat-label">Avg Score</div></div>
-    <div class="stat"><div class="stat-value">{scored_df[scored_df['PEA']==True].shape[0]}</div><div class="stat-label">PEA Eligible</div></div>
+    <div class="stat"><div class="stat-value">{len(scored_df[scored_df["Signal"].isin(["Buy", "Strong Buy"])])}</div><div class="stat-label">Buy Signals</div></div>
+    <div class="stat"><div class="stat-value">{scored_df["Composite_Score"].mean():.0f}</div><div class="stat-label">Avg Score</div></div>
+    <div class="stat"><div class="stat-value">{scored_df[scored_df["PEA"]].shape[0]}</div><div class="stat-label">PEA Eligible</div></div>
   </div>
 </div>
 
@@ -291,7 +322,7 @@ def generate_dashboard(scored_df: pd.DataFrame, output_path: str):
     <h3>Score Heatmap (Top 20)</h3>
     <div style="overflow-x:auto">
     <table class="heatmap">
-      <tr><th></th>{''.join(f'<th>{l}</th>' for l in cat_labels)}</tr>
+      <tr><th></th>{"".join(f"<th>{l}</th>" for l in cat_labels)}</tr>
       {heatmap_rows}
     </table>
     </div>
@@ -366,6 +397,7 @@ function filterSignal(signal, btn) {{
 
 if __name__ == "__main__":
     from pathlib import Path
+
     df = get_universe_dataframe()
     scored = score_universe(df)
     out_path = Path(__file__).resolve().parents[2] / "data" / "dashboard.html"

@@ -9,9 +9,10 @@ GET  /api/screener/presets        — list all 9 M8 preset metadata dicts
 POST /api/screener/preset/{name}  — run a named M8 preset
 POST /api/screener/tickers        — score a custom ad-hoc ticker list
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -27,8 +28,6 @@ from backend.app.models.screener import (
     ScreenerRefreshResponse,
     ScreenerRequest,
     ScreenerResponse,
-    ScreenerResultItem,
-    ScreenerSummary,
 )
 from backend.app.services import screener_cache
 from backend.app.services.data_fetcher import DataFetcher
@@ -41,6 +40,7 @@ router = APIRouter(tags=["screener"])
 # ---------------------------------------------------------------------------
 # Dependency aliases
 # ---------------------------------------------------------------------------
+
 
 def _get_fetcher() -> DataFetcher:
     return get_data_fetcher()
@@ -61,12 +61,14 @@ def _get_screener() -> ScreenerService:
 
 class TickerListRequest(BaseModel):
     """Request body for scoring a custom list of tickers."""
-    tickers: List[str] = Field(..., min_length=1, max_length=100)
+
+    tickers: list[str] = Field(..., min_length=1, max_length=100)
     horizon: str = Field("long_term", description="Horizon for sort order")
 
 
 class PresetRunRequest(BaseModel):
     """Request body for running a preset screen."""
+
     pea_only: bool = Field(False, description="Restrict to PEA-eligible stocks only")
     top_n: int = Field(50, ge=1, le=500, description="Max results to return")
 
@@ -74,6 +76,7 @@ class PresetRunRequest(BaseModel):
 # ---------------------------------------------------------------------------
 # Helper: build the scored universe DataFrame
 # ---------------------------------------------------------------------------
+
 
 def _build_scored_universe() -> pd.DataFrame:
     """Return the live, scored universe from the screener cache.
@@ -93,6 +96,7 @@ def _build_scored_universe() -> pd.DataFrame:
 # Helper: map a scored DataFrame row to ScreenerResultItem-compatible dict
 # ---------------------------------------------------------------------------
 
+
 def _val(row: pd.Series, key: str) -> Any:
     v = row.get(key)
     if v is None:
@@ -105,7 +109,7 @@ def _val(row: pd.Series, key: str) -> Any:
     return v
 
 
-def _str_val(row: pd.Series, key: str) -> Optional[str]:
+def _str_val(row: pd.Series, key: str) -> str | None:
     v = _val(row, key)
     if v is None:
         return None
@@ -113,7 +117,7 @@ def _str_val(row: pd.Series, key: str) -> Optional[str]:
     return s or None
 
 
-def _num(row: pd.Series, key: str) -> Optional[float]:
+def _num(row: pd.Series, key: str) -> float | None:
     v = row.get(key)
     if v is None:
         return None
@@ -126,7 +130,7 @@ def _num(row: pd.Series, key: str) -> Optional[float]:
         return None
 
 
-def _int(row: pd.Series, key: str) -> Optional[int]:
+def _int(row: pd.Series, key: str) -> int | None:
     v = row.get(key)
     if v is None:
         return None
@@ -139,7 +143,7 @@ def _int(row: pd.Series, key: str) -> Optional[int]:
         return None
 
 
-def _blockers_for_horizon(row: pd.Series, horizon: str) -> List[str]:
+def _blockers_for_horizon(row: pd.Series, horizon: str) -> list[str]:
     """Extract blockers list for the given horizon column."""
     col_map = {
         "long_term": "blockers_lt",
@@ -152,9 +156,9 @@ def _blockers_for_horizon(row: pd.Series, horizon: str) -> List[str]:
     return []
 
 
-def _df_to_results(df: pd.DataFrame, horizon: str = "long_term") -> List[Dict[str, Any]]:
+def _df_to_results(df: pd.DataFrame, horizon: str = "long_term") -> list[dict[str, Any]]:
     """Convert a scored DataFrame to a list of ScreenerResultItem-compatible dicts."""
-    results: List[Dict[str, Any]] = []
+    results: list[dict[str, Any]] = []
     for ticker, row in df.iterrows():
         # Horizon score columns — fall back to Composite_Score for legacy DFs
         composite_fb = _num(row, "Composite_Score") or 0.0
@@ -170,32 +174,34 @@ def _df_to_results(df: pd.DataFrame, horizon: str = "long_term") -> List[Dict[st
         passes_mt = bool(row.get("passes_gates_mt", True))
         passes_st = bool(row.get("passes_gates_st", True))
 
-        results.append({
-            "ticker": str(ticker),
-            "name": _str_val(row, "Name"),
-            "sector": _str_val(row, "Sector"),
-            "pea_eligible": bool(row.get("PEA", False)),
-            "score_lt": score_lt,
-            "score_mt": score_mt,
-            "score_st": score_st,
-            "signal_lt": signal_lt,
-            "signal_mt": signal_mt,
-            "signal_st": signal_st,
-            "passes_gates_lt": passes_lt,
-            "passes_gates_mt": passes_mt,
-            "passes_gates_st": passes_st,
-            "pe": _num(row, "PE"),
-            "pb": _num(row, "PB"),
-            "roe": _num(row, "ROE"),
-            "div_yield": _num(row, "DivYield"),
-            "revenue_growth": _num(row, "RevenueGrowth"),
-            "market_cap": _num(row, "MarketCap"),
-            "altman_z": _num(row, "Altman_Z"),
-            "piotroski_f": _int(row, "Piotroski_F"),
-            "dcf_mos_mid": _num(row, "DCF_MoS_Mid"),
-            "recommended_account": _val(row, "recommended_account"),
-            "blockers": _blockers_for_horizon(row, horizon),
-        })
+        results.append(
+            {
+                "ticker": str(ticker),
+                "name": _str_val(row, "Name"),
+                "sector": _str_val(row, "Sector"),
+                "pea_eligible": bool(row.get("PEA", False)),
+                "score_lt": score_lt,
+                "score_mt": score_mt,
+                "score_st": score_st,
+                "signal_lt": signal_lt,
+                "signal_mt": signal_mt,
+                "signal_st": signal_st,
+                "passes_gates_lt": passes_lt,
+                "passes_gates_mt": passes_mt,
+                "passes_gates_st": passes_st,
+                "pe": _num(row, "PE"),
+                "pb": _num(row, "PB"),
+                "roe": _num(row, "ROE"),
+                "div_yield": _num(row, "DivYield"),
+                "revenue_growth": _num(row, "RevenueGrowth"),
+                "market_cap": _num(row, "MarketCap"),
+                "altman_z": _num(row, "Altman_Z"),
+                "piotroski_f": _int(row, "Piotroski_F"),
+                "dcf_mos_mid": _num(row, "DCF_MoS_Mid"),
+                "recommended_account": _val(row, "recommended_account"),
+                "blockers": _blockers_for_horizon(row, horizon),
+            }
+        )
     return results
 
 
@@ -203,7 +209,7 @@ def _build_summary(
     total_universe: int,
     df: pd.DataFrame,
     horizon: str = "long_term",
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build ScreenerSummary from a result DataFrame."""
     if df.empty:
         return {
@@ -233,13 +239,13 @@ def _build_summary(
     if signal_col not in df.columns:
         signal_col = "Signal"
 
-    avg_score: Optional[float] = None
+    avg_score: float | None = None
     if score_col in df.columns:
         vals = pd.to_numeric(df[score_col], errors="coerce").dropna()
         if not vals.empty:
             avg_score = round(float(vals.mean()), 1)
 
-    signal_dist: Dict[str, int] = {}
+    signal_dist: dict[str, int] = {}
     if signal_col in df.columns:
         signal_dist = df[signal_col].value_counts().to_dict()
 
@@ -261,7 +267,7 @@ def _build_summary(
 async def run_screen(
     req: ScreenerRequest,
     screener: ScreenerService = Depends(_get_screener),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run a horizon-aware custom screen.
 
     When ``preset`` is set in the request body, it takes precedence over
@@ -273,17 +279,15 @@ async def run_screen(
 
     if req.preset:
         from src.strategy.horizon_presets import PRESET_REGISTRY
+
         if req.preset not in PRESET_REGISTRY:
             raise HTTPException(
                 status_code=404,
-                detail=f"Preset '{req.preset}' not found. "
-                       f"Available: {sorted(PRESET_REGISTRY.keys())}",
+                detail=f"Preset '{req.preset}' not found. Available: {sorted(PRESET_REGISTRY.keys())}",
             )
-        result_df = screener.run_preset(
-            scored_df, req.preset, pea_only=req.pea_only, limit=req.limit
-        )
+        result_df = screener.run_preset(scored_df, req.preset, pea_only=req.pea_only, limit=req.limit)
     else:
-        filters: Dict[str, Any] = req.custom_filters or {}
+        filters: dict[str, Any] = req.custom_filters or {}
         result_df = screener.run_screen(
             df=scored_df,
             filters=filters,
@@ -307,7 +311,7 @@ async def run_screen(
 @router.get("/presets")
 async def list_presets(
     screener: ScreenerService = Depends(_get_screener),
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """List all 9 M8 preset metadata dicts (name, horizon, description, recommended_account, pea_warning)."""
     return screener.get_presets()
 
@@ -317,7 +321,7 @@ async def run_preset(
     preset_name: str,
     req: PresetRunRequest,
     screener: ScreenerService = Depends(_get_screener),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Run a named M8 preset screen.
 
     ``preset_name`` must be one of the 9 keys in PRESET_REGISTRY
@@ -328,8 +332,7 @@ async def run_preset(
     if preset_name not in PRESET_REGISTRY:
         raise HTTPException(
             status_code=404,
-            detail=f"Preset '{preset_name}' not found. "
-                   f"Available: {sorted(PRESET_REGISTRY.keys())}",
+            detail=f"Preset '{preset_name}' not found. Available: {sorted(PRESET_REGISTRY.keys())}",
         )
 
     preset_meta = get_preset(preset_name)
@@ -353,7 +356,7 @@ async def run_preset(
 async def refresh_universe(
     fetcher: DataFetcher = Depends(_get_fetcher),
     scorer: ScoringService = Depends(_get_scorer),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Pull live data for the full PEA universe, score it, persist to cache.
 
     Synchronous: blocks the request until all tickers are fetched and
@@ -370,7 +373,7 @@ async def score_ticker_list(
     req: TickerListRequest,
     fetcher: DataFetcher = Depends(_get_fetcher),
     scorer: ScoringService = Depends(_get_scorer),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Fetch and score a custom list of tickers (live data from yfinance)."""
     df = fetcher.fetch_batch(req.tickers)
     if df.empty:

@@ -7,6 +7,7 @@ Coverage:
     - net_debt_to_ebitda + interest_coverage_real basic checks.
     - risk_score_real falls back to row-only signals when no price map given.
 """
+
 from __future__ import annotations
 
 import math
@@ -15,7 +16,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 for p in (PROJECT_ROOT, PROJECT_ROOT / "src"):
@@ -29,7 +29,6 @@ from src.analysis.risk_metrics import (  # noqa: E402
     realized_volatility_1y,
     risk_score_real,
 )
-
 
 # ---------------------------------------------------------------------------
 # Realized volatility
@@ -51,8 +50,9 @@ def test_realized_vol_recovers_known_sigma() -> None:
 
 
 def test_realized_vol_nan_on_short_series() -> None:
-    df = pd.DataFrame({"Date": pd.date_range("2024-01-01", periods=5, freq="D"),
-                       "Close": [100.0, 101.0, 102.0, 99.0, 101.0]})
+    df = pd.DataFrame(
+        {"Date": pd.date_range("2024-01-01", periods=5, freq="D"), "Close": [100.0, 101.0, 102.0, 99.0, 101.0]}
+    )
     assert math.isnan(realized_volatility_1y(df))
 
 
@@ -64,9 +64,17 @@ def test_realized_vol_nan_on_short_series() -> None:
 def test_max_drawdown_recovers_minus_50() -> None:
     """Engineered series: peaks at 100, troughs at 50 → drawdown -50%."""
     closes = [
-        80.0, 90.0, 100.0,            # ascend to 100
-        90.0, 80.0, 70.0, 60.0, 50.0, # crash to 50  → DD = -0.5
-        55.0, 60.0, 70.0,             # partial recovery
+        80.0,
+        90.0,
+        100.0,  # ascend to 100
+        90.0,
+        80.0,
+        70.0,
+        60.0,
+        50.0,  # crash to 50  → DD = -0.5
+        55.0,
+        60.0,
+        70.0,  # partial recovery
     ]
     dates = pd.date_range("2024-01-01", periods=len(closes), freq="D")
     df = pd.DataFrame({"Date": dates, "Close": closes})
@@ -156,10 +164,15 @@ def test_risk_score_real_works_without_price_history() -> None:
     """When price_history_map is None, the aggregator must still return scores."""
     df = pd.DataFrame(
         [
-            {"TotalDebt": 100.0, "Cash": 50.0, "EBITDA": 200.0,
-             "InterestCoverage": 12.0, "Altman_Z": 4.5, "Sector": ""},
-            {"TotalDebt": 800.0, "Cash": 50.0, "EBITDA": 100.0,
-             "InterestCoverage": 1.5, "Altman_Z": 0.8, "Sector": ""},
+            {
+                "TotalDebt": 100.0,
+                "Cash": 50.0,
+                "EBITDA": 200.0,
+                "InterestCoverage": 12.0,
+                "Altman_Z": 4.5,
+                "Sector": "",
+            },
+            {"TotalDebt": 800.0, "Cash": 50.0, "EBITDA": 100.0, "InterestCoverage": 1.5, "Altman_Z": 0.8, "Sector": ""},
         ],
         index=["SAFE", "DISTRESS"],
     )
@@ -183,10 +196,15 @@ def test_risk_score_real_with_price_history_map() -> None:
     }
     df = pd.DataFrame(
         [
-            {"TotalDebt": 100.0, "Cash": 50.0, "EBITDA": 200.0,
-             "InterestCoverage": 12.0, "Altman_Z": 4.5, "Sector": ""},
-            {"TotalDebt": 800.0, "Cash": 50.0, "EBITDA": 100.0,
-             "InterestCoverage": 1.5, "Altman_Z": 0.8, "Sector": ""},
+            {
+                "TotalDebt": 100.0,
+                "Cash": 50.0,
+                "EBITDA": 200.0,
+                "InterestCoverage": 12.0,
+                "Altman_Z": 4.5,
+                "Sector": "",
+            },
+            {"TotalDebt": 800.0, "Cash": 50.0, "EBITDA": 100.0, "InterestCoverage": 1.5, "Altman_Z": 0.8, "Sector": ""},
         ],
         index=["SAFE", "DISTRESS"],
     )

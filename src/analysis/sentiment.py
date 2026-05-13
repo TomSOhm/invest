@@ -17,10 +17,11 @@ Public API
 - ``sentiment_score(headlines, window_days=30) -> float``
 - ``sentiment_signals_df(news_map) -> pd.DataFrame``
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timedelta, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime, timedelta
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -30,7 +31,7 @@ from loguru import logger
 # Lazy classifier singleton
 # ---------------------------------------------------------------------------
 
-_PIPELINE: Optional[Any] = None
+_PIPELINE: Any | None = None
 _PIPELINE_LOAD_FAILED: bool = False
 _FINBERT_MODEL_CANDIDATES = (
     "ProsusAI/finbert",
@@ -38,7 +39,7 @@ _FINBERT_MODEL_CANDIDATES = (
 )
 
 
-def _load_pipeline() -> Optional[Any]:
+def _load_pipeline() -> Any | None:
     """Try to load a FinBERT classification pipeline.
 
     Returns the pipeline instance or None if transformers/torch are missing
@@ -61,7 +62,7 @@ def _load_pipeline() -> Optional[Any]:
         _PIPELINE_LOAD_FAILED = True
         return None
 
-    last_exc: Optional[Exception] = None
+    last_exc: Exception | None = None
     for model_name in _FINBERT_MODEL_CANDIDATES:
         try:
             _PIPELINE = pipeline("text-classification", model=model_name, top_k=None)
@@ -89,7 +90,7 @@ def reset_pipeline_cache() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _parse_date(value: Any) -> Optional[datetime]:
+def _parse_date(value: Any) -> datetime | None:
     """Parse a variety of date representations into a tz-aware UTC datetime.
 
     Accepts ISO strings, datetime objects, and Unix timestamps (yfinance).
@@ -98,11 +99,11 @@ def _parse_date(value: Any) -> Optional[datetime]:
     if value is None or value == "":
         return None
     if isinstance(value, datetime):
-        return value if value.tzinfo else value.replace(tzinfo=timezone.utc)
+        return value if value.tzinfo else value.replace(tzinfo=UTC)
     # yfinance providerPublishTime is an int (epoch seconds)
     if isinstance(value, (int, float)):
         try:
-            return datetime.fromtimestamp(float(value), tz=timezone.utc)
+            return datetime.fromtimestamp(float(value), tz=UTC)
         except (OverflowError, OSError, ValueError):
             return None
     if isinstance(value, str):
@@ -116,12 +117,10 @@ def _parse_date(value: Any) -> Optional[datetime]:
     return None
 
 
-def _filter_within_window(
-    headlines: List[Dict[str, Any]], window_days: int
-) -> List[Dict[str, Any]]:
+def _filter_within_window(headlines: list[dict[str, Any]], window_days: int) -> list[dict[str, Any]]:
     """Return only headlines whose published date is within ``window_days``."""
-    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=window_days)
-    out: List[Dict[str, Any]] = []
+    cutoff = datetime.now(tz=UTC) - timedelta(days=window_days)
+    out: list[dict[str, Any]] = []
     for item in headlines:
         # Tolerate both 'publishedAt' (M2 fetcher shape) and 'published_date' (spec).
         published = item.get("publishedAt") or item.get("published_date") or item.get("published")
@@ -133,7 +132,7 @@ def _filter_within_window(
     return out
 
 
-def _score_headlines(headlines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+def _score_headlines(headlines: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Run FinBERT over each headline title; return list of {label, score, ts}.
 
     Empty list on classifier failure.
@@ -153,8 +152,8 @@ def _score_headlines(headlines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         logger.warning(f"FinBERT inference failed: {exc}")
         return []
 
-    results: List[Dict[str, Any]] = []
-    for idx, out in zip(keep_idx, outputs):
+    results: list[dict[str, Any]] = []
+    for idx, out in zip(keep_idx, outputs, strict=False):
         # `top_k=None` returns a list-of-dicts per input; pick the argmax label.
         if isinstance(out, list) and out:
             best = max(out, key=lambda d: d.get("score", 0.0))
@@ -175,7 +174,7 @@ def _score_headlines(headlines: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
 # ---------------------------------------------------------------------------
 
 
-def sentiment_score(headlines: List[Dict[str, Any]], window_days: int = 30) -> float:
+def sentiment_score(headlines: list[dict[str, Any]], window_days: int = 30) -> float:
     """Score 0-100 from FinBERT classification of recent headlines.
 
     Aggregation
@@ -207,7 +206,7 @@ def sentiment_score(headlines: List[Dict[str, Any]], window_days: int = 30) -> f
     return float(round(100.0 * pos / total, 2))
 
 
-def _sentiment_trend(scored: List[Dict[str, Any]], window_days: int = 30) -> float:
+def _sentiment_trend(scored: list[dict[str, Any]], window_days: int = 30) -> float:
     """Slope of 7-day rolling positive-share over the window.
 
     Builds a daily series of positive-share, takes a 7-day rolling mean, then
@@ -239,7 +238,7 @@ def _sentiment_trend(scored: List[Dict[str, Any]], window_days: int = 30) -> flo
     return float(slope)
 
 
-def sentiment_signals_df(news_map: Dict[str, List[Dict[str, Any]]]) -> pd.DataFrame:
+def sentiment_signals_df(news_map: dict[str, list[dict[str, Any]]]) -> pd.DataFrame:
     """Compute sentiment signal block for a universe.
 
     Returns a DataFrame indexed by ticker with columns:
@@ -253,11 +252,13 @@ def sentiment_signals_df(news_map: Dict[str, List[Dict[str, Any]]]) -> pd.DataFr
         if np.isfinite(score) and headlines:
             scored = _score_headlines(_filter_within_window(headlines, 30))
             trend = _sentiment_trend(scored, window_days=30)
-        rows.append({
-            "Ticker": ticker,
-            "Sentiment_30d": score,
-            "Sentiment_Trend": trend,
-        })
+        rows.append(
+            {
+                "Ticker": ticker,
+                "Sentiment_30d": score,
+                "Sentiment_Trend": trend,
+            }
+        )
     if not rows:
         return pd.DataFrame(columns=["Sentiment_30d", "Sentiment_Trend"])
     return pd.DataFrame(rows).set_index("Ticker")

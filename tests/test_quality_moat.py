@@ -7,15 +7,14 @@ Coverage:
     - reinvestment_efficiency happy path & NaN guards.
     - moat_score returns 0..100 with finite outputs.
 """
+
 from __future__ import annotations
 
 import math
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
-import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 for p in (PROJECT_ROOT, PROJECT_ROOT / "src"):
@@ -30,7 +29,6 @@ from src.analysis.quality_moat import (  # noqa: E402
     roic_stability,
     roic_wacc_spread,
 )
-
 
 # ---------------------------------------------------------------------------
 # Gross Profitability (Novy-Marx)
@@ -89,9 +87,7 @@ def test_roic_stability_max_when_constant() -> None:
 
 def test_roic_stability_lower_when_volatile() -> None:
     val_stable = roic_stability(pd.Series({}), roic_history=[0.10, 0.10, 0.10, 0.10, 0.10])
-    val_volatile = roic_stability(
-        pd.Series({}), roic_history=[0.05, 0.30, -0.10, 0.40, 0.02]
-    )
+    val_volatile = roic_stability(pd.Series({}), roic_history=[0.05, 0.30, -0.10, 0.40, 0.02])
     assert val_volatile < val_stable, "Volatile ROIC must score lower than constant ROIC"
     assert 0.0 < val_volatile < 1.0
 
@@ -106,9 +102,7 @@ def test_roic_stability_nan_with_short_history() -> None:
 
 
 def test_op_margin_stability_max_when_constant() -> None:
-    val = operating_margin_stability(
-        pd.Series({}), op_margin_history=[0.20, 0.20, 0.20, 0.20, 0.20]
-    )
+    val = operating_margin_stability(pd.Series({}), op_margin_history=[0.20, 0.20, 0.20, 0.20, 0.20])
     assert math.isclose(val, 1.0, rel_tol=1e-9)
 
 
@@ -143,7 +137,7 @@ def test_reinvestment_efficiency_happy_path() -> None:
     """ΔEBIT=200, ΔIC=100 → ratio 2.0."""
     row = pd.Series(
         {
-            "EBIT_History_3y": [300.0, 200.0, 100.0],          # most recent first
+            "EBIT_History_3y": [300.0, 200.0, 100.0],  # most recent first
             "InvestedCapital_History_3y": [600.0, 550.0, 500.0],
         }
     )

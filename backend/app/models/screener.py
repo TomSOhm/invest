@@ -4,12 +4,12 @@ Invest Solo -- Screener Pydantic models (M10 schema).
 Breaking change: composite_score / signal replaced by score_lt/mt/st and
 signal_lt/mt/st. The horizon param drives which score drives sort order.
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Request models
@@ -23,11 +23,11 @@ class ScreenerRequest(BaseModel):
         "long_term",
         description="Scoring horizon that drives sort order and gate filtering",
     )
-    preset: Optional[str] = Field(
+    preset: str | None = Field(
         None,
         description="Named preset from PRESET_REGISTRY (overrides custom_filters when set)",
     )
-    custom_filters: Optional[Dict[str, Any]] = Field(
+    custom_filters: dict[str, Any] | None = Field(
         None,
         description="Ad-hoc filter key-value pairs passed directly to apply_filters",
     )
@@ -53,8 +53,8 @@ class ScreenerResultItem(BaseModel):
     """A single row returned by the screener."""
 
     ticker: str
-    name: Optional[str] = None
-    sector: Optional[str] = None
+    name: str | None = None
+    sector: str | None = None
     pea_eligible: bool = False
 
     # Three-horizon scores
@@ -73,21 +73,21 @@ class ScreenerResultItem(BaseModel):
     passes_gates_st: bool = Field(..., description="All ST investability gates satisfied")
 
     # Key raw metrics
-    pe: Optional[float] = None
-    pb: Optional[float] = None
-    roe: Optional[float] = None
-    div_yield: Optional[float] = None
-    revenue_growth: Optional[float] = None
-    market_cap: Optional[float] = None
-    altman_z: Optional[float] = None
-    piotroski_f: Optional[int] = None
-    dcf_mos_mid: Optional[float] = Field(None, description="DCF mid-case margin of safety")
+    pe: float | None = None
+    pb: float | None = None
+    roe: float | None = None
+    div_yield: float | None = None
+    revenue_growth: float | None = None
+    market_cap: float | None = None
+    altman_z: float | None = None
+    piotroski_f: int | None = None
+    dcf_mos_mid: float | None = Field(None, description="DCF mid-case margin of safety")
 
     # Preset / account metadata
-    recommended_account: Optional[str] = Field(
+    recommended_account: str | None = Field(
         None, description="'CTO' for short-term presets; 'PEA' when preset is PEA-strict"
     )
-    blockers: List[str] = Field(
+    blockers: list[str] = Field(
         default_factory=list,
         description="Failing gate keys for the requested horizon",
     )
@@ -103,10 +103,8 @@ class ScreenerSummary(BaseModel):
 
     total_passed: int = Field(0, description="Rows that passed all filters")
     total_universe: int = Field(0, description="Rows in the input universe")
-    avg_score: Optional[float] = Field(
-        None, description="Mean score for the requested horizon"
-    )
-    signal_distribution: Dict[str, int] = Field(
+    avg_score: float | None = Field(None, description="Mean score for the requested horizon")
+    signal_distribution: dict[str, int] = Field(
         default_factory=dict,
         description="Count of each signal value for the requested horizon",
     )
@@ -121,9 +119,9 @@ class ScreenerSummary(BaseModel):
 class ScreenerResponse(BaseModel):
     """Full screener API response."""
 
-    results: List[ScreenerResultItem]
+    results: list[ScreenerResultItem]
     summary: ScreenerSummary
-    last_refreshed: Optional[str] = Field(
+    last_refreshed: str | None = Field(
         None,
         description="ISO timestamp of the last screener-cache refresh, or None when never refreshed",
     )
@@ -138,7 +136,7 @@ class ScreenerRefreshResponse(BaseModel):
     """Summary returned by POST /api/screener/refresh."""
 
     tickers_fetched: int = Field(..., description="Number of tickers with usable data after fetch")
-    tickers_failed: List[str] = Field(
+    tickers_failed: list[str] = Field(
         default_factory=list,
         description="Tickers that returned no usable data (failed live fetch)",
     )
