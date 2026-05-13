@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Questions & Discussions
+    url: https://github.com/TomSOhm/invest/discussions
+    about: Ask questions, share screening results, or discuss strategy with the community.
+  - name: Documentation
+    url: https://github.com/TomSOhm/invest/tree/main/docs
+    about: Architecture, methodology, data sources, and ADRs.

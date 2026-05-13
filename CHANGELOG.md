@@ -6,7 +6,35 @@ The v2 release (M0–M12, captured in `[0.4.0]` below) is a near-complete rewrit
 
 ---
 
-## [Unreleased]
+## [Unreleased] — Public Release Prep
+
+### Added
+- `CODE_OF_CONDUCT.md` (Contributor Covenant v2.1 reference).
+- `.github/ISSUE_TEMPLATE/{bug_report.md, feature_request.md, config.yml}` — issue templates with structured fields, blank issues disabled, contact links to Discussions and docs.
+- `.github/PULL_REQUEST_TEMPLATE.md` — type-of-change checkboxes, related-issues field, CI/secrets/CHANGELOG checklist.
+- `.github/dependabot.yml` — daily updates for `pip` (`/`), `npm` (`/frontend`), weekly for `github-actions` (`/`); minor+patch grouped.
+- Full GitHub Actions CI pipeline under `.github/workflows/`:
+  - `test-backend.yml` — pytest matrix on Python 3.11/3.12 with `uv sync --frozen`
+  - `lint-backend.yml` — ruff check + ruff format
+  - `frontend.yml` — Node 24 `npm ci && npm run lint && npm run build`
+  - `codeql.yml` — Python + JavaScript/TypeScript, weekly schedule
+  - `gitleaks.yml` — secret scanning on push and PR
+- README CI status badges (test, lint, frontend, CodeQL) and Community section (CoC, Contributing, Discussions, Security disclosure link).
+- `ruff` added to `[dependency-groups] dev` in `pyproject.toml`; `[tool.ruff]` config with `line-length = 120`, target `py311`, lint rules `E,F,I,W,B,UP`.
+
+### Changed
+- Parameterized hardcoded `/home/claude/invest/` demo paths in `src/reporting/{chart_generator,dashboard_generator,excel_export}.py` to use repo-relative `data/` via `pathlib.Path(__file__).resolve().parents[2]`.
+
+### Removed
+- Untracked `.claude/` (155 files: agents, skills, fonts, configs) from git index — files remain on disk locally, gitignored.
+- Untracked `data/results_17022026/` (7 sample binary outputs) from git index — gitignored.
+
+### Security
+- Git commit history rewritten via `git filter-repo`: maintainer email migrated to GitHub noreply (`195091248+TomSOhm@users.noreply.github.com`) across all commits; accidentally-tracked binary outputs and local Claude config purged from full history.
+
+---
+
+## [Previously Unreleased]
 
 ### Added
 - M13: full documentation refresh — METHODOLOGY v2, DATA_SOURCES v2, PROJECT_BRIEF v2, 5 ADRs, CHANGELOG.

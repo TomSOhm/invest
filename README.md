@@ -20,6 +20,13 @@
   <a href="https://github.com/TomSOhm/invest/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
 </p>
 
+<p align="center">
+  <a href="https://github.com/TomSOhm/invest/actions/workflows/test-backend.yml"><img src="https://github.com/TomSOhm/invest/actions/workflows/test-backend.yml/badge.svg" alt="Backend Tests"></a>
+  <a href="https://github.com/TomSOhm/invest/actions/workflows/lint-backend.yml"><img src="https://github.com/TomSOhm/invest/actions/workflows/lint-backend.yml/badge.svg" alt="Backend Lint"></a>
+  <a href="https://github.com/TomSOhm/invest/actions/workflows/frontend.yml"><img src="https://github.com/TomSOhm/invest/actions/workflows/frontend.yml/badge.svg" alt="Frontend"></a>
+  <a href="https://github.com/TomSOhm/invest/actions/workflows/codeql.yml"><img src="https://github.com/TomSOhm/invest/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
+</p>
+
 ---
 
 ## What's new in v2 (M0–M12)
@@ -246,6 +253,13 @@ API keys are managed through `.env` (see [`.env.example`](.env.example) for setu
 ## Contributing
 
 Contributions are welcome! Please read the [Contributing Guide](CONTRIBUTING.md) for details on the development workflow, code style, and how to submit pull requests.
+
+## Community
+
+- [Code of Conduct](CODE_OF_CONDUCT.md) — the standards for participation in this project.
+- [Contributing Guide](CONTRIBUTING.md) — how to set up a dev environment, run tests, and submit PRs.
+- [GitHub Discussions](https://github.com/TomSOhm/invest/discussions) — questions, screening results, strategy talk.
+- **Security**: report vulnerabilities privately via the repo's [GitHub Security tab](https://github.com/TomSOhm/invest/security/advisories/new).
 
 ## License
 
