@@ -16,15 +16,6 @@
   <a href="#"><img src="https://img.shields.io/badge/FastAPI-0.115+-009688.svg?logo=fastapi&logoColor=white" alt="FastAPI"></a>
   <a href="#"><img src="https://img.shields.io/badge/Next.js-16+-000000.svg?logo=next.js&logoColor=white" alt="Next.js"></a>
   <a href="#"><img src="https://img.shields.io/badge/React-19-61DAFB.svg?logo=react&logoColor=black" alt="React"></a>
-  <a href="https://github.com/TomSOhm/invest/issues"><img src="https://img.shields.io/github/issues/TomSOhm/invest.svg" alt="Issues"></a>
-  <a href="https://github.com/TomSOhm/invest/pulls"><img src="https://img.shields.io/badge/PRs-welcome-brightgreen.svg" alt="PRs Welcome"></a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/TomSOhm/invest/actions/workflows/test-backend.yml"><img src="https://github.com/TomSOhm/invest/actions/workflows/test-backend.yml/badge.svg" alt="Backend Tests"></a>
-  <a href="https://github.com/TomSOhm/invest/actions/workflows/lint-backend.yml"><img src="https://github.com/TomSOhm/invest/actions/workflows/lint-backend.yml/badge.svg" alt="Backend Lint"></a>
-  <a href="https://github.com/TomSOhm/invest/actions/workflows/frontend.yml"><img src="https://github.com/TomSOhm/invest/actions/workflows/frontend.yml/badge.svg" alt="Frontend"></a>
-  <a href="https://github.com/TomSOhm/invest/actions/workflows/codeql.yml"><img src="https://github.com/TomSOhm/invest/actions/workflows/codeql.yml/badge.svg" alt="CodeQL"></a>
 </p>
 
 ---
@@ -179,37 +170,37 @@ Open [http://localhost:3000](http://localhost:3000) to access the dashboard.
 
 ## Investment Strategies
 
-| Strategy | Universe | Constraints | Use Case |
-|----------|----------|-------------|----------|
-| **PEA** | EU/EEA headquartered companies | Long-only, no leverage, tax-optimized | French investors with PEA accounts |
-| **Global** | All publicly traded companies | Unconstrained, fundamental-driven | General value investing |
+| Strategy         | Universe                       | Constraints                           | Use Case                           |
+| ---------------- | ------------------------------ | ------------------------------------- | ---------------------------------- |
+| **PEA**    | EU/EEA headquartered companies | Long-only, no leverage, tax-optimized | French investors with PEA accounts |
+| **Global** | All publicly traded companies  | Unconstrained, fundamental-driven     | General value investing            |
 
 ## Scoring Methodology
 
 Every ticker gets **three independent composite scores** (0–100) — one per horizon — plus per-horizon signals and gate states. Default category weights (set in `settings.yaml` `horizons:`):
 
-| Category | Long-Term | Medium-Term | Short-Term |
-|---|---|---|---|
-| Valuation | 20% | 20% | 5% |
-| Profitability | 25% | 15% | 5% |
-| Health | 15% | 15% | 10% |
-| Earnings Quality | 10% | 10% | 5% |
-| Growth | 10% | 15% | 5% |
-| Capital Allocation | 10% | 5% | 5% |
-| Risk | 10% | 10% | 10% |
-| Momentum | — | 10% | 55% |
+| Category           | Long-Term | Medium-Term | Short-Term |
+| ------------------ | --------- | ----------- | ---------- |
+| Valuation          | 20%       | 20%         | 5%         |
+| Profitability      | 25%       | 15%         | 5%         |
+| Health             | 15%       | 15%         | 10%        |
+| Earnings Quality   | 10%       | 10%         | 5%         |
+| Growth             | 10%       | 15%         | 5%         |
+| Capital Allocation | 10%       | 5%          | 5%         |
+| Risk               | 10%       | 10%         | 10%        |
+| Momentum           | —        | 10%         | 55%        |
 
 Each sub-score is a **sector-relative percentile rank** (0–100) computed via `df.groupby(Sector)[metric].rank(pct=True) * 100`. Sectors with fewer than 5 peers fall back to global rank.
 
 Signals combine the composite score with the **DCF margin of safety** (`MoS = (intrinsic − price) / price`):
 
-| Signal | Composite | MoS |
-|---|---|---|
-| Strong Buy | ≥ 80 | ≥ 30% (price < 70% intrinsic) |
-| Buy | ≥ 65 | ≥ 15% (price < 85% intrinsic) |
-| Hold | 40–80 | -15%–15% |
-| Sell | ≤ 40 | OR ≤ -15% |
-| Strong Sell | — | ≤ -30% (price > 130% intrinsic) |
+| Signal      | Composite | MoS                              |
+| ----------- | --------- | -------------------------------- |
+| Strong Buy  | ≥ 80     | ≥ 30% (price < 70% intrinsic)   |
+| Buy         | ≥ 65     | ≥ 15% (price < 85% intrinsic)   |
+| Hold        | 40–80    | -15%–15%                        |
+| Sell        | ≤ 40     | OR ≤ -15%                       |
+| Strong Sell | —        | ≤ -30% (price > 130% intrinsic) |
 
 When DCF can't be computed (e.g. for financials or names with missing FCF), the rule degrades gracefully to legacy composite-only thresholds.
 
@@ -217,13 +208,13 @@ See [docs/METHODOLOGY.md](docs/METHODOLOGY.md) for the full methodology, and [CH
 
 ## Tech Stack
 
-| Layer | Technologies |
-|-------|-------------|
-| **Backend** | Python 3.11+, FastAPI, Pydantic, pandas, numpy, scipy |
-| **Data** | yfinance, Financial Modeling Prep, Alpha Vantage, Finnhub |
-| **Analysis** | FinanceToolkit, Plotly, matplotlib, seaborn |
-| **Frontend** | Next.js 16, React 19, TypeScript, Tailwind CSS 4, Recharts |
-| **Reporting** | openpyxl, fpdf2, python-docx, Jinja2 |
+| Layer               | Technologies                                               |
+| ------------------- | ---------------------------------------------------------- |
+| **Backend**   | Python 3.11+, FastAPI, Pydantic, pandas, numpy, scipy      |
+| **Data**      | yfinance, Financial Modeling Prep, Alpha Vantage, Finnhub  |
+| **Analysis**  | FinanceToolkit, Plotly, matplotlib, seaborn                |
+| **Frontend**  | Next.js 16, React 19, TypeScript, Tailwind CSS 4, Recharts |
+| **Reporting** | openpyxl, fpdf2, python-docx, Jinja2                       |
 
 ## Configuration
 
@@ -240,16 +231,16 @@ API keys are managed through `.env` (see [`.env.example`](.env.example) for setu
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md) | Architecture, folder layout, three-horizon scoring overview |
-| [METHODOLOGY.md](docs/METHODOLOGY.md) | v2 methodology: sub-scores, DCF, gates, output schema |
-| [DATA_SOURCES.md](docs/DATA_SOURCES.md) | FMP + yfinance hybrid, coverage matrix, caching |
-| [PEA_RULES.md](docs/PEA_RULES.md) | French PEA eligibility criteria and tax rules |
-| [docs/adr/](docs/adr/) | Architectural Decision Records (5 ADRs documenting the v2 rewrite) |
-| [docs/backtests/methodology.md](docs/backtests/methodology.md) | Backtest framework: assumptions, biases, statistical caveats |
-| [CHANGELOG.md](CHANGELOG.md) | Milestone-by-milestone (M0–M12) version history |
-| [openapi_v2.json](openapi_v2.json) | Frozen v2 OpenAPI spec |
+| Document                                                    | Description                                                        |
+| ----------------------------------------------------------- | ------------------------------------------------------------------ |
+| [PROJECT_BRIEF.md](docs/PROJECT_BRIEF.md)                      | Architecture, folder layout, three-horizon scoring overview        |
+| [METHODOLOGY.md](docs/METHODOLOGY.md)                          | v2 methodology: sub-scores, DCF, gates, output schema              |
+| [DATA_SOURCES.md](docs/DATA_SOURCES.md)                        | FMP + yfinance hybrid, coverage matrix, caching                    |
+| [PEA_RULES.md](docs/PEA_RULES.md)                              | French PEA eligibility criteria and tax rules                      |
+| [docs/adr/](docs/adr/)                                         | Architectural Decision Records (5 ADRs documenting the v2 rewrite) |
+| [docs/backtests/methodology.md](docs/backtests/methodology.md) | Backtest framework: assumptions, biases, statistical caveats       |
+| [CHANGELOG.md](CHANGELOG.md)                                   | Milestone-by-milestone (M0–M12) version history                   |
+| [openapi_v2.json](openapi_v2.json)                             | Frozen v2 OpenAPI spec                                             |
 
 ## Contributing
 

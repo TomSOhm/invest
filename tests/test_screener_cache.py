@@ -95,7 +95,10 @@ class TestRefresh:
         # Unknown ticker:
         assert screener_cache.lookup("UNKNOWN.XX") is None
 
-    def test_persists_to_disk_and_rehydrates(self, tmp_path: Path) -> None:
+    def test_persists_to_disk_and_rehydrates(self, tmp_path: Path, monkeypatch) -> None:
+        # Redirect the module-level cache path into the test tmp_path so the
+        # parquet round-trip is isolated and CI-friendly.
+        monkeypatch.setattr(screener_cache, "_CACHE_PATH", tmp_path / "screener_scored.parquet")
         fetcher = MagicMock()
         fetcher.fetch_batch.return_value = pd.DataFrame(
             {"Price": [100.0]},

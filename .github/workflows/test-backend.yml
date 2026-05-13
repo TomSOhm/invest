@@ -40,4 +40,4 @@ jobs:
         run: uv sync --frozen
 
       - name: Run pytest
-        run: uv run pytest -q --maxfail=5
+        run: uv run pytest -q --maxfail=5 -m "not live"
