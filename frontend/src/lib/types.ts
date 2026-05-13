@@ -39,6 +39,9 @@ export interface DCFValuation {
 
 export interface QualitySignals {
   piotroski_f?: number | null;
+  piotroski_satisfied?: number | null;
+  piotroski_violated?: number | null;
+  piotroski_unknown?: number | null;
   altman_z?: number | null;
   altman_zone?: "Safe" | "Grey" | "Distress" | null;
   graham_number?: number | null;

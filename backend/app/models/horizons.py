@@ -60,6 +60,13 @@ class QualitySignals(BaseModel):
     """Quality and earnings-integrity signals (M4/M5)."""
 
     piotroski_f: int | None = Field(None, description="Piotroski F-Score 0-9", ge=0, le=9)
+    piotroski_satisfied: int | None = Field(
+        None, description="Piotroski signals with present data and passing (0-9)", ge=0, le=9
+    )
+    piotroski_violated: int | None = Field(
+        None, description="Piotroski signals with present data and failing (0-9)", ge=0, le=9
+    )
+    piotroski_unknown: int | None = Field(None, description="Piotroski signals with missing inputs (0-9)", ge=0, le=9)
     altman_z: float | None = Field(None, description="Altman Z-Score (classic or Z'')")
     altman_zone: Literal["Safe", "Grey", "Distress"] | None = Field(None, description="Altman Z zone interpretation")
     graham_number: float | None = Field(None, description="Graham Number intrinsic value")

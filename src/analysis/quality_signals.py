@@ -236,6 +236,27 @@ def piotroski_f_score(row: RowLike) -> int:
     return total
 
 
+def piotroski_breakdown(row: RowLike) -> dict[str, int]:
+    """Split the 9 Piotroski signals into satisfied / violated / unknown counts.
+
+    UI uses this to display ``2 ✓ / 0 ✗ / 7 ?`` instead of ``2/9 Weak``,
+    so users can tell missing data from genuinely-failed signals.
+
+    Returns: ``{"satisfied": int, "violated": int, "unknown": int}``
+             where the three values always sum to 9.
+    """
+    satisfied = violated = unknown = 0
+    for sig in _PIOTROSKI_SIGNALS:
+        v = sig(row)
+        if v is None:
+            unknown += 1
+        elif v == 1:
+            satisfied += 1
+        else:
+            violated += 1
+    return {"satisfied": satisfied, "violated": violated, "unknown": unknown}
+
+
 # ===========================================================================
 # Altman Z-Score (Altman 1968) -- classic 5-factor
 # ===========================================================================

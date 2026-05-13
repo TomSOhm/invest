@@ -36,6 +36,7 @@ from src.analysis.quality_signals import (
     altman_z_classic,  # re-exported for callers that want classic Z directly
     altman_z_double_prime,  # re-exported for callers that want Z'' directly
     altman_z_select,  # re-exported (returns score + variant tuple)
+    piotroski_breakdown,
 )
 from src.analysis.quality_signals import (
     altman_z_score as _altman_z_score_impl,
@@ -804,6 +805,13 @@ def score_dataframe(
     altman = df.apply(altman_z_score, axis=1)
     graham = df.apply(graham_number, axis=1)
     piotroski = df.apply(piotroski_f_score, axis=1).astype(int)
+    # M3.5: surface the breakdown so the UI can show "2 satisfied / 0 violated /
+    # 7 unknown" instead of an opaque "2/9 Weak" that conflates missing data
+    # with failed signals.
+    piotroski_split = df.apply(piotroski_breakdown, axis=1)
+    piotroski_satisfied = piotroski_split.apply(lambda d: d["satisfied"]).astype(int)
+    piotroski_violated = piotroski_split.apply(lambda d: d["violated"]).astype(int)
+    piotroski_unknown = piotroski_split.apply(lambda d: d["unknown"]).astype(int)
     completeness = df.apply(data_completeness, axis=1)
 
     # ------------------------------------------------------------------
@@ -835,6 +843,9 @@ def score_dataframe(
     out["Risk_Score"] = subscores["Risk_Score"]
     out["Signal"] = signals
     out["Piotroski_F"] = piotroski
+    out["Piotroski_Satisfied"] = piotroski_satisfied
+    out["Piotroski_Violated"] = piotroski_violated
+    out["Piotroski_Unknown"] = piotroski_unknown
     out["Altman_Z"] = altman.apply(lambda v: round(v, 2) if pd.notna(v) else np.nan)
     out["Graham_Number"] = graham.apply(lambda v: round(v, 2) if pd.notna(v) else np.nan)
     out["data_completeness"] = completeness

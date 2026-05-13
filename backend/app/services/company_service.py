@@ -115,6 +115,9 @@ class CompanyService:
         # --- Quality signals ---
         quality = {
             "piotroski_f": scoring.get("piotroski_f"),
+            "piotroski_satisfied": scoring.get("piotroski_satisfied"),
+            "piotroski_violated": scoring.get("piotroski_violated"),
+            "piotroski_unknown": scoring.get("piotroski_unknown"),
             "altman_z": scoring.get("altman_z"),
             "altman_zone": scoring.get("altman_zone"),
             "graham_number": scoring.get("graham_number"),

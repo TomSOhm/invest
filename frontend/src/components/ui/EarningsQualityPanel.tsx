@@ -20,6 +20,9 @@ export default function EarningsQualityPanel({
   quality,
 }: EarningsQualityPanelProps) {
   const f = quality.piotroski_f;
+  const pSat = quality.piotroski_satisfied;
+  const pVio = quality.piotroski_violated;
+  const pUnk = quality.piotroski_unknown;
   const z = quality.altman_z;
   const m = quality.m_score;
   const sloan = quality.sloan_accruals;
@@ -38,35 +41,64 @@ export default function EarningsQualityPanel({
           <div className="text-xs text-slate-500 inline-flex items-center gap-1">Piotroski F-Score<MetricInfo metricId="piotroski_f" size={11} /></div>
           {f != null ? (
             <>
+              {/* 9-segment bar: green = satisfied, red = violated, grey = unknown */}
               <div className="flex gap-0.5">
-                {Array.from({ length: 9 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className={clsx(
-                      "h-3 flex-1 rounded-sm transition-colors",
-                      i < f
-                        ? "bg-emerald-500"
-                        : "bg-slate-200 dark:bg-slate-700"
-                    )}
-                    aria-hidden="true"
-                  />
-                ))}
+                {Array.from({ length: 9 }).map((_, i) => {
+                  // When breakdown is available, color the bar by segment type.
+                  // Falls back to the legacy "first f green, rest grey" view
+                  // when the backend hasn't populated the split yet.
+                  const hasSplit = pSat != null && pVio != null && pUnk != null;
+                  let cls = "bg-slate-200 dark:bg-slate-700";
+                  if (hasSplit) {
+                    if (i < (pSat ?? 0)) cls = "bg-emerald-500";
+                    else if (i < (pSat ?? 0) + (pVio ?? 0)) cls = "bg-red-500";
+                    // else stays grey (unknown / missing data)
+                  } else if (i < f) {
+                    cls = "bg-emerald-500";
+                  }
+                  return (
+                    <div
+                      key={i}
+                      className={clsx("h-3 flex-1 rounded-sm transition-colors", cls)}
+                      aria-hidden="true"
+                    />
+                  );
+                })}
               </div>
-              <div
-                className={clsx(
-                  "text-sm font-bold",
-                  f >= 7
-                    ? "text-emerald-600 dark:text-emerald-400"
-                    : f >= 4
-                    ? "text-amber-600 dark:text-amber-400"
-                    : "text-red-500"
-                )}
-              >
-                {f}/9{" "}
-                <span className="font-normal text-xs">
-                  {f >= 7 ? "Strong" : f >= 4 ? "Moderate" : "Weak"}
-                </span>
-              </div>
+              {pSat != null && pVio != null && pUnk != null ? (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="text-emerald-600 dark:text-emerald-400 font-mono font-semibold">
+                    {pSat} ✓
+                  </span>
+                  <span className="text-red-500 font-mono font-semibold">{pVio} ✗</span>
+                  <span className="text-slate-400 font-mono font-semibold">{pUnk} ?</span>
+                  <span className="ml-auto font-normal text-slate-500">
+                    {pUnk >= 5
+                      ? "Unmeasurable"
+                      : pVio >= 5
+                      ? "Weak"
+                      : pSat >= 7
+                      ? "Strong"
+                      : "Moderate"}
+                  </span>
+                </div>
+              ) : (
+                <div
+                  className={clsx(
+                    "text-sm font-bold",
+                    f >= 7
+                      ? "text-emerald-600 dark:text-emerald-400"
+                      : f >= 4
+                      ? "text-amber-600 dark:text-amber-400"
+                      : "text-red-500"
+                  )}
+                >
+                  {f}/9{" "}
+                  <span className="font-normal text-xs">
+                    {f >= 7 ? "Strong" : f >= 4 ? "Moderate" : "Weak"}
+                  </span>
+                </div>
+              )}
             </>
           ) : (
             <span className="text-slate-400 text-sm">—</span>
@@ -189,7 +221,16 @@ export default function EarningsQualityPanel({
 
         {/* Graham MoS */}
         <div className="space-y-1.5">
-          <div className="text-xs text-slate-500 inline-flex items-center gap-1">Graham MoS<MetricInfo metricId="graham_mos" size={11} /></div>
+          <div className="text-xs text-slate-500 inline-flex items-center gap-1">
+            Graham MoS
+            <MetricInfo metricId="graham_mos" size={11} />
+            <span
+              className="ml-1 text-[10px] px-1 py-px rounded bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400"
+              title="Graham Number assumes mean-reverting low-P/E value style. Often negative for growth stocks. Informational only -- NOT part of the composite signal."
+            >
+              value-style ref
+            </span>
+          </div>
           {grahamMos != null ? (
             <>
               <div

@@ -133,6 +133,15 @@ class ScoringService:
 
         quality = {
             "piotroski_f": int(scored_row.get("Piotroski_F", 0)) if pd.notna(scored_row.get("Piotroski_F")) else None,
+            "piotroski_satisfied": (
+                int(scored_row.get("Piotroski_Satisfied")) if pd.notna(scored_row.get("Piotroski_Satisfied")) else None
+            ),
+            "piotroski_violated": (
+                int(scored_row.get("Piotroski_Violated")) if pd.notna(scored_row.get("Piotroski_Violated")) else None
+            ),
+            "piotroski_unknown": (
+                int(scored_row.get("Piotroski_Unknown")) if pd.notna(scored_row.get("Piotroski_Unknown")) else None
+            ),
             "altman_z": az,
             "altman_zone": _altman_zone(az),
             "graham_number": gn,
@@ -248,6 +257,9 @@ class ScoringService:
         price = _safe_float(row.get("Price"))
         graham_mos_val = round((gn / price - 1) * 100, 1) if gn and price and price > 0 else None
         piotroski = piotroski_f_score(row)
+        from src.analysis.quality_signals import piotroski_breakdown
+
+        piotroski_split = piotroski_breakdown(row)
 
         horizon_block = {
             "score": composite,
@@ -264,6 +276,9 @@ class ScoringService:
             "shareholder_score": round(scores.get("shareholder_return", 50.0), 1),
             "risk_score": round(scores.get("risk", 50.0), 1),
             "piotroski_f": piotroski,
+            "piotroski_satisfied": piotroski_split["satisfied"],
+            "piotroski_violated": piotroski_split["violated"],
+            "piotroski_unknown": piotroski_split["unknown"],
             "altman_z": az,
             "altman_zone": _altman_zone(az),
             "graham_number": gn,

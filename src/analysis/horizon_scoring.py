@@ -76,23 +76,41 @@ def _is_finite(val: Any) -> bool:
     return np.isfinite(f)
 
 
+_COVERAGE_FLOOR = 0.5  # below this, composite gets damped toward neutral 50
+_COVERAGE_DAMP_TO = 50.0  # the score a fully-missing row collapses toward
+
+
 def _renormalised_weighted_mean(
     row: pd.Series,
     weights: dict[str, float],
     sub_score_columns: dict[str, str],
 ) -> float:
-    """Weighted sum across categories, renormalising over the present-only set.
+    """Coverage-aware weighted mean across scoring categories.
 
-    When a category's column is missing from the DataFrame OR the row's value
-    is non-finite, that category drops out — both its score and its weight.
-    The remaining weights are renormalised so the composite stays on the
-    0..100 scale even when several inputs are absent.
+    Each category contributes (score * weight) only when its column exists
+    AND the row's value is finite. Pure renormalisation over the present
+    set inflated composites for sparse rows (1 strong category out of 6
+    => composite ≈ that one category). We now dampen toward neutral when
+    coverage drops below ``_COVERAGE_FLOOR``:
 
-    Returns NaN when *every* category is missing (degenerate row).
+        weighted = sum(score * weight) / sum(weight)         # present-only mean
+        coverage = sum(present weight) / sum(total weight)
+        if coverage >= floor:
+            composite = weighted                              # no penalty
+        else:
+            t = coverage / floor                              # 0..1
+            composite = t * weighted + (1 - t) * 50           # blend to neutral
+
+    Effect: a row with 80% coverage scores at the present-only mean; a row
+    with 0% coverage collapses to NaN; in between, the composite is pulled
+    toward 50, so a "Buy"-grade signal cannot ride a single sub-score.
+    Returns NaN only when *every* category is missing.
     """
     present_score = 0.0
     present_weight = 0.0
+    total_weight = 0.0
     for cat, w in weights.items():
+        total_weight += float(w)
         col = sub_score_columns.get(cat)
         if col is None:
             continue
@@ -101,9 +119,14 @@ def _renormalised_weighted_mean(
             continue
         present_score += float(val) * float(w)
         present_weight += float(w)
-    if present_weight <= 0:
+    if present_weight <= 0 or total_weight <= 0:
         return float("nan")
-    return present_score / present_weight
+    weighted = present_score / present_weight
+    coverage = present_weight / total_weight
+    if coverage >= _COVERAGE_FLOOR:
+        return weighted
+    t = coverage / _COVERAGE_FLOOR
+    return t * weighted + (1.0 - t) * _COVERAGE_DAMP_TO
 
 
 def _check_gates(
