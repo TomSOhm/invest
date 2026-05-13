@@ -22,4 +22,13 @@ dev = [
     "pyyaml>=6.0",
     "uvicorn[standard]>=0.34.0",
     "yfinance>=0.2.40",
+    "ruff>=0.6",
 ]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W", "B", "UP"]
+ignore = ["E501"]
