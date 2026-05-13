@@ -67,3 +67,7 @@ data/watchlist.json
 *.tmp
 *.bak
 *.log
+
+# Release scratchpads (gh issue bodies, mailmaps, etc.)
+.release-*.md
+mailmap.txt
