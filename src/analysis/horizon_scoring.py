@@ -202,6 +202,40 @@ def _check_gates(
     return blockers
 
 
+# Blockers whose presence means "we don't have enough data to score honestly".
+# When any of these fire, force the signal to "Insufficient Data" regardless of
+# composite — the composite is built on the few categories that happen to be
+# present, so a high score is meaningless.
+_DATA_QUALITY_BLOCKERS = frozenset(
+    {
+        "min_data_completeness",
+        "missing_data_completeness",
+        "missing_altman_z",
+        "missing_market_cap",
+        "missing_years_listed",
+        "missing_avg_volume",
+        "missing_realized_vol_1y",
+        "missing_momentum",
+    }
+)
+
+
+def _downgrade_signal_for_blockers(sig: str, blockers: list[str]) -> str:
+    """Drop a Buy/Strong Buy signal when blockers indicate the call is unsafe.
+
+    - Any data-quality blocker -> "Insufficient Data"
+    - Any other blocker -> cap at "Hold" (don't promote, don't sell)
+    - No blockers -> signal unchanged
+    """
+    if not blockers:
+        return sig
+    if any(b in _DATA_QUALITY_BLOCKERS for b in blockers):
+        return "Insufficient Data"
+    if sig in ("Strong Buy", "Buy"):
+        return "Hold"
+    return sig
+
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Per-horizon scorers
 # ──────────────────────────────────────────────────────────────────────────────
@@ -253,6 +287,9 @@ def _score_one_horizon(
         sig = generate_signal(signal_input, mos)
 
         bls = _check_gates(row, gates, require_momentum=require_momentum)
+        # Gates that flag data-quality holes force "Insufficient Data";
+        # other failed gates cap at "Hold". A clean row passes through.
+        sig = _downgrade_signal_for_blockers(sig, bls)
 
         scores.append(round(composite, 1) if _is_finite(composite) else float("nan"))
         signals.append(sig)

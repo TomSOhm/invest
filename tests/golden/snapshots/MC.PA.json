@@ -36,7 +36,7 @@
   "score_lt": 54.4,
   "score_mt": 51.6,
   "score_st": 52.7,
-  "signal_lt": "Sell",
+  "signal_lt": "Insufficient Data",
   "signal_mt": "Sell",
-  "signal_st": "Sell"
+  "signal_st": "Insufficient Data"
 }

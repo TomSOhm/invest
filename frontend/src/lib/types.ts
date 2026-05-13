@@ -4,7 +4,7 @@
 
 export type Horizon = "long_term" | "medium_term" | "short_term";
 
-export type Signal = "Strong Buy" | "Buy" | "Hold" | "Sell" | "Strong Sell";
+export type Signal = "Strong Buy" | "Buy" | "Hold" | "Sell" | "Strong Sell" | "Insufficient Data";
 
 // ---------------------------------------------------------------------------
 // Horizon scoring block (mirrors backend HorizonScoring)

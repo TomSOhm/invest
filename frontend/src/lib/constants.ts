@@ -4,6 +4,7 @@ export const SIGNAL_COLORS: Record<string, string> = {
   "Hold": "#f59e0b",         // amber-500
   "Sell": "#f87171",         // red-400
   "Strong Sell": "#ef4444",  // red-500
+  "Insufficient Data": "#94a3b8",  // slate-400 — neutral, not a recommendation
 };
 
 export const SIGNAL_TEXT_COLORS: Record<string, string> = {
@@ -12,6 +13,7 @@ export const SIGNAL_TEXT_COLORS: Record<string, string> = {
   "Hold": "text-amber-600 dark:text-amber-400",
   "Sell": "text-red-500 dark:text-red-400",
   "Strong Sell": "text-red-600 dark:text-red-500",
+  "Insufficient Data": "text-slate-500 dark:text-slate-400",
 };
 
 export function scoreToColor(score: number): string {
@@ -29,6 +31,7 @@ export function signalToBgColor(signal: string): string {
     "Hold": "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-300",
     "Sell": "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400",
     "Strong Sell": "bg-red-200 text-red-800 dark:bg-red-900/50 dark:text-red-300",
+    "Insufficient Data": "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300",
   };
   return map[signal] ?? "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300";
 }

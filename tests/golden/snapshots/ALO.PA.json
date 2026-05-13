@@ -39,7 +39,7 @@
   "score_lt": 32.1,
   "score_mt": 33.2,
   "score_st": 29.2,
-  "signal_lt": "Strong Sell",
+  "signal_lt": "Insufficient Data",
   "signal_mt": "Strong Sell",
-  "signal_st": "Strong Sell"
+  "signal_st": "Insufficient Data"
 }

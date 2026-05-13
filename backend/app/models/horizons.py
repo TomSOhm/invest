@@ -20,7 +20,9 @@ class HorizonScoring(BaseModel):
     """Score + signal + gate state for a single scoring horizon."""
 
     score: float = Field(..., description="Composite score 0-100 for this horizon")
-    signal: Literal["Strong Buy", "Buy", "Hold", "Sell", "Strong Sell"] = Field(..., description="Investment signal")
+    signal: Literal["Strong Buy", "Buy", "Hold", "Sell", "Strong Sell", "Insufficient Data"] = Field(
+        ..., description="Investment signal (Insufficient Data when data-quality gates fail)"
+    )
     passes_gates: bool = Field(..., description="All investability gates satisfied")
     blockers: list[str] = Field(
         default_factory=list,

@@ -39,7 +39,7 @@
   "score_lt": 54.0,
   "score_mt": 54.7,
   "score_st": 50.6,
-  "signal_lt": "Hold",
-  "signal_mt": "Hold",
-  "signal_st": "Hold"
+  "signal_lt": "Insufficient Data",
+  "signal_mt": "Insufficient Data",
+  "signal_st": "Insufficient Data"
 }
