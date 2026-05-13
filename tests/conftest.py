@@ -9,12 +9,13 @@ Frozen inputs decouple regression tests from live-data drift: bug fixes in the
 scoring engine produce a diff in the snapshot files, not a noise-laden diff
 from yfinance returning slightly different numbers between runs.
 """
+
 from __future__ import annotations
 
 import json
 import math
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -25,7 +26,7 @@ SNAPSHOTS_DIR = GOLDEN_DIR / "snapshots"
 TICKERS_FILE = GOLDEN_DIR / "tickers.txt"
 
 
-def load_tickers() -> List[str]:
+def load_tickers() -> list[str]:
     """Read non-empty, non-comment lines from tickers.txt."""
     if not TICKERS_FILE.exists():
         return []
@@ -37,7 +38,10 @@ def load_tickers() -> List[str]:
 
 
 _WINDOWS_RESERVED = {
-    "CON", "PRN", "AUX", "NUL",
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
     *(f"COM{i}" for i in range(1, 10)),
     *(f"LPT{i}" for i in range(1, 10)),
 }
@@ -65,12 +69,12 @@ def snapshot_path(ticker: str) -> Path:
     return SNAPSHOTS_DIR / f"{_safe_filename(ticker)}.json"
 
 
-def load_input_row(ticker: str) -> Dict[str, Any]:
+def load_input_row(ticker: str) -> dict[str, Any]:
     """Load a frozen input row, replacing JSON-NaN sentinels with float NaN."""
     return _decode_floats(json.loads(input_path(ticker).read_text(encoding="utf-8")))
 
 
-def load_snapshot(ticker: str) -> Dict[str, Any]:
+def load_snapshot(ticker: str) -> dict[str, Any]:
     return json.loads(snapshot_path(ticker).read_text(encoding="utf-8"))
 
 
@@ -85,22 +89,19 @@ def _decode_floats(obj: Any) -> Any:
     return obj
 
 
-def row_dict_to_series(row: Dict[str, Any]) -> pd.Series:
+def row_dict_to_series(row: dict[str, Any]) -> pd.Series:
     """Convert a frozen JSON row back into a pandas Series for scoring functions."""
     return pd.Series(row)
 
 
-def available_golden_tickers() -> List[str]:
+def available_golden_tickers() -> list[str]:
     """Tickers that have BOTH a frozen input and a snapshot on disk."""
     if not INPUTS_DIR.exists() or not SNAPSHOTS_DIR.exists():
         return []
     declared = set(load_tickers())
-    return sorted(
-        t for t in declared
-        if input_path(t).exists() and snapshot_path(t).exists()
-    )
+    return sorted(t for t in declared if input_path(t).exists() and snapshot_path(t).exists())
 
 
 @pytest.fixture(scope="session")
-def golden_tickers() -> List[str]:
+def golden_tickers() -> list[str]:
     return available_golden_tickers()

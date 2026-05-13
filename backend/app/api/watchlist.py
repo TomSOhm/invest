@@ -2,9 +2,10 @@
 Invest Solo -- Watchlist API Router (M10)
 Add, remove, and view watchlist items with three-horizon scoring enrichment.
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict
+from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
 
@@ -18,7 +19,7 @@ router = APIRouter(tags=["watchlist"])
 @router.get("/", response_model=WatchlistResponse)
 async def get_watchlist(
     svc: WatchlistService = Depends(get_watchlist_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Return the full watchlist with cached data and three-horizon scoring.
 
     This endpoint is cache-only: no live FMP/yfinance calls are made.
@@ -36,7 +37,7 @@ async def get_watchlist(
 async def add_to_watchlist(
     req: AddWatchlistRequest,
     svc: WatchlistService = Depends(get_watchlist_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Add a ticker to the watchlist.
 
     Triggers a live fetch for the new ticker only so scoring fields populate
@@ -50,7 +51,7 @@ async def add_to_watchlist(
 async def remove_from_watchlist(
     item_id: str,
     svc: WatchlistService = Depends(get_watchlist_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Remove an item from the watchlist."""
     removed = svc.remove_item(item_id)
     if not removed:
@@ -61,7 +62,7 @@ async def remove_from_watchlist(
 @router.post("/refresh", response_model=WatchlistResponse)
 async def refresh_watchlist(
     svc: WatchlistService = Depends(get_watchlist_service),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Force-refresh all live data for watchlist items.
 
     Invalidates the cache for every stored ticker and re-fetches live data

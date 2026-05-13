@@ -7,27 +7,28 @@ sub-scores. score_dataframe continues to delegate to score_universe unchanged
 (the engine already emits score_lt/mt/st columns when settings.yaml has a
 horizons: block).
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
 from loguru import logger
 
 from src.analysis.scoring_engine import (
-    score_universe,
-    compute_composite_score,
-    generate_signal,
-    piotroski_f_score,
-    altman_z_score,
-    graham_number,
     SCORING_WEIGHTS,
     SIGNAL_THRESHOLDS,
+    altman_z_score,
+    compute_composite_score,
+    generate_signal,
+    graham_number,
+    piotroski_f_score,
+    score_universe,
 )
 
 
-def _safe_float(value: Any) -> Optional[float]:
+def _safe_float(value: Any) -> float | None:
     """Convert to float; return None for NaN / Inf / non-numeric."""
     if value is None:
         return None
@@ -40,7 +41,7 @@ def _safe_float(value: Any) -> Optional[float]:
         return None
 
 
-def _altman_zone(z: Optional[float]) -> Optional[str]:
+def _altman_zone(z: float | None) -> str | None:
     """Map Altman Z-score to zone label (classic thresholds)."""
     if z is None:
         return None
@@ -70,7 +71,7 @@ class ScoringService:
         logger.info(f"Scoring {len(df)} stocks")
         return score_universe(df)
 
-    def score_single(self, row: pd.Series) -> Dict[str, Any]:
+    def score_single(self, row: pd.Series) -> dict[str, Any]:
         """
         Score a single stock (represented as a pandas Series).
 
@@ -103,7 +104,7 @@ class ScoringService:
 
         return self.extract_scoring_from_row(scored_df.iloc[0])
 
-    def extract_scoring_from_row(self, scored_row: pd.Series) -> Dict[str, Any]:
+    def extract_scoring_from_row(self, scored_row: pd.Series) -> dict[str, Any]:
         """
         Build the scoring dict from a row that has ALREADY been scored.
 
@@ -126,7 +127,7 @@ class ScoringService:
         az = _safe_float(scored_row.get("Altman_Z"))
         gn = _safe_float(scored_row.get("Graham_Number"))
         price = _safe_float(scored_row.get("Price"))
-        graham_mos_val: Optional[float] = None
+        graham_mos_val: float | None = None
         if gn is not None and price and price > 0:
             graham_mos_val = round((gn / price - 1) * 100, 1)
 
@@ -144,7 +145,7 @@ class ScoringService:
         }
 
         # --- DCF ---
-        dcf_warnings: List[str] = []
+        dcf_warnings: list[str] = []
         raw_warnings = scored_row.get("DCF_Warnings")
         if isinstance(raw_warnings, list):
             dcf_warnings = [str(w) for w in raw_warnings]
@@ -171,7 +172,7 @@ class ScoringService:
         }
 
         # --- Momentum signals ---
-        def _bool_or_none(val: Any) -> Optional[bool]:
+        def _bool_or_none(val: Any) -> bool | None:
             if val is None or (isinstance(val, float) and np.isnan(val)):
                 return None
             return bool(val)
@@ -196,7 +197,7 @@ class ScoringService:
         composite_fallback = _safe_float(scored_row.get("Composite_Score", 50.0)) or 50.0
         signal_fallback = str(scored_row.get("Signal") or generate_signal(composite_fallback))
 
-        def _blockers(col: str) -> List[str]:
+        def _blockers(col: str) -> list[str]:
             raw = scored_row.get(col)
             if isinstance(raw, list):
                 return raw
@@ -236,7 +237,7 @@ class ScoringService:
             "data_completeness": _safe_float(scored_row.get("data_completeness", 0.0)) or 0.0,
         }
 
-    def _fallback_single(self, row: pd.Series) -> Dict[str, Any]:
+    def _fallback_single(self, row: pd.Series) -> dict[str, Any]:
         """Minimal fallback when the vectorised path produces an empty result."""
         scores = compute_composite_score(row)
         composite = scores.get("composite", 50.0)
@@ -245,9 +246,7 @@ class ScoringService:
         az = _safe_float(altman_z_score(row))
         gn = _safe_float(graham_number(row))
         price = _safe_float(row.get("Price"))
-        graham_mos_val = (
-            round((gn / price - 1) * 100, 1) if gn and price and price > 0 else None
-        )
+        graham_mos_val = round((gn / price - 1) * 100, 1) if gn and price and price > 0 else None
         piotroski = piotroski_f_score(row)
 
         horizon_block = {
@@ -314,11 +313,11 @@ class ScoringService:
         }
 
     @staticmethod
-    def get_weights() -> Dict[str, float]:
+    def get_weights() -> dict[str, float]:
         """Return the scoring category weights."""
         return dict(SCORING_WEIGHTS)
 
     @staticmethod
-    def get_thresholds() -> Dict[str, Any]:
+    def get_thresholds() -> dict[str, Any]:
         """Return the signal threshold configuration."""
         return dict(SIGNAL_THRESHOLDS)

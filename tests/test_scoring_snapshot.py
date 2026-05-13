@@ -10,13 +10,13 @@ Snapshots are refreshed via:
 A deliberate methodology change should produce a snapshot diff. Review the
 diff in the PR and run the rescore command to commit the new expected output.
 """
+
 from __future__ import annotations
 
 import math
 import sys
 from pathlib import Path
 
-import pandas as pd
 import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -24,13 +24,11 @@ for p in (PROJECT_ROOT, PROJECT_ROOT / "backend", PROJECT_ROOT / "src"):
     sys.path.insert(0, str(p))
 
 from scripts.capture_golden_snapshots import score_row  # noqa: E402
-
 from tests.conftest import (  # noqa: E402
     available_golden_tickers,
     load_input_row,
     load_snapshot,
 )
-
 
 GOLDEN_TICKERS = available_golden_tickers()
 
@@ -66,6 +64,5 @@ def test_scoring_snapshot_matches(ticker: str) -> None:
 def test_at_least_some_golden_files_exist() -> None:
     """Sanity check: a fresh checkout should have golden fixtures committed."""
     assert GOLDEN_TICKERS, (
-        "No golden snapshots found in tests/golden/snapshots/. "
-        "Run: python -m scripts.capture_golden_snapshots --all"
+        "No golden snapshots found in tests/golden/snapshots/. Run: python -m scripts.capture_golden_snapshots --all"
     )

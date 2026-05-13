@@ -7,16 +7,16 @@ Usage:
     python -m scripts.coverage_report --tickers MC.PA OR.PA AIR.PA SAP.DE ASML.AS AAPL MSFT JPM BRK-B NVDA
     python -m scripts.coverage_report --tickers AAPL MSFT    # quick test
 """
+
 from __future__ import annotations
 
 import argparse
-import json
 import math
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 # Ensure project root on sys.path
 _PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -31,20 +31,20 @@ from backend.app.services.cache_service import CacheService
 from backend.app.services.market_data.fmp_fetcher import FMPDataFetcher
 from backend.app.services.market_data.hybrid_fetcher import HybridDataFetcher
 from backend.app.services.market_data.yfinance_fetcher import YFinanceDataFetcher
-from backend.app.config import settings
 
-COVERAGE_MATRIX_PATH = (
-    _PROJECT_ROOT
-    / "backend"
-    / "app"
-    / "services"
-    / "market_data"
-    / "coverage_matrix.md"
-)
+COVERAGE_MATRIX_PATH = _PROJECT_ROOT / "backend" / "app" / "services" / "market_data" / "coverage_matrix.md"
 
 DEFAULT_TICKERS = [
-    "MC.PA", "OR.PA", "AIR.PA", "SAP.DE", "ASML.AS",  # PEA
-    "AAPL", "MSFT", "JPM", "BRK-B", "NVDA",            # US
+    "MC.PA",
+    "OR.PA",
+    "AIR.PA",
+    "SAP.DE",
+    "ASML.AS",  # PEA
+    "AAPL",
+    "MSFT",
+    "JPM",
+    "BRK-B",
+    "NVDA",  # US
 ]
 
 
@@ -55,11 +55,10 @@ def _is_finite(val: Any) -> bool:
         return False
 
 
-def run_coverage(tickers: List[str], bust_cache: bool = False) -> None:
+def run_coverage(tickers: list[str], bust_cache: bool = False) -> None:
     cache = CacheService()
     fmp_token = os.getenv("FMP_TOKEN", "")
-    fmp = FMPDataFetcher(token=fmp_token, cache=cache,
-                         enabled=bool(fmp_token))
+    fmp = FMPDataFetcher(token=fmp_token, cache=cache, enabled=bool(fmp_token))
     yf = YFinanceDataFetcher(cache=cache)
     hybrid = HybridDataFetcher(fmp=fmp, yf=yf, cache=cache)
 
@@ -67,17 +66,16 @@ def run_coverage(tickers: List[str], bust_cache: bool = False) -> None:
 
     # Columns to display in the coverage table
     display_cols = [
-        c for c in SCORING_COLUMNS
-        if c not in ("Name", "Sector", "Industry", "Country", "Exchange", "PEA", "PEA_PME")
+        c for c in SCORING_COLUMNS if c not in ("Name", "Sector", "Industry", "Country", "Exchange", "PEA", "PEA_PME")
     ]
 
-    print(f"\n{'='*70}")
+    print(f"\n{'=' * 70}")
     print("Invest Solo -- Hybrid Data Coverage Report")
     print(f"Tickers: {', '.join(tickers)}")
     print(f"FMP enabled: {bool(fmp_token)}")
-    print(f"{'='*70}\n")
+    print(f"{'=' * 70}\n")
 
-    all_results: List[Dict[str, Any]] = []
+    all_results: list[dict[str, Any]] = []
 
     for ticker in tickers:
         if bust_cache:
@@ -141,12 +139,12 @@ def run_coverage(tickers: List[str], bust_cache: bool = False) -> None:
 
 
 def _update_coverage_matrix(
-    tickers: List[str],
-    results: List[Dict[str, Any]],
-    display_cols: List[str],
+    tickers: list[str],
+    results: list[dict[str, Any]],
+    display_cols: list[str],
 ) -> None:
     """Append the per-ticker coverage table into coverage_matrix.md."""
-    now = datetime.now(tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
+    now = datetime.now(tz=UTC).strftime("%Y-%m-%d %H:%M UTC")
 
     # Build markdown table
     header = "| Field | " + " | ".join(tickers) + " |"
@@ -157,7 +155,7 @@ def _update_coverage_matrix(
         for row in results:
             sources = row.get("field_sources", {})
             src = sources.get(col, "?")
-            val = row.get(col)
+            row.get(col)
             if src == "fmp":
                 indicator = "FMP"
             elif src == "yfinance":
@@ -186,6 +184,7 @@ def _update_coverage_matrix(
     # Remove any previous auto-generated section
     if "<!-- COVERAGE_REPORT_LAST_RUN" in content:
         import re
+
         content = re.sub(
             r"\n<!-- COVERAGE_REPORT_LAST_RUN.*",
             "",
@@ -201,9 +200,7 @@ def _update_coverage_matrix(
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(
-        description="Run coverage report for HybridDataFetcher"
-    )
+    parser = argparse.ArgumentParser(description="Run coverage report for HybridDataFetcher")
     parser.add_argument(
         "--tickers",
         nargs="+",

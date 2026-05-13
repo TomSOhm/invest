@@ -1,4 +1,5 @@
 """Tests that NaN gate columns are skipped, not blocking, in horizon presets."""
+
 from __future__ import annotations
 
 import numpy as np

@@ -5,9 +5,10 @@ Breaking change: legacy composite_score / signal / ScoringBreakdown fields
 are removed. Replaced by the three-horizon block + quality/risk/momentum
 sub-models from horizons.py.
 """
+
 from __future__ import annotations
 
-from typing import Dict, Literal, Optional
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -19,7 +20,6 @@ from backend.app.models.horizons import (
     RiskSignals,
     SubScores,
 )
-
 
 # ---------------------------------------------------------------------------
 # Analyst ratings
@@ -34,10 +34,10 @@ class AnalystRatings(BaseModel):
     sell: int = 0
     strong_buy: int = 0
     strong_sell: int = 0
-    target_low: Optional[float] = None
-    target_mean: Optional[float] = None
-    target_high: Optional[float] = None
-    target_median: Optional[float] = None
+    target_low: float | None = None
+    target_mean: float | None = None
+    target_high: float | None = None
+    target_median: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -50,58 +50,58 @@ class CompanyMetrics(BaseModel):
 
     ticker: str
     name: str = ""
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    country: Optional[str] = None
-    exchange: Optional[str] = None
+    sector: str | None = None
+    industry: str | None = None
+    country: str | None = None
+    exchange: str | None = None
 
     # Price & size
-    price: Optional[float] = None
-    market_cap: Optional[float] = None
-    enterprise_value: Optional[float] = None
+    price: float | None = None
+    market_cap: float | None = None
+    enterprise_value: float | None = None
 
     # Valuation ratios
-    pe: Optional[float] = None
-    forward_pe: Optional[float] = None
-    pb: Optional[float] = None
-    ps: Optional[float] = None
-    pfcf: Optional[float] = None
-    ev_ebitda: Optional[float] = None
-    ev_sales: Optional[float] = None
-    peg: Optional[float] = None
+    pe: float | None = None
+    forward_pe: float | None = None
+    pb: float | None = None
+    ps: float | None = None
+    pfcf: float | None = None
+    ev_ebitda: float | None = None
+    ev_sales: float | None = None
+    peg: float | None = None
 
     # Margins
-    gross_margin: Optional[float] = None
-    operating_margin: Optional[float] = None
-    net_margin: Optional[float] = None
-    fcf_margin: Optional[float] = None
+    gross_margin: float | None = None
+    operating_margin: float | None = None
+    net_margin: float | None = None
+    fcf_margin: float | None = None
 
     # Returns
-    roe: Optional[float] = None
-    roa: Optional[float] = None
-    roic: Optional[float] = None
+    roe: float | None = None
+    roa: float | None = None
+    roic: float | None = None
 
     # Growth
-    revenue_growth: Optional[float] = None
+    revenue_growth: float | None = None
 
     # Balance sheet
-    current_ratio: Optional[float] = None
-    debt_equity: Optional[float] = None
-    interest_coverage: Optional[float] = None
+    current_ratio: float | None = None
+    debt_equity: float | None = None
+    interest_coverage: float | None = None
 
     # Shareholder
-    div_yield: Optional[float] = None
-    payout_ratio: Optional[float] = None
+    div_yield: float | None = None
+    payout_ratio: float | None = None
 
     # Risk & ownership
-    beta: Optional[float] = None
-    fifty_two_week_high: Optional[float] = None
-    fifty_two_week_low: Optional[float] = None
-    fifty_two_week_high_pct: Optional[float] = None
-    insider_pct: Optional[float] = None
-    institutional_pct: Optional[float] = None
-    short_pct_float: Optional[float] = None
-    earnings_surprise_pct: Optional[float] = None
+    beta: float | None = None
+    fifty_two_week_high: float | None = None
+    fifty_two_week_low: float | None = None
+    fifty_two_week_high_pct: float | None = None
+    insider_pct: float | None = None
+    institutional_pct: float | None = None
+    short_pct_float: float | None = None
+    earnings_surprise_pct: float | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -118,18 +118,18 @@ class CompanyDetail(BaseModel):
 
     ticker: str
     name: str
-    sector: Optional[str] = None
-    industry: Optional[str] = None
-    country: Optional[str] = None
-    exchange: Optional[str] = None
+    sector: str | None = None
+    industry: str | None = None
+    country: str | None = None
+    exchange: str | None = None
     pea_eligible: bool = False
     pea_pme_eligible: bool = False
 
-    price: Optional[float] = None
-    market_cap: Optional[float] = None
+    price: float | None = None
+    market_cap: float | None = None
 
     # Three-horizon scoring (long_term / medium_term / short_term)
-    horizons: Dict[
+    horizons: dict[
         Literal["long_term", "medium_term", "short_term"],
         HorizonScoring,
     ] = Field(..., description="Horizon-specific scores, signals, and gate states")
@@ -141,7 +141,7 @@ class CompanyDetail(BaseModel):
     momentum: MomentumSignals = Field(..., description="M9 price momentum and revision signals")
 
     metrics: CompanyMetrics = Field(..., description="Raw financial metrics (ratios, margins)")
-    analyst_ratings: Optional[AnalystRatings] = None
+    analyst_ratings: AnalystRatings | None = None
     data_completeness: float = Field(0.0, description="Fraction of scoring inputs present 0-1")
 
     data_source: str = "yfinance"

@@ -7,11 +7,12 @@ lifted directly from M1's data_fetcher.py to avoid duplication.  data_fetcher.py
 is kept as a compatibility shim over HybridDataFetcher and no longer contains
 the yfinance plumbing directly; this module owns it.
 """
+
 from __future__ import annotations
 
-import time
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional, Sequence
+from collections.abc import Sequence
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -20,12 +21,12 @@ from loguru import logger
 
 from backend.app.services.cache_service import CacheService
 
-
 # ---------------------------------------------------------------------------
 # Low-level helpers (moved from data_fetcher.py)
 # ---------------------------------------------------------------------------
 
-def _safe_get(info: Dict[str, Any], key: str, default: Any = np.nan) -> Any:
+
+def _safe_get(info: dict[str, Any], key: str, default: Any = np.nan) -> Any:
     """Safely extract a value from a yfinance info dict."""
     val = info.get(key, default)
     if val is None:
@@ -55,7 +56,7 @@ def _is_finite_number(val: Any) -> bool:
 
 
 def _latest_from_statement(
-    statement: Optional[pd.DataFrame],
+    statement: pd.DataFrame | None,
     candidate_keys: Sequence[str],
 ) -> float:
     """Pull the most-recent value of any candidate row label from a yfinance statement.
@@ -70,7 +71,7 @@ def _latest_from_statement(
 
 
 def _nth_from_statement(
-    statement: Optional[pd.DataFrame],
+    statement: pd.DataFrame | None,
     candidate_keys: Sequence[str],
     n: int = 0,
 ) -> float:
@@ -107,11 +108,11 @@ def _nth_from_statement(
 
 
 def _get_real_ebit(
-    tk: "yf.Ticker",
-    info: Dict[str, Any],
+    tk: yf.Ticker,
+    info: dict[str, Any],
     ebitda: float,
-    cashflow: Optional[pd.DataFrame] = None,
-    financials: Optional[pd.DataFrame] = None,
+    cashflow: pd.DataFrame | None = None,
+    financials: pd.DataFrame | None = None,
 ) -> float:
     """Fetch real EBIT, never aliasing to EBITDA.
 
@@ -159,8 +160,8 @@ def _get_real_ebit(
 
 
 def _get_real_interest_expense(
-    tk: "yf.Ticker",
-    financials: Optional[pd.DataFrame] = None,
+    tk: yf.Ticker,
+    financials: pd.DataFrame | None = None,
 ) -> float:
     """Fetch real Interest Expense from the income statement.
 
@@ -189,7 +190,7 @@ def _get_real_interest_expense(
     return abs(float(val))
 
 
-def _get_shares_prior_year(tk: "yf.Ticker") -> float:
+def _get_shares_prior_year(tk: yf.Ticker) -> float:
     """Get shares outstanding ~1 year ago via ``tk.get_shares_full()``.
 
     Returns NaN if the API returns nothing or fails.
@@ -224,9 +225,9 @@ def _get_shares_prior_year(tk: "yf.Ticker") -> float:
 
 
 def _get_balance_sheet_items(
-    tk: "yf.Ticker",
-    balance_sheet: Optional[pd.DataFrame] = None,
-) -> Dict[str, float]:
+    tk: yf.Ticker,
+    balance_sheet: pd.DataFrame | None = None,
+) -> dict[str, float]:
     """Fetch CurrentAssets, CurrentLiabilities, RetainedEarnings + equity/asset backups."""
     try:
         if balance_sheet is None:
@@ -303,10 +304,10 @@ _CL_KEYS = ("Current Liabilities", "Total Current Liabilities", "CurrentLiabilit
 
 
 def _get_yoy_inputs(
-    balance_sheet: Optional[pd.DataFrame],
-    financials: Optional[pd.DataFrame],
-    cashflow: Optional[pd.DataFrame],
-) -> Dict[str, float]:
+    balance_sheet: pd.DataFrame | None,
+    financials: pd.DataFrame | None,
+    cashflow: pd.DataFrame | None,
+) -> dict[str, float]:
     """Pull prior-year (n=1 column) values needed for Piotroski YoY deltas.
 
     Returns a dict with the M4 ``*_PriorYear`` fields plus ``LongTermDebt`` and
@@ -319,7 +320,7 @@ def _get_yoy_inputs(
     (very common for European mid-caps on the free tier), values are NaN and
     the corresponding Piotroski signals will simply be skipped.
     """
-    out: Dict[str, float] = {}
+    out: dict[str, float] = {}
 
     # Balance sheet ------------------------------------------------------
     out["LongTermDebt"] = _nth_from_statement(balance_sheet, _LTD_KEYS, n=0)
@@ -327,11 +328,7 @@ def _get_yoy_inputs(
     out["TotalAssets_PriorYear"] = _nth_from_statement(balance_sheet, _TA_KEYS, n=1)
     ca_prior = _nth_from_statement(balance_sheet, _CA_KEYS, n=1)
     cl_prior = _nth_from_statement(balance_sheet, _CL_KEYS, n=1)
-    if (
-        _is_finite_number(ca_prior)
-        and _is_finite_number(cl_prior)
-        and float(cl_prior) != 0
-    ):
+    if _is_finite_number(ca_prior) and _is_finite_number(cl_prior) and float(cl_prior) != 0:
         out["CurrentRatio_PriorYear"] = float(ca_prior) / float(cl_prior)
     else:
         out["CurrentRatio_PriorYear"] = np.nan
@@ -341,11 +338,7 @@ def _get_yoy_inputs(
     ni_prior = _nth_from_statement(financials, _NI_KEYS, n=1)
     gp_prior = _nth_from_statement(financials, _GP_KEYS, n=1)
     out["Revenue_PriorYear"] = rev_prior
-    if (
-        _is_finite_number(gp_prior)
-        and _is_finite_number(rev_prior)
-        and float(rev_prior) > 0
-    ):
+    if _is_finite_number(gp_prior) and _is_finite_number(rev_prior) and float(rev_prior) > 0:
         out["GrossMargin_PriorYear"] = float(gp_prior) / float(rev_prior)
     else:
         out["GrossMargin_PriorYear"] = np.nan
@@ -366,14 +359,14 @@ def _get_yoy_inputs(
     return out
 
 
-def _years_since_first_trade(info: Dict[str, Any]) -> float:
+def _years_since_first_trade(info: dict[str, Any]) -> float:
     """Compute years since first listing from ``firstTradeDateEpochUtc``."""
     epoch = info.get("firstTradeDateEpochUtc")
     if epoch is None or not _is_finite_number(epoch):
         return np.nan
     try:
-        first_trade = datetime.fromtimestamp(float(epoch), tz=timezone.utc)
-        now = datetime.now(tz=timezone.utc)
+        first_trade = datetime.fromtimestamp(float(epoch), tz=UTC)
+        now = datetime.now(tz=UTC)
         return (now - first_trade).days / 365.25
     except (OverflowError, OSError, ValueError):
         return np.nan
@@ -428,6 +421,7 @@ def _country_to_code(country_name: str) -> str:
 # YFinanceDataFetcher
 # ---------------------------------------------------------------------------
 
+
 class YFinanceDataFetcher:
     """Implements the MarketDataSource Protocol via yfinance.
 
@@ -437,14 +431,14 @@ class YFinanceDataFetcher:
 
     name: str = "yfinance"
 
-    def __init__(self, cache: Optional[CacheService] = None) -> None:
+    def __init__(self, cache: CacheService | None = None) -> None:
         self._cache = cache or CacheService()
 
     # ------------------------------------------------------------------
     # Protocol methods
     # ------------------------------------------------------------------
 
-    def fetch_quote(self, ticker: str) -> Dict[str, Any]:
+    def fetch_quote(self, ticker: str) -> dict[str, Any]:
         """Fetch current price snapshot from yfinance info dict."""
         cache_key = f"yf:quote:{ticker}"
         cached = self._cache.get(cache_key)
@@ -502,10 +496,7 @@ class YFinanceDataFetcher:
             # Remove duplicate index entries (keep first occurrence)
             merged = merged[~merged.index.duplicated(keep="first")]
             # Normalise columns to ISO date strings
-            merged.columns = [
-                c.strftime("%Y-%m-%d") if hasattr(c, "strftime") else str(c)
-                for c in merged.columns
-            ]
+            merged.columns = [c.strftime("%Y-%m-%d") if hasattr(c, "strftime") else str(c) for c in merged.columns]
             # Cache for 24 hours
             self._cache.set(cache_key, merged.to_dict(), ttl_seconds=86400)
             return merged
@@ -543,10 +534,7 @@ class YFinanceDataFetcher:
 
             merged = pd.concat(frames)
             merged = merged[~merged.index.duplicated(keep="first")]
-            merged.columns = [
-                c.strftime("%Y-%m-%d") if hasattr(c, "strftime") else str(c)
-                for c in merged.columns
-            ]
+            merged.columns = [c.strftime("%Y-%m-%d") if hasattr(c, "strftime") else str(c) for c in merged.columns]
             # Cache 6 hours
             self._cache.set(cache_key, merged.to_dict(), ttl_seconds=21600)
             return merged
@@ -589,7 +577,7 @@ class YFinanceDataFetcher:
             logger.warning(f"yfinance fetch_price_history failed for {ticker}: {exc}")
             return pd.DataFrame()
 
-    def fetch_eps_estimates(self, ticker: str) -> Optional[pd.DataFrame]:
+    def fetch_eps_estimates(self, ticker: str) -> pd.DataFrame | None:
         """Fetch analyst EPS estimates from yfinance earnings_estimate."""
         try:
             tk = yf.Ticker(ticker)
@@ -602,14 +590,14 @@ class YFinanceDataFetcher:
             logger.debug(f"yfinance fetch_eps_estimates failed for {ticker}: {exc}")
             return None
 
-    def fetch_eps_revisions(self, ticker: str) -> Optional[pd.DataFrame]:
+    def fetch_eps_revisions(self, ticker: str) -> pd.DataFrame | None:
         """yfinance does not provide EPS revision history.
 
         Raises ``NotImplementedError`` so the hybrid composer falls through to FMP.
         """
         raise NotImplementedError("yfinance does not provide EPS revision history")
 
-    def fetch_analyst_targets(self, ticker: str) -> Optional[Dict[str, Any]]:
+    def fetch_analyst_targets(self, ticker: str) -> dict[str, Any] | None:
         """Fetch consensus analyst price targets from yfinance info."""
         try:
             tk = yf.Ticker(ticker)
@@ -619,8 +607,10 @@ class YFinanceDataFetcher:
             target_high = _safe_get(info, "targetHighPrice", None)
             target_median = _safe_get(info, "targetMedianPrice", None)
 
-            if all(v is None or (isinstance(v, float) and np.isnan(v))
-                   for v in [target_mean, target_low, target_high, target_median]):
+            if all(
+                v is None or (isinstance(v, float) and np.isnan(v))
+                for v in [target_mean, target_low, target_high, target_median]
+            ):
                 return None
 
             return {
@@ -634,7 +624,7 @@ class YFinanceDataFetcher:
             logger.warning(f"yfinance fetch_analyst_targets failed for {ticker}: {exc}")
             return None
 
-    def fetch_news(self, ticker: str, limit: int = 20) -> Optional[List[Dict[str, Any]]]:
+    def fetch_news(self, ticker: str, limit: int = 20) -> list[dict[str, Any]] | None:
         """Fetch recent news headlines from yfinance."""
         try:
             tk = yf.Ticker(ticker)
@@ -647,11 +637,7 @@ class YFinanceDataFetcher:
                 # older versions are flat. Support both.
                 content = item.get("content", item)
                 title = content.get("title", "") or item.get("title", "")
-                published = (
-                    content.get("pubDate")
-                    or content.get("displayTime")
-                    or item.get("providerPublishTime", "")
-                )
+                published = content.get("pubDate") or content.get("displayTime") or item.get("providerPublishTime", "")
                 publisher = (
                     content.get("provider", {}).get("displayName", "")
                     if isinstance(content.get("provider"), dict)
@@ -662,22 +648,24 @@ class YFinanceDataFetcher:
                     if isinstance(content.get("canonicalUrl"), dict)
                     else item.get("link", "")
                 )
-                result.append({
-                    "title": title,
-                    # M9 sentiment scorer reads `text` first; fall back to title.
-                    "text": content.get("summary", "") or title,
-                    # Keep both keys: `publishedAt` (M2) and `published_date` (M9 spec).
-                    "publishedAt": published,
-                    "published_date": published,
-                    "source": publisher,
-                    "url": url,
-                })
+                result.append(
+                    {
+                        "title": title,
+                        # M9 sentiment scorer reads `text` first; fall back to title.
+                        "text": content.get("summary", "") or title,
+                        # Keep both keys: `publishedAt` (M2) and `published_date` (M9 spec).
+                        "publishedAt": published,
+                        "published_date": published,
+                        "source": publisher,
+                        "url": url,
+                    }
+                )
             return result if result else None
         except Exception as exc:
             logger.debug(f"yfinance fetch_news failed for {ticker}: {exc}")
             return None
 
-    def fetch_profile(self, ticker: str) -> Dict[str, Any]:
+    def fetch_profile(self, ticker: str) -> dict[str, Any]:
         """Fetch company profile from yfinance info."""
         try:
             tk = yf.Ticker(ticker)
@@ -689,7 +677,7 @@ class YFinanceDataFetcher:
             first_trade_date = None
             if first_trade_epoch is not None and _is_finite_number(first_trade_epoch):
                 try:
-                    dt = datetime.fromtimestamp(float(first_trade_epoch), tz=timezone.utc)
+                    dt = datetime.fromtimestamp(float(first_trade_epoch), tz=UTC)
                     first_trade_date = dt.date().isoformat()
                 except (OverflowError, OSError, ValueError):
                     pass
@@ -717,7 +705,7 @@ class YFinanceDataFetcher:
     # Composite fetch (used by HybridDataFetcher for the full scoring row)
     # ------------------------------------------------------------------
 
-    def fetch_full_row(self, ticker: str) -> Dict[str, Any]:
+    def fetch_full_row(self, ticker: str) -> dict[str, Any]:
         """Fetch a complete scoring row for *ticker* using yfinance.
 
         This is the method that powers the legacy DataFetcher.fetch_single()
@@ -725,16 +713,13 @@ class YFinanceDataFetcher:
         SCORING_COLUMNS.  Returns a flat dict with all fields (NaN when
         absent).
         """
-        result: Dict[str, Any] = {}
+        result: dict[str, Any] = {}
 
         try:
             tk = yf.Ticker(ticker)
             info = tk.info or {}
 
-            if not info or (
-                info.get("regularMarketPrice") is None
-                and info.get("currentPrice") is None
-            ):
+            if not info or (info.get("regularMarketPrice") is None and info.get("currentPrice") is None):
                 logger.warning(f"No data returned from yfinance for {ticker}")
                 return {}
 
@@ -781,17 +766,13 @@ class YFinanceDataFetcher:
             # Cash Flow
             result["OperatingCashflow"] = _safe_get(info, "operatingCashflow", np.nan)
             result["FCF"] = _safe_get(info, "freeCashflow", np.nan)
-            capex_val = (
-                _safe_get(info, "operatingCashflow", 0) - _safe_get(info, "freeCashflow", 0)
-            )
+            capex_val = _safe_get(info, "operatingCashflow", 0) - _safe_get(info, "freeCashflow", 0)
             result["CapEx"] = capex_val if capex_val != 0 else np.nan
 
             # Balance Sheet
             bs_items = _get_balance_sheet_items(tk, balance_sheet=balance_sheet)
             ta_info = _safe_get(info, "totalAssets", np.nan)
-            result["TotalAssets"] = (
-                ta_info if _is_finite_number(ta_info) else bs_items["TotalAssets_BS"]
-            )
+            result["TotalAssets"] = ta_info if _is_finite_number(ta_info) else bs_items["TotalAssets_BS"]
             equity_info = _safe_get(info, "totalStockholderEquity", np.nan)
             if _is_finite_number(equity_info):
                 result["TotalEquity"] = equity_info
@@ -824,11 +805,7 @@ class YFinanceDataFetcher:
             shares = _safe_get(info, "sharesOutstanding", np.nan)
             if _is_finite_number(fcf) and fcf > 0 and _is_finite_number(shares) and shares > 0:
                 fcf_per_share = fcf / shares
-                result["PFCF"] = (
-                    price / fcf_per_share
-                    if _is_finite_number(price) and fcf_per_share > 0
-                    else np.nan
-                )
+                result["PFCF"] = price / fcf_per_share if _is_finite_number(price) and fcf_per_share > 0 else np.nan
             else:
                 result["PFCF"] = np.nan
 
@@ -872,11 +849,7 @@ class YFinanceDataFetcher:
                 result["DebtEquity"] = result["DebtEquity"] / 100.0
 
             interest_expense = _get_real_interest_expense(tk, financials=financials)
-            if (
-                _is_finite_number(ebit_real)
-                and _is_finite_number(interest_expense)
-                and interest_expense > 0
-            ):
+            if _is_finite_number(ebit_real) and _is_finite_number(interest_expense) and interest_expense > 0:
                 result["InterestCoverage"] = float(ebit_real) / float(interest_expense)
             else:
                 result["InterestCoverage"] = np.nan
@@ -940,22 +913,22 @@ class YFinanceDataFetcher:
 
     @staticmethod
     def _extract_history_and_prior(
-        financials: Optional[pd.DataFrame],
-        balance_sheet: Optional[pd.DataFrame],
-        cashflow: Optional[pd.DataFrame],
-        current_ebit: Optional[float] = None,
-        current_equity: Optional[float] = None,
-        current_debt: Optional[float] = None,
-        current_cash: Optional[float] = None,
-    ) -> Dict[str, Any]:
+        financials: pd.DataFrame | None,
+        balance_sheet: pd.DataFrame | None,
+        cashflow: pd.DataFrame | None,
+        current_ebit: float | None = None,
+        current_equity: float | None = None,
+        current_debt: float | None = None,
+        current_cash: float | None = None,
+    ) -> dict[str, Any]:
         """Pull 5y / 3y history arrays + Beneish prior-year scalars from yfinance.
 
         Tolerant of gaps: every field defaults to NaN or [] when yfinance does
         not return the underlying line item.
         """
-        out: Dict[str, Any] = {}
+        out: dict[str, Any] = {}
 
-        def _series_at(stmt: Optional[pd.DataFrame], keys: Sequence[str]) -> List[float]:
+        def _series_at(stmt: pd.DataFrame | None, keys: Sequence[str]) -> list[float]:
             """Return finite numeric values from row matching any key, ordered most-recent first."""
             if stmt is None or not isinstance(stmt, pd.DataFrame) or stmt.empty:
                 return []
@@ -966,7 +939,7 @@ class YFinanceDataFetcher:
                         if row.empty:
                             continue
                         row = row.iloc[0]
-                    vals: List[float] = []
+                    vals: list[float] = []
                     for c in row.index:
                         v = row[c]
                         if _is_finite_number(v):
@@ -981,7 +954,9 @@ class YFinanceDataFetcher:
         ebit_hist = _series_at(financials, ["EBIT", "Operating Income", "OperatingIncome"])
         op_inc_hist = ebit_hist
         cogs_hist = _series_at(financials, ["Cost Of Revenue", "Cost Of Goods Sold", "CostOfRevenue"])
-        sga_hist = _series_at(financials, ["Selling General And Administration", "SellingGeneralAndAdministrative", "SG&A Expense"])
+        sga_hist = _series_at(
+            financials, ["Selling General And Administration", "SellingGeneralAndAdministrative", "SG&A Expense"]
+        )
         gross_profit_hist = _series_at(financials, ["Gross Profit", "GrossProfit"])
         interest_hist = _series_at(financials, ["Interest Expense", "InterestExpense"])
 
@@ -989,18 +964,29 @@ class YFinanceDataFetcher:
         ta_hist = _series_at(balance_sheet, ["Total Assets", "TotalAssets"])
         ca_hist = _series_at(balance_sheet, ["Current Assets", "Total Current Assets", "CurrentAssets"])
         cl_hist = _series_at(balance_sheet, ["Current Liabilities", "Total Current Liabilities", "CurrentLiabilities"])
-        recv_hist = _series_at(balance_sheet, ["Net Receivables", "Receivables", "AccountsReceivable", "Accounts Receivable"])
-        ppe_hist = _series_at(balance_sheet, ["Net PPE", "Property Plant Equipment Net", "Net Property Plant And Equipment"])
+        recv_hist = _series_at(
+            balance_sheet, ["Net Receivables", "Receivables", "AccountsReceivable", "Accounts Receivable"]
+        )
+        ppe_hist = _series_at(
+            balance_sheet, ["Net PPE", "Property Plant Equipment Net", "Net Property Plant And Equipment"]
+        )
         ltd_hist = _series_at(balance_sheet, ["Long Term Debt", "LongTermDebt"])
-        equity_hist = _series_at(balance_sheet, ["Stockholders Equity", "Total Stockholder Equity", "Common Stock Equity"])
+        equity_hist = _series_at(
+            balance_sheet, ["Stockholders Equity", "Total Stockholder Equity", "Common Stock Equity"]
+        )
         debt_hist = _series_at(balance_sheet, ["Total Debt", "TotalDebt"])
         cash_hist = _series_at(balance_sheet, ["Cash And Cash Equivalents", "CashAndCashEquivalents", "Cash"])
 
         # Cash-flow series
         fcf_hist = _series_at(cashflow, ["Free Cash Flow", "FreeCashFlow"])
-        op_cf_hist = _series_at(cashflow, ["Operating Cash Flow", "OperatingCashFlow", "Cash Flow From Continuing Operating Activities"])
+        op_cf_hist = _series_at(
+            cashflow, ["Operating Cash Flow", "OperatingCashFlow", "Cash Flow From Continuing Operating Activities"]
+        )
         capex_hist = _series_at(cashflow, ["Capital Expenditure", "CapitalExpenditure", "Capital Expenditures"])
-        da_hist = _series_at(cashflow, ["Depreciation And Amortization", "DepreciationAndAmortization", "Depreciation Amortization Depletion"])
+        da_hist = _series_at(
+            cashflow,
+            ["Depreciation And Amortization", "DepreciationAndAmortization", "Depreciation Amortization Depletion"],
+        )
 
         # FCF fallback: OCF - |CapEx|
         if not fcf_hist and op_cf_hist and capex_hist:
@@ -1008,7 +994,7 @@ class YFinanceDataFetcher:
             fcf_hist = [op_cf_hist[i] - abs(capex_hist[i]) for i in range(n)]
 
         # Operating-margin history (op_income / revenue)
-        op_margin_hist: List[float] = []
+        op_margin_hist: list[float] = []
         if op_inc_hist and revenue_hist:
             n = min(len(op_inc_hist), len(revenue_hist))
             for i in range(n):
@@ -1016,8 +1002,8 @@ class YFinanceDataFetcher:
                     op_margin_hist.append(op_inc_hist[i] / revenue_hist[i])
 
         # ROIC + invested-capital history
-        roic_hist: List[float] = []
-        ic_hist: List[float] = []
+        roic_hist: list[float] = []
+        ic_hist: list[float] = []
         if ebit_hist and equity_hist and debt_hist and cash_hist:
             n = min(len(ebit_hist), len(equity_hist), len(debt_hist), len(cash_hist))
             for i in range(n):
@@ -1035,7 +1021,7 @@ class YFinanceDataFetcher:
         out["InvestedCapital_History_3y"] = ic_hist[:3]
 
         # Beneish prior-year scalars
-        def _idx(seq: List[float], i: int) -> float:
+        def _idx(seq: list[float], i: int) -> float:
             return seq[i] if 0 <= i < len(seq) else float("nan")
 
         out.setdefault("Receivables", _idx(recv_hist, 0))

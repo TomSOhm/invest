@@ -2,12 +2,13 @@
 Invest Solo -- Portfolio JSON File Store
 Persists portfolio positions to data/portfolio.json.
 """
+
 import json
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -25,7 +26,7 @@ _EMPTY_PORTFOLIO = {
 class PortfolioStore:
     """Thread-safe JSON file store for portfolio positions."""
 
-    def __init__(self, path: Optional[Path] = None) -> None:
+    def __init__(self, path: Path | None = None) -> None:
         self._path = path or PORTFOLIO_PATH
         self._lock = threading.Lock()
         self._ensure_file()
@@ -36,18 +37,18 @@ class PortfolioStore:
         if not self._path.exists():
             self._write(_EMPTY_PORTFOLIO.copy())
 
-    def _read(self) -> Dict[str, Any]:
+    def _read(self) -> dict[str, Any]:
         """Read the JSON file and return its contents."""
         try:
-            with open(self._path, "r", encoding="utf-8") as fh:
+            with open(self._path, encoding="utf-8") as fh:
                 return json.load(fh)
         except (json.JSONDecodeError, OSError) as exc:
             logger.error(f"Error reading portfolio file: {exc}")
             return _EMPTY_PORTFOLIO.copy()
 
-    def _write(self, data: Dict[str, Any]) -> None:
+    def _write(self, data: dict[str, Any]) -> None:
         """Write data to the JSON file."""
-        data["last_modified"] = datetime.now(timezone.utc).isoformat()
+        data["last_modified"] = datetime.now(UTC).isoformat()
         try:
             with open(self._path, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
@@ -56,7 +57,7 @@ class PortfolioStore:
 
     # -- public API --
 
-    def get_positions(self) -> List[Dict[str, Any]]:
+    def get_positions(self) -> list[dict[str, Any]]:
         """Return all stored positions."""
         with self._lock:
             data = self._read()
@@ -67,17 +68,17 @@ class PortfolioStore:
         ticker: str,
         quantity: float,
         buy_price: float,
-        buy_date: Optional[str] = None,
+        buy_date: str | None = None,
         account_type: str = "pea",
-        notes: Optional[str] = None,
-    ) -> Dict[str, Any]:
+        notes: str | None = None,
+    ) -> dict[str, Any]:
         """Add a new position and return it (including generated id)."""
         position = {
             "id": str(uuid.uuid4()),
             "ticker": ticker.upper(),
             "quantity": quantity,
             "buy_price": buy_price,
-            "buy_date": buy_date or datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "buy_date": buy_date or datetime.now(UTC).strftime("%Y-%m-%d"),
             "account_type": account_type,
             "notes": notes or "",
         }
@@ -88,7 +89,7 @@ class PortfolioStore:
         logger.info(f"Added position: {ticker} x{quantity} @ {buy_price}")
         return position
 
-    def update_position(self, position_id: str, updates: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+    def update_position(self, position_id: str, updates: dict[str, Any]) -> dict[str, Any] | None:
         """
         Update fields on an existing position.
         Returns the updated position or None if not found.

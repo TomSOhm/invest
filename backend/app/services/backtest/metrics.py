@@ -6,9 +6,8 @@ Pure-function metric library operating on pandas Series.
 All inputs are assumed to be aligned (same DatetimeIndex). Functions return
 ``float('nan')`` when input is too short / degenerate rather than raising.
 """
-from __future__ import annotations
 
-from typing import Tuple
+from __future__ import annotations
 
 import numpy as np
 import pandas as pd
@@ -106,9 +105,7 @@ def information_ratio(
     """
     if strategy_returns is None or benchmark_returns is None:
         return float("nan")
-    aligned = pd.concat(
-        [strategy_returns, benchmark_returns], axis=1, join="inner"
-    ).dropna()
+    aligned = pd.concat([strategy_returns, benchmark_returns], axis=1, join="inner").dropna()
     if len(aligned) < 2:
         return float("nan")
     active = aligned.iloc[:, 0] - aligned.iloc[:, 1]
@@ -135,7 +132,7 @@ def alpha_beta(
     strategy_returns: pd.Series,
     benchmark_returns: pd.Series,
     rf: float = 0.03,
-) -> Tuple[float, float]:
+) -> tuple[float, float]:
     """Annualised Jensen alpha and beta from CAPM regression.
 
     OLS on excess returns (over the per-period rf):
@@ -150,9 +147,7 @@ def alpha_beta(
     """
     if strategy_returns is None or benchmark_returns is None:
         return float("nan"), float("nan")
-    aligned = pd.concat(
-        [strategy_returns, benchmark_returns], axis=1, join="inner"
-    ).dropna()
+    aligned = pd.concat([strategy_returns, benchmark_returns], axis=1, join="inner").dropna()
     if len(aligned) < 5:
         return float("nan"), float("nan")
     rf_d = rf / _TRADING_DAYS_PER_YEAR

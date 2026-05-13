@@ -18,6 +18,7 @@ Run modes:
 The script is intentionally tolerant: a ticker that fails to fetch is logged
 and skipped, never aborting the run. JSON encoding handles NaN/Inf safely.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,7 +27,7 @@ import math
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -36,19 +37,20 @@ sys.path.insert(0, str(PROJECT_ROOT))
 sys.path.insert(0, str(PROJECT_ROOT / "backend"))
 sys.path.insert(0, str(PROJECT_ROOT / "src"))
 
+from functools import lru_cache
+
 from backend.app.services.cache_service import CacheService  # noqa: E402
 from backend.app.services.data_fetcher import DataFetcher  # noqa: E402
 from src.analysis.scoring_engine import (  # noqa: E402
     altman_z_score,
     compute_composite_score,
     data_completeness,
+    dcf_with_sensitivity,
     generate_signal,
     graham_number,
     piotroski_f_score,
-    dcf_with_sensitivity,
     score_dataframe,
 )
-from functools import lru_cache
 
 GOLDEN_DIR = PROJECT_ROOT / "tests" / "golden"
 INPUTS_DIR = GOLDEN_DIR / "inputs"
@@ -57,7 +59,10 @@ TICKERS_FILE = GOLDEN_DIR / "tickers.txt"
 
 
 _WINDOWS_RESERVED = {
-    "CON", "PRN", "AUX", "NUL",
+    "CON",
+    "PRN",
+    "AUX",
+    "NUL",
     *(f"COM{i}" for i in range(1, 10)),
     *(f"LPT{i}" for i in range(1, 10)),
 }
@@ -76,7 +81,7 @@ def safe_filename(ticker: str) -> str:
     return cleaned
 
 
-def load_tickers() -> List[str]:
+def load_tickers() -> list[str]:
     return [
         line.strip()
         for line in TICKERS_FILE.read_text(encoding="utf-8").splitlines()
@@ -116,7 +121,7 @@ def _decode_floats(obj: Any) -> Any:
     return obj
 
 
-def write_json(path: Path, data: Dict[str, Any]) -> None:
+def write_json(path: Path, data: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(
         json.dumps(_encode_floats(data), indent=2, sort_keys=True, ensure_ascii=False),
@@ -124,7 +129,7 @@ def write_json(path: Path, data: Dict[str, Any]) -> None:
     )
 
 
-def fetch_input(fetcher: DataFetcher, ticker: str) -> Dict[str, Any] | None:
+def fetch_input(fetcher: DataFetcher, ticker: str) -> dict[str, Any] | None:
     """Fetch live data for one ticker; return the row dict or None on hard failure."""
     try:
         row = fetcher.fetch_single(ticker)
@@ -146,7 +151,7 @@ def _golden_peer_universe() -> pd.DataFrame:
     universe every time (deterministic snapshots). Index is the ticker
     symbol parsed from the filename.
     """
-    rows: Dict[str, Dict[str, Any]] = {}
+    rows: dict[str, dict[str, Any]] = {}
     if not INPUTS_DIR.exists():
         return pd.DataFrame()
     for path in sorted(INPUTS_DIR.glob("*.json")):
@@ -184,7 +189,7 @@ def _golden_universe_scored() -> pd.DataFrame:
     return score_dataframe(peers)
 
 
-def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
+def score_row(row: dict[str, Any], ticker: str | None = None) -> dict[str, Any]:
     """Run the current scoring engine on a frozen input row → snapshot dict.
 
     The peer universe used for sector-relative ranking is loaded lazily
@@ -216,7 +221,13 @@ def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
     price = series.get("Price")
     graham_mos = (
         round((gn / price - 1) * 100, 1)
-        if (gn is not None and not (isinstance(gn, float) and math.isnan(gn)) and price and not (isinstance(price, float) and math.isnan(price)) and price > 0)
+        if (
+            gn is not None
+            and not (isinstance(gn, float) and math.isnan(gn))
+            and price
+            and not (isinstance(price, float) and math.isnan(price))
+            and price > 0
+        )
         else float("nan")
     )
 
@@ -284,9 +295,18 @@ def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
     # ------------------------------------------------------------------
     scored_universe = _golden_universe_scored()
     horizon_cols = (
-        "score_lt", "signal_lt", "passes_gates_lt", "blockers_lt",
-        "score_mt", "signal_mt", "passes_gates_mt", "blockers_mt",
-        "score_st", "signal_st", "passes_gates_st", "blockers_st",
+        "score_lt",
+        "signal_lt",
+        "passes_gates_lt",
+        "blockers_lt",
+        "score_mt",
+        "signal_mt",
+        "passes_gates_mt",
+        "blockers_mt",
+        "score_st",
+        "signal_st",
+        "passes_gates_st",
+        "blockers_st",
         "recommended_account",
     )
     if ticker and ticker in scored_universe.index:
@@ -315,7 +335,7 @@ def score_row(row: Dict[str, Any], ticker: str | None = None) -> Dict[str, Any]:
     return snap
 
 
-def main(argv: List[str] | None = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--all", action="store_true", help="capture every ticker in tickers.txt")
     parser.add_argument("--tickers", nargs="+", help="capture only these tickers")

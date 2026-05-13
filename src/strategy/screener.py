@@ -19,10 +19,9 @@ QUALITY_GROWTH_FILTERS, DIVIDEND_INCOME_FILTERS) and their helper
 functions (screen_pea_value, screen_global_best, etc.) are preserved
 unchanged so existing callers keep working.
 """
-import pandas as pd
-import numpy as np
-from typing import Optional, Dict, List
 
+import numpy as np
+import pandas as pd
 
 DEFAULT_FILTERS = {
     "min_market_cap": 100e6,
@@ -93,7 +92,7 @@ def _nan_safe_le(series: pd.Series, threshold: float) -> pd.Series:
     return (series <= threshold) | series.isna()
 
 
-def apply_filters(df: pd.DataFrame, filters: Dict, pea_only: bool = False) -> pd.DataFrame:
+def apply_filters(df: pd.DataFrame, filters: dict, pea_only: bool = False) -> pd.DataFrame:
     """Apply screening filters to scored DataFrame.
 
     Parameters
@@ -214,7 +213,7 @@ def apply_filters(df: pd.DataFrame, filters: Dict, pea_only: bool = False) -> pd
     effective_pea_only = pea_only or bool(filters.get("pea_only", False))
     if effective_pea_only:
         if _col_present(df, "PEA"):
-            mask &= df["PEA"] == True
+            mask &= df["PEA"]
         # If PEA column absent, skip (don't crash); caller should ensure column.
 
     f = filters
@@ -264,7 +263,7 @@ def apply_filters(df: pd.DataFrame, filters: Dict, pea_only: bool = False) -> pd
 
     # exclude_sectors: drop rows whose Sector is in the exclusion list
     if "exclude_sectors" in f and _col_present(df, "Sector"):
-        excluded: List[str] = list(f["exclude_sectors"])
+        excluded: list[str] = list(f["exclude_sectors"])
         if excluded:
             mask &= ~df["Sector"].isin(excluded)
 
@@ -514,7 +513,7 @@ def get_top_picks(df: pd.DataFrame, n: int = 10, strategy: str = "pea_value") ->
     return result.head(n)
 
 
-def generate_screening_summary(df: pd.DataFrame) -> Dict:
+def generate_screening_summary(df: pd.DataFrame) -> dict:
     """Generate summary statistics of the screened universe."""
     if df.empty:
         return {"count": 0}

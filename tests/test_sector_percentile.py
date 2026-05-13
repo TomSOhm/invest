@@ -1,4 +1,5 @@
 """Unit tests for ``src.analysis.sector_percentile.score_sector_relative``."""
+
 from __future__ import annotations
 
 import math
@@ -15,7 +16,6 @@ for p in (PROJECT_ROOT, PROJECT_ROOT / "src"):
         sys.path.insert(0, str(p))
 
 from src.analysis.sector_percentile import score_sector_relative  # noqa: E402
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Sector group with >= min_n peers
@@ -71,10 +71,7 @@ def test_small_sector_falls_back_to_global() -> None:
         {
             "PE": [15, 18, 20, 22, 25, 30, 35, 40, 45, 50],
             # 4 utilities (small) + 6 software (qualifies for sector rank).
-            "Sector": (
-                ["Utilities"] * 4
-                + ["Technology"] * 6
-            ),
+            "Sector": (["Utilities"] * 4 + ["Technology"] * 6),
         },
         index=[f"S{i}" for i in range(10)],
     )
@@ -84,9 +81,7 @@ def test_small_sector_falls_back_to_global() -> None:
     # 35, 40, 45, 50] -> percentiles [10, 20, 30, 40, 50, 60, 70, 80,
     # 90, 100]. Inverse: [90, 80, 70, 60, ...]. Utilities are rows 0..3
     # (PE 15, 18, 20, 22) -> inverse global ranks [90, 80, 70, 60].
-    np.testing.assert_allclose(
-        result.iloc[:4].values, [90.0, 80.0, 70.0, 60.0], atol=1e-4
-    )
+    np.testing.assert_allclose(result.iloc[:4].values, [90.0, 80.0, 70.0, 60.0], atol=1e-4)
 
     # Tech (rows 4..9): rank within sector PE [25, 30, 35, 40, 45, 50]
     # -> [16.67, 33.33, 50, 66.67, 83.33, 100]; inverse -> [83.33,
@@ -188,9 +183,7 @@ def test_missing_sector_column_uses_global_rank() -> None:
     result = score_sector_relative(df, "PE", inverse=True, min_n=5)
     # 5 rows globally -> percentiles [20, 40, 60, 80, 100]; inverse
     # [80, 60, 40, 20, 0].
-    np.testing.assert_allclose(
-        result.values, [80.0, 60.0, 40.0, 20.0, 0.0], atol=1e-4
-    )
+    np.testing.assert_allclose(result.values, [80.0, 60.0, 40.0, 20.0, 0.0], atol=1e-4)
 
 
 def test_empty_sector_label_falls_through_to_global() -> None:

@@ -14,11 +14,12 @@ hand-crafted rows that cover the failure / pass quadrants:
 All scores stay deterministic because we feed the sub-score columns
 directly rather than running them through ``score_dataframe``.
 """
+
 from __future__ import annotations
 
 import sys
 from pathlib import Path
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
 import pytest
@@ -28,13 +29,11 @@ for p in (PROJECT_ROOT, PROJECT_ROOT / "backend", PROJECT_ROOT / "src"):
     sys.path.insert(0, str(p))
 
 from src.analysis.horizon_scoring import (  # noqa: E402
-    DEFAULT_SUB_SCORE_COLUMNS,
     score_long_term,
     score_medium_term,
     score_short_term,
     score_three_horizons,
 )
-
 
 # ---------------------------------------------------------------------------
 # Horizon weight / gate fixtures (mirror settings.yaml so tests stay aligned)
@@ -122,7 +121,7 @@ def _row(
     avg_volume: float = 5_000_000.0,
     realized_vol_1y: float = 0.25,
     dcf_mos_mid: float = float("nan"),
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build a synthetic universe row keyed by ticker."""
     return {
         "Ticker": ticker,
@@ -355,9 +354,14 @@ def test_signal_uses_dcf_mos_when_available() -> None:
     """
     deep_value = _row(
         "DEEP",
-        valuation=90.0, profitability=90.0, health=85.0,
-        growth=85.0, capital_allocation=80.0, risk_v2=80.0,
-        earnings_quality=85.0, momentum=70.0,
+        valuation=90.0,
+        profitability=90.0,
+        health=85.0,
+        growth=85.0,
+        capital_allocation=80.0,
+        risk_v2=80.0,
+        earnings_quality=85.0,
+        momentum=70.0,
         dcf_mos_mid=0.40,  # 40% margin of safety → Strong Buy gate
     )
     df = pd.DataFrame([deep_value]).set_index("Ticker")

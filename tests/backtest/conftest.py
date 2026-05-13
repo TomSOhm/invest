@@ -5,9 +5,10 @@ The backtest tests run against a deterministic synthetic price-history
 fetcher so they don't depend on live FMP / yfinance availability and stay
 fast (<30s each).
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -62,7 +63,7 @@ class SyntheticFetcher:
         self,
         start: pd.Timestamp = pd.Timestamp("2018-01-01"),
         end: pd.Timestamp = pd.Timestamp("2024-12-31"),
-        ticker_drifts: Optional[Dict[str, float]] = None,
+        ticker_drifts: dict[str, float] | None = None,
         benchmark_drift: float = 0.06,
     ) -> None:
         self._start = start
@@ -86,7 +87,7 @@ class SyntheticFetcher:
             annual_vol=0.20,
         )
 
-    def fetch_quote(self, ticker: str) -> Dict[str, Any]:
+    def fetch_quote(self, ticker: str) -> dict[str, Any]:
         return {}
 
     def fetch_fundamentals_annual(self, ticker: str) -> pd.DataFrame:
@@ -107,7 +108,7 @@ class SyntheticFetcher:
     def fetch_news(self, ticker: str, limit: int = 20):
         return None
 
-    def fetch_profile(self, ticker: str) -> Dict[str, Any]:
+    def fetch_profile(self, ticker: str) -> dict[str, Any]:
         return {}
 
 
@@ -134,18 +135,20 @@ def alpha_fetcher() -> SyntheticFetcher:
 def pea_universe_df() -> pd.DataFrame:
     """Use the bundled PEA sample universe DataFrame as fundamentals input."""
     from src.data.sample_universe import get_universe_dataframe
+
     return get_universe_dataframe()
 
 
 @pytest.fixture
-def pea_tickers(pea_universe_df) -> List[str]:
+def pea_tickers(pea_universe_df) -> list[str]:
     return list(pea_universe_df.index)
 
 
 @pytest.fixture
-def sp500_tickers() -> List[str]:
+def sp500_tickers() -> list[str]:
     """Curated S&P 500 sample (top ~50 by market cap)."""
     from backend.app.services.backtest.cli import SP500_SAMPLE_50
+
     return list(SP500_SAMPLE_50)
 
 

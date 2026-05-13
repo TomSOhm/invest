@@ -4,9 +4,8 @@ Invest Solo -- FastAPI Application Entry Point
 Run from project root:
     python -m uvicorn backend.app.main:app --reload
 """
-# Config must be imported first to set up sys.path
-from backend.app.config import settings  # noqa: F401
 
+# Config must be imported first to set up sys.path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from loguru import logger
@@ -16,6 +15,7 @@ from backend.app.api.market import router as market_router
 from backend.app.api.portfolio import router as portfolio_router
 from backend.app.api.screener import router as screener_router
 from backend.app.api.watchlist import router as watchlist_router
+from backend.app.config import settings  # noqa: F401
 
 # ---------------------------------------------------------------------------
 # Application
@@ -57,9 +57,10 @@ app.include_router(company_router, prefix="/api/company")
 # Startup / Shutdown Events
 # ---------------------------------------------------------------------------
 
+
 @app.on_event("startup")
 async def on_startup() -> None:
-    logger.info(f"Invest Solo API v0.4.0 starting up (M10 three-horizon schema)")
+    logger.info("Invest Solo API v0.4.0 starting up (M10 three-horizon schema)")
     logger.info(f"Project: {settings.project_name} v{settings.project_version}")
     logger.info(f"Data source: {settings.primary_source}")
     logger.info(f"PEA enabled: {settings.pea_enabled} ({len(settings.pea_eligible_countries)} countries)")
@@ -73,6 +74,7 @@ async def on_shutdown() -> None:
 # ---------------------------------------------------------------------------
 # Root redirect
 # ---------------------------------------------------------------------------
+
 
 @app.get("/")
 async def root():

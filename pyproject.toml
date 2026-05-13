@@ -34,6 +34,8 @@ dev = [
     "pytest>=8.0",
     "pytest-mock>=3.12",
     "pytest-asyncio>=0.24",
+    "pyarrow>=14.0",
+    "openpyxl>=3.1",
 ]
 
 [tool.ruff]
@@ -42,4 +44,9 @@ target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "B", "UP"]
-ignore = ["E501"]
+# E501 line-length handled by ruff format
+# B008 mutable default args via pd.Timestamp() are intentional in test/backtest fixtures
+# E402 module-level import not at top: src/reporting/* uses sys.path.insert() before imports
+# F822 undefined-export: __all__ may reference re-exported symbols not statically visible
+# E741 ambiguous variable name 'l': legacy single-letter loop variables, low value to rename
+ignore = ["E501", "B008", "E402", "F822", "E741"]

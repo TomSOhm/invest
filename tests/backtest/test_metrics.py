@@ -1,4 +1,5 @@
 """Unit tests for the backtest metrics library."""
+
 from __future__ import annotations
 
 import math

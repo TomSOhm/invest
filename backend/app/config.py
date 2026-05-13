@@ -2,10 +2,11 @@
 Invest Solo -- Backend Configuration
 Loads settings.yaml and ensures src modules are importable.
 """
+
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 from dotenv import load_dotenv
@@ -33,15 +34,15 @@ if _root_str not in sys.path:
 SETTINGS_PATH = PROJECT_ROOT / "settings.yaml"
 
 
-def _load_settings() -> Dict[str, Any]:
+def _load_settings() -> dict[str, Any]:
     """Load settings.yaml from the project root."""
     if not SETTINGS_PATH.exists():
         raise FileNotFoundError(f"settings.yaml not found at {SETTINGS_PATH}")
-    with open(SETTINGS_PATH, "r", encoding="utf-8") as fh:
+    with open(SETTINGS_PATH, encoding="utf-8") as fh:
         return yaml.safe_load(fh)
 
 
-_RAW_SETTINGS: Dict[str, Any] = _load_settings()
+_RAW_SETTINGS: dict[str, Any] = _load_settings()
 
 
 # ---------------------------------------------------------------------------
@@ -50,7 +51,7 @@ _RAW_SETTINGS: Dict[str, Any] = _load_settings()
 class AppConfig:
     """Typed accessor for all application settings."""
 
-    def __init__(self, raw: Dict[str, Any]) -> None:
+    def __init__(self, raw: dict[str, Any]) -> None:
         self._raw = raw
 
     # -- project --
@@ -85,7 +86,7 @@ class AppConfig:
         return bool(self._raw["pea"]["enabled"])
 
     @property
-    def pea_eligible_countries(self) -> List[str]:
+    def pea_eligible_countries(self) -> list[str]:
         return [str(c).upper() for c in self._raw["pea"]["eligible_countries"]]
 
     @property
@@ -119,7 +120,7 @@ class AppConfig:
 
     # -- scoring --
     @property
-    def scoring_weights(self) -> Dict[str, float]:
+    def scoring_weights(self) -> dict[str, float]:
         s = self._raw["scoring"]
         return {
             "valuation": s["valuation_weight"],
@@ -132,12 +133,12 @@ class AppConfig:
 
     # -- signals --
     @property
-    def signal_thresholds(self) -> Dict[str, Any]:
+    def signal_thresholds(self) -> dict[str, Any]:
         return self._raw["signals"]
 
     # -- horizons (M7) --
     @property
-    def horizons_block(self) -> Dict[str, Any]:
+    def horizons_block(self) -> dict[str, Any]:
         """Full ``horizons:`` block from settings.yaml.
 
         Returns an empty dict when missing, so legacy configs (pre-M7) keep
@@ -147,17 +148,17 @@ class AppConfig:
         return self._raw.get("horizons", {}) or {}
 
     @property
-    def horizons_long_term(self) -> Dict[str, Any]:
+    def horizons_long_term(self) -> dict[str, Any]:
         """Weights + gates for the long-term horizon (>3y holding)."""
         return self.horizons_block.get("long_term", {}) or {}
 
     @property
-    def horizons_medium_term(self) -> Dict[str, Any]:
+    def horizons_medium_term(self) -> dict[str, Any]:
         """Weights + gates for the medium-term horizon (~6mo-3y)."""
         return self.horizons_block.get("medium_term", {}) or {}
 
     @property
-    def horizons_short_term(self) -> Dict[str, Any]:
+    def horizons_short_term(self) -> dict[str, Any]:
         """Weights + gates for the short-term horizon (<6mo, momentum-led)."""
         return self.horizons_block.get("short_term", {}) or {}
 
@@ -192,7 +193,7 @@ class AppConfig:
         return float(self._raw["screener"].get("min_years_listed", 0))
 
     @property
-    def screener_exclude_sectors(self) -> List[str]:
+    def screener_exclude_sectors(self) -> list[str]:
         return self._raw["screener"].get("exclude_sectors", [])
 
     # -- fmp --
@@ -207,7 +208,7 @@ class AppConfig:
         return int(self._raw.get("fmp", {}).get("daily_limit", 240))
 
     @property
-    def fmp_token(self) -> Optional[str]:
+    def fmp_token(self) -> str | None:
         """FMP API token loaded from the FMP_TOKEN environment variable."""
         return os.getenv("FMP_TOKEN") or None
 
@@ -222,7 +223,7 @@ class AppConfig:
 
     # -- raw access --
     @property
-    def raw(self) -> Dict[str, Any]:
+    def raw(self) -> dict[str, Any]:
         return self._raw
 
 

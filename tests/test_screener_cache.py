@@ -1,10 +1,10 @@
 """Tests for the screener cache module."""
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -84,9 +84,7 @@ class TestRefresh:
         )
         scorer = MagicMock()
         scorer.score_dataframe.return_value = _scored_df(["MC.PA", "TTE.PA"])
-        with patch.object(
-            screener_cache, "load_pea_universe", return_value=["MC.PA", "TTE.PA"]
-        ):
+        with patch.object(screener_cache, "load_pea_universe", return_value=["MC.PA", "TTE.PA"]):
             screener_cache.refresh(fetcher, scorer, use_yfinance_holdings=False)
 
         row = screener_cache.lookup("MC.PA")
@@ -106,9 +104,7 @@ class TestRefresh:
         )
         scorer = MagicMock()
         scorer.score_dataframe.return_value = _scored_df(["MC.PA"])
-        with patch.object(
-            screener_cache, "load_pea_universe", return_value=["MC.PA"]
-        ):
+        with patch.object(screener_cache, "load_pea_universe", return_value=["MC.PA"]):
             screener_cache.refresh(fetcher, scorer, use_yfinance_holdings=False)
 
         # Reset in-memory state — disk should still hold the parquet
@@ -121,17 +117,13 @@ class TestRefresh:
         fetcher = MagicMock()
         fetcher.fetch_batch.return_value = pd.DataFrame()
         scorer = MagicMock()
-        with patch.object(
-            screener_cache, "load_pea_universe", return_value=["MC.PA"]
-        ):
+        with patch.object(screener_cache, "load_pea_universe", return_value=["MC.PA"]):
             with pytest.raises(RuntimeError, match="empty DataFrame"):
                 screener_cache.refresh(fetcher, scorer, use_yfinance_holdings=False)
 
     def test_empty_universe_raises(self) -> None:
         fetcher = MagicMock()
         scorer = MagicMock()
-        with patch.object(
-            screener_cache, "load_pea_universe", return_value=[]
-        ):
+        with patch.object(screener_cache, "load_pea_universe", return_value=[]):
             with pytest.raises(RuntimeError, match="no tickers"):
                 screener_cache.refresh(fetcher, scorer, use_yfinance_holdings=False)

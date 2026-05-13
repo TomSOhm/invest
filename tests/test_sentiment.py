@@ -5,10 +5,11 @@ matching the spec for M9.  When transformers IS installed they monkeypatch
 the FinBERT pipeline singleton to a deterministic dummy classifier so we
 don't have to download model weights in CI.
 """
+
 from __future__ import annotations
 
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 
@@ -38,9 +39,11 @@ class _DummyPipeline:
                 label = "negative"
             else:
                 label = "neutral"
-            results.append([
-                {"label": label, "score": 0.9},
-            ])
+            results.append(
+                [
+                    {"label": label, "score": 0.9},
+                ]
+            )
         return results
 
 
@@ -59,7 +62,7 @@ def _patch_pipeline(monkeypatch):
 
 
 def _now() -> datetime:
-    return datetime.now(tz=timezone.utc)
+    return datetime.now(tz=UTC)
 
 
 def test_sentiment_score_all_positive_high():
@@ -124,12 +127,8 @@ def test_sentiment_score_mixed_returns_around_50():
 
 def test_sentiment_signals_df_basic():
     news_map = {
-        "AAPL": [
-            {"title": f"good thing {i}", "publishedAt": _now()} for i in range(5)
-        ],
-        "MSFT": [
-            {"title": f"bad thing {i}", "publishedAt": _now()} for i in range(5)
-        ],
+        "AAPL": [{"title": f"good thing {i}", "publishedAt": _now()} for i in range(5)],
+        "MSFT": [{"title": f"bad thing {i}", "publishedAt": _now()} for i in range(5)],
     }
     out = sentiment.sentiment_signals_df(news_map)
     assert "Sentiment_30d" in out.columns

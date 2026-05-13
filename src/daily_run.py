@@ -2,19 +2,22 @@
 Invest Solo — Main Analysis Pipeline
 Runs the full screening, scoring, and report generation.
 """
-import sys
+
 import os
+import sys
+
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-import pandas as pd
-import numpy as np
 from datetime import datetime
 
-from src.data.sample_universe import get_universe_dataframe
 from src.analysis.scoring_engine import score_universe
+from src.data.sample_universe import get_universe_dataframe
 from src.strategy.screener import (
-    screen_pea_value, screen_pea_quality, screen_dividend_income,
-    screen_global_best, generate_screening_summary
+    generate_screening_summary,
+    screen_dividend_income,
+    screen_global_best,
+    screen_pea_quality,
+    screen_pea_value,
 )
 
 
@@ -58,8 +61,19 @@ def run_pipeline():
     print("=" * 60)
 
     display_cols = [
-        "Name", "Sector", "Country", "Price", "Composite_Score", "Signal",
-        "PE", "ROE", "DivYield", "Piotroski_F", "Altman_Z", "Graham_Number", "Graham_MoS"
+        "Name",
+        "Sector",
+        "Country",
+        "Price",
+        "Composite_Score",
+        "Signal",
+        "PE",
+        "ROE",
+        "DivYield",
+        "Piotroski_F",
+        "Altman_Z",
+        "Graham_Number",
+        "Graham_MoS",
     ]
 
     for name, result in strategies.items():

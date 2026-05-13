@@ -48,9 +48,10 @@ Usage
 >>> list_presets()
 >>> filtered_df = screen_horizon_preset(df, "LT_QUALITY_COMPOUNDER")
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any
 
 import pandas as pd
 
@@ -58,14 +59,14 @@ import pandas as pd
 # Internal type alias
 # ──────────────────────────────────────────────────────────────────────────────
 
-_PresetDict = Dict[str, Any]
+_PresetDict = dict[str, Any]
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Universal pre-filter block
 # Applied to every preset.  Values come from HORIZON_CONFIGS.md §0.
 # ──────────────────────────────────────────────────────────────────────────────
 
-_UNIVERSAL_PREFILTERS: Dict[str, Any] = {
+_UNIVERSAL_PREFILTERS: dict[str, Any] = {
     # Liquidity floor — avoid manipulation and noise (€100M market cap)
     "min_market_cap": 100_000_000,
     # Daily traded value floor (volume × price); column AvgVolume in scorer
@@ -95,54 +96,48 @@ LT_QUALITY_COMPOUNDER: _PresetDict = {
     # Columns not yet plumbed (present in plan, absent from data fetcher as of M8).
     # apply_filters silently skips these keys when the column is absent.
     "requires": [
-        "GrossMargin_Stddev_5y",   # max_gross_margin_stddev_5y
-        "RevenueCAGR_5y",          # min_revenue_cagr_5y, max_revenue_cagr_5y
-        "EPS_CAGR_5y",             # min_eps_cagr_5y
-        "PosRevenueYears_5y",      # min_pos_revenue_years_5y
-        "TotalShareholderYield",   # min_total_shareholder_yield
+        "GrossMargin_Stddev_5y",  # max_gross_margin_stddev_5y
+        "RevenueCAGR_5y",  # min_revenue_cagr_5y, max_revenue_cagr_5y
+        "EPS_CAGR_5y",  # min_eps_cagr_5y
+        "PosRevenueYears_5y",  # min_pos_revenue_years_5y
+        "TotalShareholderYield",  # min_total_shareholder_yield
     ],
     "filters": {
         # ── Universal pre-filters ─────────────────────────────────────────
         **_UNIVERSAL_PREFILTERS,
         # LT uses a stricter data-completeness threshold than the ST horizon
         "min_data_completeness": 0.80,
-
         # ── Quality / Profitability ───────────────────────────────────────
-        "min_roic": 0.12,             # 12% ROIC (above WACC for most names)
-        "min_roic_5y_avg": 0.10,      # Sustained, not a one-off
-        "min_gross_profitability": 0.20,   # GP / Total Assets (Novy-Marx)
+        "min_roic": 0.12,  # 12% ROIC (above WACC for most names)
+        "min_roic_5y_avg": 0.10,  # Sustained, not a one-off
+        "min_gross_profitability": 0.20,  # GP / Total Assets (Novy-Marx)
         "max_gross_margin_stddev_5y": 0.05,  # 5pp = stable pricing power
-        "min_fcf_margin": 0.05,       # Cash-generative
-        "min_ccr_3y_avg": 0.70,       # FCF / NI: earnings quality
-        "min_f_score": 7,             # 7+ on real (not proxied) F-Score
-
+        "min_fcf_margin": 0.05,  # Cash-generative
+        "min_ccr_3y_avg": 0.70,  # FCF / NI: earnings quality
+        "min_f_score": 7,  # 7+ on real (not proxied) F-Score
         # ── Financial Health ──────────────────────────────────────────────
-        "min_altman_z": 2.6,          # Safe zone (Z'' for non-manufacturers)
-        "max_nd_ebitda": 2.5,         # Conservative leverage
-        "min_interest_coverage": 5.0, # Real interest expense, not fabricated
-        "min_current_ratio": 1.0,     # Relaxed for banks/insurers (0 accepted)
-
+        "min_altman_z": 2.6,  # Safe zone (Z'' for non-manufacturers)
+        "max_nd_ebitda": 2.5,  # Conservative leverage
+        "min_interest_coverage": 5.0,  # Real interest expense, not fabricated
+        "min_current_ratio": 1.0,  # Relaxed for banks/insurers (0 accepted)
         # ── Valuation (sector-relative percentile rank) ───────────────────
         # max_sector_pe_percentile: 70 -> "not in top 30% richest in sector"
         # Implemented as min_valuation_score (M3 sector-relative 0-100):
         # low valuation score means rich; a score < ~70 passes if
         # the mapping is approximately linear. Keep both semantics documented.
-        "min_valuation_score": 30,    # Not in bottom-30 of valuation rank
-        "max_ev_ebit": 18,            # Cross-sector EV/EBIT cap
-        "min_dcf_mos": 0.15,          # 15% below DCF base case
-        "max_p_fcf": 30,              # FCF-based valuation cap
-
+        "min_valuation_score": 30,  # Not in bottom-30 of valuation rank
+        "max_ev_ebit": 18,  # Cross-sector EV/EBIT cap
+        "min_dcf_mos": 0.15,  # 15% below DCF base case
+        "max_p_fcf": 30,  # FCF-based valuation cap
         # ── Growth (multi-period) ─────────────────────────────────────────
         "min_revenue_cagr_5y": 0.03,  # 3%/y minimum (GDP + inflation)
-        "min_eps_cagr_5y": 0.05,      # 5% EPS growth
-        "min_pos_revenue_years_5y": 4, # 4 of 5 years growing = consistency
+        "min_eps_cagr_5y": 0.05,  # 5% EPS growth
+        "min_pos_revenue_years_5y": 4,  # 4 of 5 years growing = consistency
         "max_revenue_cagr_5y": 0.40,  # >40%/y = unsustainable
-
         # ── Capital Allocation ────────────────────────────────────────────
         "min_total_shareholder_yield": 0.02,  # Div + buyback + debt-reduction
-
         # ── Composite gate (horizon score) ───────────────────────────────
-        "min_composite_score_lt": 70, # On revised LT-weighted composite
+        "min_composite_score_lt": 70,  # On revised LT-weighted composite
     },
 }
 
@@ -173,7 +168,6 @@ LT_PEA_DEFENSIVE: _PresetDict = {
         "pea_only": True,
         # Raise market-cap floor for stability
         "min_market_cap": 1_000_000_000,  # €1B+
-
         # ── Quality / Profitability (same as LT_QUALITY_COMPOUNDER) ───────
         "min_roic": 0.12,
         "min_roic_5y_avg": 0.10,
@@ -182,35 +176,29 @@ LT_PEA_DEFENSIVE: _PresetDict = {
         "min_fcf_margin": 0.05,
         "min_ccr_3y_avg": 0.70,
         "min_f_score": 7,
-
         # ── Financial Health ──────────────────────────────────────────────
         "min_altman_z": 2.6,
         "max_nd_ebitda": 2.5,
         "min_interest_coverage": 5.0,
         "min_current_ratio": 1.0,
-
         # ── Defensive overrides ───────────────────────────────────────────
-        "max_beta": 1.0,              # Defensive bias — below-market vol
-        "min_div_yield": 0.02,        # Income kicker (PEA tax efficiency)
-        "max_payout_ratio": 0.65,     # Dividend sustainability
+        "max_beta": 1.0,  # Defensive bias — below-market vol
+        "min_div_yield": 0.02,  # Income kicker (PEA tax efficiency)
+        "max_payout_ratio": 0.65,  # Dividend sustainability
         # Exclude energy producers on ESG grounds (optional, surfaced in UI)
         "exclude_sectors": ["Tobacco", "Gambling", "Coal_Mining", "Energy_Producers"],
-
         # ── Valuation ─────────────────────────────────────────────────────
         "min_valuation_score": 30,
         "max_ev_ebit": 18,
         "min_dcf_mos": 0.15,
         "max_p_fcf": 30,
-
         # ── Growth ────────────────────────────────────────────────────────
         "min_revenue_cagr_5y": 0.03,
         "min_eps_cagr_5y": 0.05,
         "min_pos_revenue_years_5y": 4,
         "max_revenue_cagr_5y": 0.40,
-
         # ── Capital Allocation ────────────────────────────────────────────
         "min_total_shareholder_yield": 0.02,
-
         # ── Composite gate ────────────────────────────────────────────────
         "min_composite_score_lt": 70,
     },
@@ -229,26 +217,23 @@ LT_DEEP_VALUE: _PresetDict = {
         "ROIC 5y avg ≥ 6%, and positive FCF in ≥ 3 of last 5 years."
     ),
     "requires": [
-        "PosRevenueYears_5y",    # positive_fcf_3of5_years
+        "PosRevenueYears_5y",  # positive_fcf_3of5_years
     ],
     "filters": {
         # ── Universal pre-filters ─────────────────────────────────────────
         **_UNIVERSAL_PREFILTERS,
-
         # ── Cheap on multiples (sector-relative bottom-30% cheapest) ───────
         # max_sector_pe_percentile: 30 -> bottom-30% richest = cheapest tier
         # Implemented as max_valuation_score: at most 30% of peers are cheaper.
         # Using min_valuation_score would be confusing here; use a dedicated key.
-        "max_valuation_score": 30,    # In the cheapest 30% of sector peers
-        "max_pb": 1.5,               # Book-value floor
-        "max_ev_ebit": 9,            # Cross-sector cheap cap
-        "min_dcf_mos": 0.30,         # 30%+ below DCF — larger MoS required
-
+        "max_valuation_score": 30,  # In the cheapest 30% of sector peers
+        "max_pb": 1.5,  # Book-value floor
+        "max_ev_ebit": 9,  # Cross-sector cheap cap
+        "min_dcf_mos": 0.30,  # 30%+ below DCF — larger MoS required
         # ── Anti-value-trap gates ─────────────────────────────────────────
-        "min_f_score": 6,            # F-Score ≥ 6 filters fading businesses
-        "min_altman_z": 1.8,         # Out of distress zone (above grey-zone floor)
-        "min_roic_5y_avg": 0.06,     # Generates some returns on capital
-
+        "min_f_score": 6,  # F-Score ≥ 6 filters fading businesses
+        "min_altman_z": 1.8,  # Out of distress zone (above grey-zone floor)
+        "min_roic_5y_avg": 0.06,  # Generates some returns on capital
         # ── Composite gate ────────────────────────────────────────────────
         "min_composite_score_lt": 60,
     },
@@ -267,39 +252,33 @@ MT_GARP: _PresetDict = {
         "confirmation (price above 200dma, positive 3m relative strength)."
     ),
     "requires": [
-        "Forward_PE",              # max_forward_pe
-        "PEG_Forward",             # max_peg_forward
-        "EV_EBIT_Forward",         # max_ev_ebit_forward
+        "Forward_PE",  # max_forward_pe
+        "PEG_Forward",  # max_peg_forward
+        "EV_EBIT_Forward",  # max_ev_ebit_forward
         "RevenueGrowth_Acceleration",  # min_revenue_growth_acceleration
     ],
     "filters": {
         # ── Universal pre-filters ─────────────────────────────────────────
         **_UNIVERSAL_PREFILTERS,
-
         # ── Forward valuation (not trailing) ─────────────────────────────
-        "max_forward_pe": 18,         # Pay only fair price
-        "max_peg_forward": 1.3,       # Growth-adjusted valuation cap
-        "max_ev_ebit_forward": 14,    # Forward EV/EBIT if estimates available
-
+        "max_forward_pe": 18,  # Pay only fair price
+        "max_peg_forward": 1.3,  # Growth-adjusted valuation cap
+        "max_ev_ebit_forward": 14,  # Forward EV/EBIT if estimates available
         # ── Catalyst signals ──────────────────────────────────────────────
-        "min_eps_revision_3m": 0.0,   # Not declining (EPS_Rev_90d column)
+        "min_eps_revision_3m": 0.0,  # Not declining (EPS_Rev_90d column)
         "min_eps_revision_6m": 0.02,  # +2% upward revision in 6 months
         "min_operating_margin_trend_2y": 0.005,  # Op margin expanding 50bp/y
         "min_revenue_growth_yoy": 0.05,  # Currently growing
         "min_revenue_growth_acceleration": 0.0,  # Latest quarter ≥ trailing avg
-
         # ── Quality floor ─────────────────────────────────────────────────
         "min_roic": 0.10,
         "min_f_score": 6,
-        "min_altman_z": 2.0,          # Grey-zone OK, distress excluded
-
+        "min_altman_z": 2.0,  # Grey-zone OK, distress excluded
         # ── Capital structure ─────────────────────────────────────────────
         "max_nd_ebitda": 3.0,
-
         # ── Technical confirmation ────────────────────────────────────────
-        "price_above_200dma": True,   # Above_200DMA column (M9)
+        "price_above_200dma": True,  # Above_200DMA column (M9)
         "min_relative_strength_3m_vs_index": 0.0,  # RS_3m > 0
-
         # ── Composite gate ────────────────────────────────────────────────
         "min_composite_score_mt": 65,
     },
@@ -319,21 +298,18 @@ MT_TURNAROUND: _PresetDict = {
     ),
     "requires": [
         "OpMarginImprovement_YoY",  # min_op_margin_improvement_yoy
-        "OpMargin_IsPositive",      # current_year_op_margin_positive
+        "OpMargin_IsPositive",  # current_year_op_margin_positive
         "DebtMaturities_2y_Covered",  # debt_maturities_2y_covered
     ],
     "filters": {
         # ── Universal pre-filters ─────────────────────────────────────────
         **_UNIVERSAL_PREFILTERS,
-
         # ── Was bad, getting better ───────────────────────────────────────
         "min_op_margin_improvement_yoy": 0.03,  # +300bp YoY improvement
-        "positive_fcf_latest_year": True,        # Cash-positive latest year
-
+        "positive_fcf_latest_year": True,  # Cash-positive latest year
         # ── Financially survivable ────────────────────────────────────────
-        "min_altman_z": 1.5,          # Out of distress zone
-        "positive_cash_balance": True, # Positive cash balance
-
+        "min_altman_z": 1.5,  # Out of distress zone
+        "positive_cash_balance": True,  # Positive cash balance
         # ── Composite gate ────────────────────────────────────────────────
         "min_composite_score_mt": 55,
     },
@@ -352,25 +328,22 @@ MT_INCOME: _PresetDict = {
         "≥ 10 consecutive dividend years, payout ≤ 75%."
     ),
     "requires": [
-        "DivGrowth_5y_CAGR",        # min_dividend_growth_5y_cagr
-        "FCF_DivCoverage",          # min_fcf_dividend_coverage
-        "ConsecutiveDivYears",      # min_consecutive_dividend_years
+        "DivGrowth_5y_CAGR",  # min_dividend_growth_5y_cagr
+        "FCF_DivCoverage",  # min_fcf_dividend_coverage
+        "ConsecutiveDivYears",  # min_consecutive_dividend_years
     ],
     "filters": {
         # ── Universal pre-filters ─────────────────────────────────────────
         **_UNIVERSAL_PREFILTERS,
-
         # ── Dividend quality ──────────────────────────────────────────────
-        "min_div_yield": 0.035,       # 3.5% starting yield
-        "max_payout_ratio": 0.75,     # Sustainability: ≤ 75% of earnings paid
+        "min_div_yield": 0.035,  # 3.5% starting yield
+        "max_payout_ratio": 0.75,  # Sustainability: ≤ 75% of earnings paid
         "min_dividend_growth_5y_cagr": 0.03,  # Dividend growers, not yield traps
-        "min_fcf_dividend_coverage": 1.4,   # FCF / dividends paid > 1.4×
+        "min_fcf_dividend_coverage": 1.4,  # FCF / dividends paid > 1.4×
         "min_consecutive_dividend_years": 10,  # Track record
-
         # ── Financial health ──────────────────────────────────────────────
         "max_nd_ebitda": 3.5,
         "min_f_score": 6,
-
         # ── Composite gate ────────────────────────────────────────────────
         "min_composite_score_mt": 55,
     },
@@ -392,37 +365,31 @@ ST_MOMENTUM_QUALITY: _PresetDict = {
     "recommended_account": "CTO",
     "pea_warning": True,
     "requires": [
-        "Momentum_12_1_Quartile",     # momentum_12_1: top_quartile check
-        "Short_Interest_Trend",       # short_interest_trend
+        "Momentum_12_1_Quartile",  # momentum_12_1: top_quartile check
+        "Short_Interest_Trend",  # short_interest_trend
     ],
     "filters": {
         # ── Universal pre-filters (ST raises market-cap floor) ────────────
         **{**_UNIVERSAL_PREFILTERS, "min_market_cap": 500_000_000},
         "min_avg_daily_volume_eur": 2_000_000,  # Real liquidity for execution
-
         # ── Momentum signals (M9 columns) ─────────────────────────────────
-        "price_above_50dma": True,         # Above_50DMA
-        "price_above_200dma": True,        # Above_200DMA
-        "ma_50_above_ma_200": True,        # Golden_Cross
-        "min_volume_surge_5d_vs_90d": 1.3, # Volume_Surge ≥ 1.3
-
+        "price_above_50dma": True,  # Above_50DMA
+        "price_above_200dma": True,  # Above_200DMA
+        "ma_50_above_ma_200": True,  # Golden_Cross
+        "min_volume_surge_5d_vs_90d": 1.3,  # Volume_Surge ≥ 1.3
         # ── Earnings catalyst ─────────────────────────────────────────────
-        "min_sue_z_score": 1.0,            # Strong beat (SUE column from M9)
-        "min_eps_revision_3m": 0.0,        # Not declining
-
+        "min_sue_z_score": 1.0,  # Strong beat (SUE column from M9)
+        "min_eps_revision_3m": 0.0,  # Not declining
         # ── Sentiment ─────────────────────────────────────────────────────
-        "min_news_sentiment_30d": 0.0,     # Neutral or positive (NaN = pass)
-
+        "min_news_sentiment_30d": 0.0,  # Neutral or positive (NaN = pass)
         # ── Quality floor (avoid pump-and-dump) ───────────────────────────
         "min_altman_z": 1.5,
-        "min_f_score": 5,                  # Lower than LT but not junk
-
+        "min_f_score": 5,  # Lower than LT but not junk
         # ── Risk gates ────────────────────────────────────────────────────
         "max_beta": 1.8,
-        "max_realized_vol_1y": 0.50,       # 50% annualized — no 100% vol names
-
+        "max_realized_vol_1y": 0.50,  # 50% annualized — no 100% vol names
         # ── Composite gate ────────────────────────────────────────────────
-        "min_composite_score_st": 50,      # Lower bar — momentum is the signal
+        "min_composite_score_st": 50,  # Lower bar — momentum is the signal
     },
 }
 
@@ -441,24 +408,20 @@ ST_EARNINGS_DRIFT: _PresetDict = {
     "recommended_account": "CTO",
     "pea_warning": True,
     "requires": [
-        "EarningsAnnouncement_Within5d",   # trigger: earnings_announcement_within_5d
-        "GapUp_Pct",                        # gap_up_pct ≥ 3%
-        "NoNegativeGuidanceRevision",       # no_negative_guidance_revision
+        "EarningsAnnouncement_Within5d",  # trigger: earnings_announcement_within_5d
+        "GapUp_Pct",  # gap_up_pct ≥ 3%
+        "NoNegativeGuidanceRevision",  # no_negative_guidance_revision
     ],
     "filters": {
         # ── Universal pre-filters ─────────────────────────────────────────
         **{**_UNIVERSAL_PREFILTERS, "min_market_cap": 500_000_000},
-
         # ── Beat quality ──────────────────────────────────────────────────
-        "min_sue_z_score": 1.5,            # Strong beat (SUE column from M9)
-        "min_volume_surge_5d_vs_90d": 2.0, # 2× volume surge on announcement day
-
+        "min_sue_z_score": 1.5,  # Strong beat (SUE column from M9)
+        "min_volume_surge_5d_vs_90d": 2.0,  # 2× volume surge on announcement day
         # ── Momentum confirmation ─────────────────────────────────────────
-        "min_eps_revision_3m": 0.0,        # Positive revision post-announcement
-
+        "min_eps_revision_3m": 0.0,  # Positive revision post-announcement
         # ── No negative guidance ──────────────────────────────────────────
-        "min_news_sentiment_30d": 0.0,     # Neutral or positive
-
+        "min_news_sentiment_30d": 0.0,  # Neutral or positive
         # ── Composite gate ────────────────────────────────────────────────
         "min_composite_score_st": 45,
     },
@@ -481,25 +444,21 @@ ST_OVERSOLD_BOUNCE: _PresetDict = {
     # RSI_2 requires intraday or high-frequency price data; not yet plumbed.
     # price_above_200dma is already a column from M9 momentum module.
     "requires": [
-        "RSI_2",                    # rsi_2_below_10: extreme oversold trigger
-        "NoEarningsWithin3d",       # no_earnings_within_3d guard
-        "NoRecentNegativeNews",     # no_recent_negative_news guard
+        "RSI_2",  # rsi_2_below_10: extreme oversold trigger
+        "NoEarningsWithin3d",  # no_earnings_within_3d guard
+        "NoRecentNegativeNews",  # no_recent_negative_news guard
     ],
     "filters": {
         # ── Universal pre-filters ─────────────────────────────────────────
         **{**_UNIVERSAL_PREFILTERS, "min_market_cap": 500_000_000},
-
         # ── Mean-reversion setup ──────────────────────────────────────────
         # RSI_2 < 10 is the primary entry trigger; column not yet available.
         # When RSI_2 is plumbed, add: "max_rsi_2": 10
-        "price_above_200dma": True,        # Only in long-term uptrends
-
+        "price_above_200dma": True,  # Only in long-term uptrends
         # ── Sentiment safety guard ────────────────────────────────────────
-        "min_news_sentiment_30d": 0.0,     # No recent negative news catalyst
-
+        "min_news_sentiment_30d": 0.0,  # No recent negative news catalyst
         # ── Risk gates ────────────────────────────────────────────────────
         "min_altman_z": 1.5,
-
         # ── Composite gate ────────────────────────────────────────────────
         "min_composite_score_st": 40,
     },
@@ -509,7 +468,7 @@ ST_OVERSOLD_BOUNCE: _PresetDict = {
 # Registry
 # ──────────────────────────────────────────────────────────────────────────────
 
-PRESET_REGISTRY: Dict[str, _PresetDict] = {
+PRESET_REGISTRY: dict[str, _PresetDict] = {
     "LT_QUALITY_COMPOUNDER": LT_QUALITY_COMPOUNDER,
     "LT_PEA_DEFENSIVE": LT_PEA_DEFENSIVE,
     "LT_DEEP_VALUE": LT_DEEP_VALUE,
@@ -534,13 +493,11 @@ def get_preset(name: str) -> _PresetDict:
     """
     if name not in PRESET_REGISTRY:
         valid = sorted(PRESET_REGISTRY.keys())
-        raise KeyError(
-            f"Unknown preset {name!r}. Valid names: {valid}"
-        )
+        raise KeyError(f"Unknown preset {name!r}. Valid names: {valid}")
     return PRESET_REGISTRY[name]
 
 
-def list_presets() -> List[Dict[str, str]]:
+def list_presets() -> list[dict[str, str]]:
     """Return a summary list of all registered presets.
 
     Each entry contains ``name``, ``horizon``, and ``description``.

@@ -9,6 +9,7 @@ Coverage:
         * FCF == 0.5*NI    → ratio ≈ 0.5
         * Only 2 valid years → NaN (≥ 3 required)
 """
+
 from __future__ import annotations
 
 import math
@@ -17,7 +18,6 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 for p in (PROJECT_ROOT, PROJECT_ROOT / "src"):
@@ -29,7 +29,6 @@ from src.analysis.earnings_quality import (  # noqa: E402
     earnings_quality_score,
     sloan_accruals,
 )
-
 
 # ---------------------------------------------------------------------------
 # Beneish M-Score fixtures

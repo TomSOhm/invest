@@ -202,10 +202,8 @@ export function usePortfolio(initialHorizon: Horizon = "long_term") {
   }, [horizon]);
 
   // Mount-once fetch. Empty deps on purpose — horizon flip does not refetch.
-  useEffect(() => {
-    fetch(initialHorizon);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
+  useEffect(() => { fetch(initialHorizon); }, []);
 
   return {
     data,

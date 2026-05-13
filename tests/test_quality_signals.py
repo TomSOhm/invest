@@ -13,14 +13,12 @@ Coverage
 * Altman Z'' on a distressed fixture (Atos-like, expect < 1.1)
 * Graham Number formula sanity check
 """
+
 from __future__ import annotations
 
 import math
 import sys
 from pathlib import Path
-
-import numpy as np
-import pytest
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 for p in (PROJECT_ROOT, PROJECT_ROOT / "src"):
@@ -43,7 +41,6 @@ from src.analysis.quality_signals import (  # noqa: E402
     piotroski_signal_8_delta_gross_margin,
     piotroski_signal_9_delta_asset_turnover,
 )
-
 
 # ===========================================================================
 # Piotroski -- individual signal tests
@@ -78,14 +75,10 @@ class TestPiotroskiSignal2:
 
 class TestPiotroskiSignal3:
     def test_roa_improved(self) -> None:
-        assert (
-            piotroski_signal_3_delta_roa({"ROA": 0.10, "ROA_PriorYear": 0.07}) == 1
-        )
+        assert piotroski_signal_3_delta_roa({"ROA": 0.10, "ROA_PriorYear": 0.07}) == 1
 
     def test_roa_declined(self) -> None:
-        assert (
-            piotroski_signal_3_delta_roa({"ROA": 0.05, "ROA_PriorYear": 0.07}) == 0
-        )
+        assert piotroski_signal_3_delta_roa({"ROA": 0.05, "ROA_PriorYear": 0.07}) == 0
 
     def test_missing_prior_year_returns_none(self) -> None:
         assert piotroski_signal_3_delta_roa({"ROA": 0.05}) is None
@@ -94,20 +87,10 @@ class TestPiotroskiSignal3:
 class TestPiotroskiSignal4:
     def test_accruals_quality_high(self) -> None:
         # CFO > NetIncome -> low accruals -> +1
-        assert (
-            piotroski_signal_4_accruals(
-                {"OperatingCashflow": 100, "NetIncome": 50}
-            )
-            == 1
-        )
+        assert piotroski_signal_4_accruals({"OperatingCashflow": 100, "NetIncome": 50}) == 1
 
     def test_accruals_quality_low(self) -> None:
-        assert (
-            piotroski_signal_4_accruals(
-                {"OperatingCashflow": 50, "NetIncome": 100}
-            )
-            == 0
-        )
+        assert piotroski_signal_4_accruals({"OperatingCashflow": 50, "NetIncome": 100}) == 0
 
     def test_missing_inputs(self) -> None:
         assert piotroski_signal_4_accruals({"NetIncome": 100}) is None
@@ -115,29 +98,14 @@ class TestPiotroskiSignal4:
 
 class TestPiotroskiSignal5:
     def test_leverage_decreased(self) -> None:
-        assert (
-            piotroski_signal_5_delta_leverage(
-                {"LongTermDebt": 80, "LongTermDebt_PriorYear": 100}
-            )
-            == 1
-        )
+        assert piotroski_signal_5_delta_leverage({"LongTermDebt": 80, "LongTermDebt_PriorYear": 100}) == 1
 
     def test_leverage_increased(self) -> None:
-        assert (
-            piotroski_signal_5_delta_leverage(
-                {"LongTermDebt": 120, "LongTermDebt_PriorYear": 100}
-            )
-            == 0
-        )
+        assert piotroski_signal_5_delta_leverage({"LongTermDebt": 120, "LongTermDebt_PriorYear": 100}) == 0
 
     def test_leverage_unchanged_does_not_count(self) -> None:
         # Strict less-than: a tie is treated as no improvement.
-        assert (
-            piotroski_signal_5_delta_leverage(
-                {"LongTermDebt": 100, "LongTermDebt_PriorYear": 100}
-            )
-            == 0
-        )
+        assert piotroski_signal_5_delta_leverage({"LongTermDebt": 100, "LongTermDebt_PriorYear": 100}) == 0
 
     def test_missing_returns_none(self) -> None:
         assert piotroski_signal_5_delta_leverage({"LongTermDebt": 100}) is None
@@ -145,57 +113,27 @@ class TestPiotroskiSignal5:
 
 class TestPiotroskiSignal6:
     def test_liquidity_improved(self) -> None:
-        assert (
-            piotroski_signal_6_delta_liquidity(
-                {"CurrentRatio": 2.0, "CurrentRatio_PriorYear": 1.5}
-            )
-            == 1
-        )
+        assert piotroski_signal_6_delta_liquidity({"CurrentRatio": 2.0, "CurrentRatio_PriorYear": 1.5}) == 1
 
     def test_liquidity_declined(self) -> None:
-        assert (
-            piotroski_signal_6_delta_liquidity(
-                {"CurrentRatio": 1.0, "CurrentRatio_PriorYear": 1.5}
-            )
-            == 0
-        )
+        assert piotroski_signal_6_delta_liquidity({"CurrentRatio": 1.0, "CurrentRatio_PriorYear": 1.5}) == 0
 
 
 class TestPiotroskiSignal7:
     def test_no_dilution(self) -> None:
         # Shares decreased -> good
-        assert (
-            piotroski_signal_7_no_dilution(
-                {"Shares": 1_000_000, "Shares_PriorYear": 1_000_000}
-            )
-            == 1
-        )
+        assert piotroski_signal_7_no_dilution({"Shares": 1_000_000, "Shares_PriorYear": 1_000_000}) == 1
 
     def test_small_buyback(self) -> None:
         # A buyback always passes
-        assert (
-            piotroski_signal_7_no_dilution(
-                {"Shares": 950_000, "Shares_PriorYear": 1_000_000}
-            )
-            == 1
-        )
+        assert piotroski_signal_7_no_dilution({"Shares": 950_000, "Shares_PriorYear": 1_000_000}) == 1
 
     def test_within_tolerance(self) -> None:
         # Up to +0.5% increase counts as "no meaningful dilution"
-        assert (
-            piotroski_signal_7_no_dilution(
-                {"Shares": 1_005_000, "Shares_PriorYear": 1_000_000}
-            )
-            == 1
-        )
+        assert piotroski_signal_7_no_dilution({"Shares": 1_005_000, "Shares_PriorYear": 1_000_000}) == 1
 
     def test_meaningful_dilution(self) -> None:
-        assert (
-            piotroski_signal_7_no_dilution(
-                {"Shares": 1_100_000, "Shares_PriorYear": 1_000_000}
-            )
-            == 0
-        )
+        assert piotroski_signal_7_no_dilution({"Shares": 1_100_000, "Shares_PriorYear": 1_000_000}) == 0
 
     def test_missing_returns_none(self) -> None:
         assert piotroski_signal_7_no_dilution({"Shares": 1_000_000}) is None
@@ -203,20 +141,10 @@ class TestPiotroskiSignal7:
 
 class TestPiotroskiSignal8:
     def test_margin_improved(self) -> None:
-        assert (
-            piotroski_signal_8_delta_gross_margin(
-                {"GrossMargin": 0.45, "GrossMargin_PriorYear": 0.40}
-            )
-            == 1
-        )
+        assert piotroski_signal_8_delta_gross_margin({"GrossMargin": 0.45, "GrossMargin_PriorYear": 0.40}) == 1
 
     def test_margin_declined(self) -> None:
-        assert (
-            piotroski_signal_8_delta_gross_margin(
-                {"GrossMargin": 0.35, "GrossMargin_PriorYear": 0.40}
-            )
-            == 0
-        )
+        assert piotroski_signal_8_delta_gross_margin({"GrossMargin": 0.35, "GrossMargin_PriorYear": 0.40}) == 0
 
 
 class TestPiotroskiSignal9:
@@ -290,8 +218,8 @@ def _all_zero_row() -> dict:
     return {
         "ROA": -0.05,
         "OperatingCashflow": -100,
-        "ROA_PriorYear": 0.10,        # ROA declined
-        "NetIncome": 200,             # CFO < NI
+        "ROA_PriorYear": 0.10,  # ROA declined
+        "NetIncome": 200,  # CFO < NI
         "LongTermDebt": 120,
         "LongTermDebt_PriorYear": 100,  # LTD increased
         "CurrentRatio": 1.0,
@@ -404,12 +332,12 @@ def _atos_like_distressed_row() -> dict:
         "Sector": "Technology",  # IT services -> Z'' applies
         "TotalAssets": 9_000.0,
         "TotalEquity": 500.0,
-        "MarketCap": 250.0,            # post-collapse
+        "MarketCap": 250.0,  # post-collapse
         "Revenue": 10_700.0,
-        "EBIT": 50.0,                  # near zero
+        "EBIT": 50.0,  # near zero
         "CurrentAssets": 3_000.0,
         "CurrentLiabilities": 5_500.0,  # working capital deficit
-        "RetainedEarnings": -4_500.0,   # massive accumulated losses
+        "RetainedEarnings": -4_500.0,  # massive accumulated losses
     }
 
 
@@ -459,7 +387,7 @@ class TestGrahamNumber:
     def test_basic_formula(self) -> None:
         # EPS = 2.0, BVPS = 8.0 -> Graham = sqrt(22.5 * 2 * 8) = sqrt(360) = 18.97
         row = {
-            "NetIncome": 200.0,    # NI = 200, shares = 100 -> EPS = 2.0
+            "NetIncome": 200.0,  # NI = 200, shares = 100 -> EPS = 2.0
             "Shares": 100.0,
             "TotalEquity": 800.0,  # BVPS = 800 / 100 = 8.0
         }
