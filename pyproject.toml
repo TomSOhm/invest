@@ -1,3 +1,11 @@
+[project]
+name = "invest-solo"
+version = "0.4.0"
+description = "Quantitative fundamental analysis platform for PEA-eligible and global stocks"
+requires-python = ">=3.13"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
@@ -23,6 +31,9 @@ dev = [
     "uvicorn[standard]>=0.34.0",
     "yfinance>=0.2.40",
     "ruff>=0.6",
+    "pytest>=8.0",
+    "pytest-mock>=3.12",
+    "pytest-asyncio>=0.24",
 ]
 
 [tool.ruff]
