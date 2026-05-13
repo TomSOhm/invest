@@ -151,11 +151,12 @@ cd invest
 cp .env.example .env
 # Edit .env with your API keys (see .env.example for providers)
 
-# Install Python dependencies
-pip install -r requirements.txt
+# Install Python dependencies (uv recommended; pip fallback below)
+uv sync --frozen
+# Fallback if uv not installed: pip install -r backend/requirements.txt
 
 # Install frontend dependencies
-cd frontend && bun install && cd ..
+cd frontend && npm ci && cd ..
 ```
 
 ### Running
