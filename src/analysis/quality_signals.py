@@ -26,13 +26,14 @@ Public surface (consumed by ``src/analysis/scoring_engine.py``):
 The 9 individual Piotroski signal helpers are also public so callers / tests
 can inspect each component.
 """
+
 from __future__ import annotations
 
-from typing import Any, Mapping, Optional, Set, Tuple, Union
+from collections.abc import Mapping
+from typing import Any
 
 import numpy as np
 import pandas as pd
-
 
 # ---------------------------------------------------------------------------
 # Sector dispatch for Altman variants
@@ -40,7 +41,7 @@ import pandas as pd
 
 # Sectors classified as "manufacturers" for the classic 5-factor Altman Z
 # (asset-turnover X5 only makes sense when the firm sells physical product).
-_ALTMAN_MANUFACTURER_SECTORS: Set[str] = {
+_ALTMAN_MANUFACTURER_SECTORS: set[str] = {
     "Industrials",
     "Materials",
     "Energy",
@@ -54,7 +55,7 @@ _ALTMAN_MANUFACTURER_SECTORS: Set[str] = {
 # ---------------------------------------------------------------------------
 
 # A ``row`` argument may be a plain dict, pd.Series, or any Mapping.
-RowLike = Union[Mapping[str, Any], pd.Series]
+RowLike = Mapping[str, Any] | pd.Series
 
 
 def _is_finite(val: Any) -> bool:
@@ -80,7 +81,7 @@ def _get(row: RowLike, key: str, default: Any = np.nan) -> Any:
     return getattr(row, key, default)
 
 
-def _finite_or_none(val: Any) -> Optional[float]:
+def _finite_or_none(val: Any) -> float | None:
     """Coerce *val* to float when finite, else return None."""
     return float(val) if _is_finite(val) else None
 
@@ -101,7 +102,7 @@ def _finite_or_none(val: Any) -> Optional[float]:
 # ---------------------------------------------------------------------------
 
 
-def piotroski_signal_1_roa_positive(row: RowLike) -> Optional[int]:
+def piotroski_signal_1_roa_positive(row: RowLike) -> int | None:
     """Signal 1 -- Profitability: ROA > 0.
 
     Returns 1 if current-year ROA is positive, 0 if non-positive, None when
@@ -113,7 +114,7 @@ def piotroski_signal_1_roa_positive(row: RowLike) -> Optional[int]:
     return 1 if roa > 0 else 0
 
 
-def piotroski_signal_2_cfo_positive(row: RowLike) -> Optional[int]:
+def piotroski_signal_2_cfo_positive(row: RowLike) -> int | None:
     """Signal 2 -- Profitability: Cash From Operations > 0."""
     cfo = _finite_or_none(_get(row, "OperatingCashflow"))
     if cfo is None:
@@ -121,7 +122,7 @@ def piotroski_signal_2_cfo_positive(row: RowLike) -> Optional[int]:
     return 1 if cfo > 0 else 0
 
 
-def piotroski_signal_3_delta_roa(row: RowLike) -> Optional[int]:
+def piotroski_signal_3_delta_roa(row: RowLike) -> int | None:
     """Signal 3 -- Profitability: ROA improved YoY (ROA_t > ROA_{t-1})."""
     roa_now = _finite_or_none(_get(row, "ROA"))
     roa_prior = _finite_or_none(_get(row, "ROA_PriorYear"))
@@ -130,7 +131,7 @@ def piotroski_signal_3_delta_roa(row: RowLike) -> Optional[int]:
     return 1 if roa_now > roa_prior else 0
 
 
-def piotroski_signal_4_accruals(row: RowLike) -> Optional[int]:
+def piotroski_signal_4_accruals(row: RowLike) -> int | None:
     """Signal 4 -- Earnings quality: CFO > Net Income (low accruals).
 
     Piotroski (2000) compares CFO scaled by total assets against ROA, but the
@@ -144,7 +145,7 @@ def piotroski_signal_4_accruals(row: RowLike) -> Optional[int]:
     return 1 if cfo > ni else 0
 
 
-def piotroski_signal_5_delta_leverage(row: RowLike) -> Optional[int]:
+def piotroski_signal_5_delta_leverage(row: RowLike) -> int | None:
     """Signal 5 -- Leverage: Long-term debt decreased YoY (ΔLTD < 0).
 
     A non-strict tie (ΔLTD == 0) is treated as a non-improvement (=0).
@@ -156,7 +157,7 @@ def piotroski_signal_5_delta_leverage(row: RowLike) -> Optional[int]:
     return 1 if ltd_now < ltd_prior else 0
 
 
-def piotroski_signal_6_delta_liquidity(row: RowLike) -> Optional[int]:
+def piotroski_signal_6_delta_liquidity(row: RowLike) -> int | None:
     """Signal 6 -- Liquidity: Current ratio improved YoY (CR_t > CR_{t-1})."""
     cr_now = _finite_or_none(_get(row, "CurrentRatio"))
     cr_prior = _finite_or_none(_get(row, "CurrentRatio_PriorYear"))
@@ -165,7 +166,7 @@ def piotroski_signal_6_delta_liquidity(row: RowLike) -> Optional[int]:
     return 1 if cr_now > cr_prior else 0
 
 
-def piotroski_signal_7_no_dilution(row: RowLike) -> Optional[int]:
+def piotroski_signal_7_no_dilution(row: RowLike) -> int | None:
     """Signal 7 -- Equity issuance: No meaningful dilution.
 
     The classical test is "no new shares issued in the past year".  We allow
@@ -179,7 +180,7 @@ def piotroski_signal_7_no_dilution(row: RowLike) -> Optional[int]:
     return 1 if delta <= 0.005 else 0
 
 
-def piotroski_signal_8_delta_gross_margin(row: RowLike) -> Optional[int]:
+def piotroski_signal_8_delta_gross_margin(row: RowLike) -> int | None:
     """Signal 8 -- Operating efficiency: Gross margin improved YoY."""
     gm_now = _finite_or_none(_get(row, "GrossMargin"))
     gm_prior = _finite_or_none(_get(row, "GrossMargin_PriorYear"))
@@ -188,7 +189,7 @@ def piotroski_signal_8_delta_gross_margin(row: RowLike) -> Optional[int]:
     return 1 if gm_now > gm_prior else 0
 
 
-def piotroski_signal_9_delta_asset_turnover(row: RowLike) -> Optional[int]:
+def piotroski_signal_9_delta_asset_turnover(row: RowLike) -> int | None:
     """Signal 9 -- Operating efficiency: Asset turnover improved YoY.
 
     AT = Revenue / TotalAssets.  If either current or prior period assets are
@@ -254,7 +255,7 @@ def piotroski_f_score(row: RowLike) -> int:
 # ---------------------------------------------------------------------------
 
 
-def _altman_x_factors(row: RowLike) -> Optional[Tuple[float, float, float, float, float]]:
+def _altman_x_factors(row: RowLike) -> tuple[float, float, float, float, float] | None:
     """Build the five X factors common to Z and Z''. Returns None on missing data."""
     ta = _finite_or_none(_get(row, "TotalAssets"))
     eq = _finite_or_none(_get(row, "TotalEquity"))
@@ -321,7 +322,7 @@ def altman_z_double_prime(row: RowLike) -> float:
     return 6.56 * x1 + 3.26 * x2 + 6.72 * x3 + 1.05 * x4
 
 
-def altman_z_select(row: RowLike) -> Tuple[float, str]:
+def altman_z_select(row: RowLike) -> tuple[float, str]:
     """Pick the right Altman variant based on the row's Sector.
 
     Returns a tuple ``(score, variant)`` where variant is one of

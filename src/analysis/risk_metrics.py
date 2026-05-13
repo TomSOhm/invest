@@ -16,17 +16,18 @@ The aggregator accepts ``price_history_map`` as optional. When None, it
 gracefully falls back to row-only signals (ND/EBITDA, IC, Z'') and skips the
 price-derived ones.
 """
+
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
+from typing import Any
 
 import numpy as np
 import pandas as pd
 
-
 # ---------------------------------------------------------------------------
 # Internal helpers
 # ---------------------------------------------------------------------------
+
 
 def _is_finite(val: Any) -> bool:
     try:
@@ -92,6 +93,7 @@ def _zscore_norm(series: pd.Series, higher_is_better: bool = True) -> pd.Series:
 # ---------------------------------------------------------------------------
 # Price-history derived signals
 # ---------------------------------------------------------------------------
+
 
 def realized_volatility_1y(price_history: Any) -> float:
     """Annualised stddev of daily log-returns over the most recent ~252 trading days.
@@ -174,6 +176,7 @@ def beta_5y_monthly(price_history: Any, market_history: Any) -> float:
 # Row-derived signals
 # ---------------------------------------------------------------------------
 
+
 def net_debt_to_ebitda(row: pd.Series) -> float:
     """(TotalDebt - Cash) / EBITDA. NaN if EBITDA <= 0 or any input missing."""
     debt = _as_float(row.get("TotalDebt"))
@@ -207,9 +210,10 @@ def interest_coverage_real(row: pd.Series) -> float:
 # Aggregator
 # ---------------------------------------------------------------------------
 
+
 def risk_score_real(
     df: pd.DataFrame,
-    price_history_map: Optional[Dict[str, Any]] = None,
+    price_history_map: dict[str, Any] | None = None,
 ) -> pd.Series:
     """Sector-relative composite of risk signals. Higher = SAFER (0..100).
 
@@ -262,9 +266,9 @@ def risk_score_real(
     market_hist = (price_history_map or {}).get("_market") if have_prices else None
 
     if have_prices:
-        vols: Dict[Any, float] = {}
-        mdds: Dict[Any, float] = {}
-        betas: Dict[Any, float] = {}
+        vols: dict[Any, float] = {}
+        mdds: dict[Any, float] = {}
+        betas: dict[Any, float] = {}
         for idx in df.index:
             ticker = str(idx)
             ph = price_history_map.get(ticker)
@@ -304,18 +308,19 @@ def risk_score_real(
         def _norm(metric: str, higher_is_better: bool) -> pd.Series:
             return score_sector_relative(tmp, metric, inverse=not higher_is_better)
     except (ImportError, AttributeError, TypeError):
+
         def _norm(metric: str, higher_is_better: bool) -> pd.Series:
             return _zscore_norm(tmp[metric], higher_is_better=higher_is_better)
 
-    parts: Dict[str, pd.Series] = {
+    parts: dict[str, pd.Series] = {
         "nd_ebitda": _norm("nd_ebitda", False),  # lower is safer
         "ic": _norm("ic", True),
         "altman": _norm("altman", True),
     }
     if have_prices:
-        parts["vol"] = _norm("vol", False)       # lower vol = safer
-        parts["mdd"] = _norm("mdd", True)         # closer to 0 (less negative) = safer
-        parts["beta"] = _norm("beta", False)      # lower beta = safer
+        parts["vol"] = _norm("vol", False)  # lower vol = safer
+        parts["mdd"] = _norm("mdd", True)  # closer to 0 (less negative) = safer
+        parts["beta"] = _norm("beta", False)  # lower beta = safer
 
     combined = pd.concat(parts, axis=1)
     score = combined.mean(axis=1, skipna=True).fillna(50.0).clip(0.0, 100.0)

@@ -25,11 +25,12 @@ The framework gracefully tolerates **data gaps**: when a ticker has no price
 history at a given date, it is excluded from the basket and a warning entry
 is appended to ``BacktestResult.data_gaps``.
 """
+
 from __future__ import annotations
 
 import warnings
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import Any, Literal
 
 import numpy as np
 import pandas as pd
@@ -45,7 +46,6 @@ from backend.app.services.backtest.metrics import (
     total_return,
 )
 from backend.app.services.market_data.protocol import MarketDataSource
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Config / Result dataclasses
@@ -87,7 +87,7 @@ class BacktestConfig:
 
     start: pd.Timestamp
     end: pd.Timestamp
-    universe: List[str]
+    universe: list[str]
     benchmark: str
     preset_name: str
     rebalance_freq: Literal["M", "Q", "Y"] = "Q"
@@ -101,17 +101,11 @@ class BacktestConfig:
         self.start = pd.Timestamp(self.start)
         self.end = pd.Timestamp(self.end)
         if self.end <= self.start:
-            raise ValueError(
-                f"BacktestConfig: end ({self.end}) must be > start ({self.start})"
-            )
+            raise ValueError(f"BacktestConfig: end ({self.end}) must be > start ({self.start})")
         if self.rebalance_freq not in ("M", "Q", "Y"):
-            raise ValueError(
-                f"rebalance_freq must be 'M', 'Q', or 'Y' (got {self.rebalance_freq!r})"
-            )
+            raise ValueError(f"rebalance_freq must be 'M', 'Q', or 'Y' (got {self.rebalance_freq!r})")
         if self.max_position_size <= 0 or self.max_position_size > 1:
-            raise ValueError(
-                f"max_position_size must be in (0, 1] (got {self.max_position_size})"
-            )
+            raise ValueError(f"max_position_size must be in (0, 1] (got {self.max_position_size})")
 
 
 @dataclass
@@ -121,9 +115,9 @@ class BacktestResult:
     config: BacktestConfig
     equity_curve: pd.Series
     benchmark_curve: pd.Series
-    positions_log: List[Dict[str, Any]] = field(default_factory=list)
-    summary: Dict[str, float] = field(default_factory=dict)
-    data_gaps: List[Dict[str, Any]] = field(default_factory=list)
+    positions_log: list[dict[str, Any]] = field(default_factory=list)
+    summary: dict[str, float] = field(default_factory=dict)
+    data_gaps: list[dict[str, Any]] = field(default_factory=list)
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -151,13 +145,13 @@ class WalkForwardBacktest:
         self,
         config: BacktestConfig,
         fetcher: MarketDataSource,
-        universe_df: Optional[pd.DataFrame] = None,
+        universe_df: pd.DataFrame | None = None,
     ) -> None:
         self.config = config
         self.fetcher = fetcher
         self._universe_df = universe_df
-        self._price_history_cache: Dict[str, pd.DataFrame] = {}
-        self._benchmark_history: Optional[pd.DataFrame] = None
+        self._price_history_cache: dict[str, pd.DataFrame] = {}
+        self._benchmark_history: pd.DataFrame | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -191,8 +185,8 @@ class WalkForwardBacktest:
         scored_df = self._score_universe()
 
         # 4. Walk forward.
-        positions_log: List[Dict[str, Any]] = []
-        data_gaps: List[Dict[str, Any]] = []
+        positions_log: list[dict[str, Any]] = []
+        data_gaps: list[dict[str, Any]] = []
 
         # Daily equity curve, seeded with starting capital on the day BEFORE the
         # first rebalance. Use the trading-day index of the benchmark (which is
@@ -212,7 +206,7 @@ class WalkForwardBacktest:
         equity = pd.Series(np.nan, index=master_index, dtype=float)
         equity.iloc[0] = cfg.initial_capital
         last_equity = cfg.initial_capital
-        prev_basket_weights: Dict[str, float] = {}
+        prev_basket_weights: dict[str, float] = {}
 
         for i, rebal_date in enumerate(rebalance_dates):
             # Pick the next master-index date >= rebal_date.
@@ -238,9 +232,7 @@ class WalkForwardBacktest:
             last_equity *= 1.0 - turnover_cost
 
             # Compute period returns per ticker over [anchor_date, window_end].
-            period_returns, gaps = self._compute_basket_period_returns(
-                basket, anchor_date, window_end, master_index
-            )
+            period_returns, gaps = self._compute_basket_period_returns(basket, anchor_date, window_end, master_index)
             data_gaps.extend(gaps)
 
             # Apply the basket return path to equity.
@@ -251,9 +243,7 @@ class WalkForwardBacktest:
                 last_equity = float(equity_path.iloc[-1])
             else:
                 # No data -> hold flat.
-                window_slice = master_index[
-                    (master_index >= anchor_date) & (master_index <= window_end)
-                ]
+                window_slice = master_index[(master_index >= anchor_date) & (master_index <= window_end)]
                 if len(window_slice) > 0:
                     equity.loc[window_slice] = last_equity
 
@@ -328,7 +318,7 @@ class WalkForwardBacktest:
             df.index = df.index.tz_localize(None)
         return df
 
-    def _build_rebalance_schedule(self) -> List[pd.Timestamp]:
+    def _build_rebalance_schedule(self) -> list[pd.Timestamp]:
         """Return rebalance anchor dates between start and end inclusive."""
         cfg = self.config
         # Use period_range for unambiguous quarter/month/year-end anchors.
@@ -339,9 +329,7 @@ class WalkForwardBacktest:
         # Always include the start date as the first anchor so the first basket
         # gets a reasonable holding period (otherwise quarterly anchor is at
         # quarter-end which truncates the first window).
-        anchors = [pd.Timestamp(cfg.start)] + [
-            a for a in anchors if a > pd.Timestamp(cfg.start) and a <= cfg.end
-        ]
+        anchors = [pd.Timestamp(cfg.start)] + [a for a in anchors if a > pd.Timestamp(cfg.start) and a <= cfg.end]
         return anchors
 
     def _build_master_trading_index(self) -> pd.DatetimeIndex:
@@ -366,17 +354,14 @@ class WalkForwardBacktest:
         """
         if self._universe_df is None or self._universe_df.empty:
             logger.warning(
-                "WalkForwardBacktest: no universe_df supplied -- "
-                "preset filters will see only sentinel columns"
+                "WalkForwardBacktest: no universe_df supplied -- preset filters will see only sentinel columns"
             )
             return self._universe_df if self._universe_df is not None else pd.DataFrame()
 
         # Build the price-history map for momentum signals (M9).
-        ph_map = {
-            t: df for t, df in self._price_history_cache.items() if not df.empty
-        }
+        ph_map = {t: df for t, df in self._price_history_cache.items() if not df.empty}
         # Each ph_map entry needs a "Date" column for the momentum module.
-        normalised_ph_map: Dict[str, pd.DataFrame] = {}
+        normalised_ph_map: dict[str, pd.DataFrame] = {}
         for t, df in ph_map.items():
             if df.empty:
                 continue
@@ -392,11 +377,8 @@ class WalkForwardBacktest:
             scored = _score_df(
                 self._universe_df,
                 price_history_map=normalised_ph_map or None,
-                market_history=self._benchmark_history.reset_index().rename(
-                    columns={"index": "Date"}
-                )
-                if self._benchmark_history is not None
-                and not self._benchmark_history.empty
+                market_history=self._benchmark_history.reset_index().rename(columns={"index": "Date"})
+                if self._benchmark_history is not None and not self._benchmark_history.empty
                 else None,
             )
         except Exception as exc:
@@ -405,9 +387,7 @@ class WalkForwardBacktest:
 
         return scored
 
-    def _build_basket(
-        self, scored_df: pd.DataFrame, rebalance_date: pd.Timestamp
-    ) -> Dict[str, float]:
+    def _build_basket(self, scored_df: pd.DataFrame, rebalance_date: pd.Timestamp) -> dict[str, float]:
         """Apply the preset, equal-weight, and cap by ``max_position_size``."""
         from src.strategy.horizon_presets import screen_horizon_preset
 
@@ -417,9 +397,7 @@ class WalkForwardBacktest:
         try:
             screened = screen_horizon_preset(scored_df, self.config.preset_name)
         except KeyError:
-            logger.error(
-                f"unknown preset {self.config.preset_name!r} -- empty basket"
-            )
+            logger.error(f"unknown preset {self.config.preset_name!r} -- empty basket")
             return {}
         except Exception as exc:
             logger.warning(f"screen_horizon_preset raised: {exc} -- empty basket")
@@ -431,7 +409,7 @@ class WalkForwardBacktest:
         # Cap by max_position_size: number of names = ceil(1 / max_position_size).
         max_n = max(1, int(round(1.0 / self.config.max_position_size)))
         # Filter out tickers with no price history at the rebalance date.
-        eligible: List[str] = []
+        eligible: list[str] = []
         for ticker in screened.index.tolist():
             hist = self._price_history_cache.get(ticker)
             if hist is None or hist.empty:
@@ -454,7 +432,7 @@ class WalkForwardBacktest:
 
     def _compute_basket_period_returns(
         self,
-        basket: Dict[str, float],
+        basket: dict[str, float],
         start_date: pd.Timestamp,
         end_date: pd.Timestamp,
         master_index: pd.DatetimeIndex,
@@ -467,17 +445,15 @@ class WalkForwardBacktest:
             returns : pd.Series indexed by trading-day Timestamps
             gaps    : list[dict] per-ticker missing-data warnings
         """
-        gaps: List[Dict[str, Any]] = []
+        gaps: list[dict[str, Any]] = []
         if not basket:
             return pd.Series(dtype=float), gaps
 
-        window_idx = master_index[
-            (master_index > start_date) & (master_index <= end_date)
-        ]
+        window_idx = master_index[(master_index > start_date) & (master_index <= end_date)]
         if len(window_idx) == 0:
             return pd.Series(dtype=float), gaps
 
-        ticker_returns: Dict[str, pd.Series] = {}
+        ticker_returns: dict[str, pd.Series] = {}
         for ticker, _w in basket.items():
             hist = self._price_history_cache.get(ticker)
             if hist is None or hist.empty:
@@ -500,9 +476,7 @@ class WalkForwardBacktest:
                 )
                 continue
             # Reindex onto the master window to align with benchmark trading days.
-            series = hist[close_col].reindex(
-                hist.index.union(window_idx)
-            ).ffill().reindex(window_idx)
+            series = hist[close_col].reindex(hist.index.union(window_idx)).ffill().reindex(window_idx)
             if series.dropna().empty:
                 gaps.append(
                     {
@@ -527,16 +501,14 @@ class WalkForwardBacktest:
         return portfolio_rets, gaps
 
     @staticmethod
-    def _pick_close_column(df: pd.DataFrame) -> Optional[str]:
+    def _pick_close_column(df: pd.DataFrame) -> str | None:
         """Find the close-price column; tolerates Adj Close / Close variants."""
         for name in ("Adj Close", "AdjClose", "Close", "close"):
             if name in df.columns:
                 return name
         return None
 
-    def _compute_turnover_cost(
-        self, prev: Dict[str, float], curr: Dict[str, float]
-    ) -> float:
+    def _compute_turnover_cost(self, prev: dict[str, float], curr: dict[str, float]) -> float:
         """Half the L1 distance × transaction cost rate."""
         if not prev and not curr:
             return 0.0
@@ -564,9 +536,7 @@ class WalkForwardBacktest:
             return pd.Series(dtype=float)
         return bench / first * self.config.initial_capital
 
-    def _build_summary(
-        self, equity: pd.Series, benchmark: pd.Series
-    ) -> Dict[str, float]:
+    def _build_summary(self, equity: pd.Series, benchmark: pd.Series) -> dict[str, float]:
         """Compute the full summary metric block."""
         with warnings.catch_warnings():
             warnings.simplefilter("ignore")

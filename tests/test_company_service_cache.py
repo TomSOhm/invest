@@ -1,10 +1,10 @@
 """Tests for company_service ↔ screener_cache integration."""
+
 from __future__ import annotations
 
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
@@ -237,9 +237,27 @@ def test_cache_miss_falls_back_to_single_row() -> None:
             "sentiment_trend": None,
         },
         "horizons": {
-            "long_term": {"score": 50.0, "signal": "Hold", "passes_gates": True, "blockers": [], "recommended_account": None},
-            "medium_term": {"score": 50.0, "signal": "Hold", "passes_gates": True, "blockers": [], "recommended_account": None},
-            "short_term": {"score": 50.0, "signal": "Hold", "passes_gates": True, "blockers": [], "recommended_account": "CTO"},
+            "long_term": {
+                "score": 50.0,
+                "signal": "Hold",
+                "passes_gates": True,
+                "blockers": [],
+                "recommended_account": None,
+            },
+            "medium_term": {
+                "score": 50.0,
+                "signal": "Hold",
+                "passes_gates": True,
+                "blockers": [],
+                "recommended_account": None,
+            },
+            "short_term": {
+                "score": 50.0,
+                "signal": "Hold",
+                "passes_gates": True,
+                "blockers": [],
+                "recommended_account": "CTO",
+            },
         },
         "data_completeness": 0.5,
     }

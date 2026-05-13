@@ -2,12 +2,13 @@
 Invest Solo -- Watchlist JSON File Store
 Persists watchlist items to data/watchlist.json.
 """
+
 import json
 import threading
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -25,7 +26,7 @@ _EMPTY_WATCHLIST = {
 class WatchlistStore:
     """Thread-safe JSON file store for watchlist items."""
 
-    def __init__(self, path: Optional[Path] = None) -> None:
+    def __init__(self, path: Path | None = None) -> None:
         self._path = path or WATCHLIST_PATH
         self._lock = threading.Lock()
         self._ensure_file()
@@ -36,16 +37,16 @@ class WatchlistStore:
         if not self._path.exists():
             self._write(_EMPTY_WATCHLIST.copy())
 
-    def _read(self) -> Dict[str, Any]:
+    def _read(self) -> dict[str, Any]:
         try:
-            with open(self._path, "r", encoding="utf-8") as fh:
+            with open(self._path, encoding="utf-8") as fh:
                 return json.load(fh)
         except (json.JSONDecodeError, OSError) as exc:
             logger.error(f"Error reading watchlist file: {exc}")
             return _EMPTY_WATCHLIST.copy()
 
-    def _write(self, data: Dict[str, Any]) -> None:
-        data["last_modified"] = datetime.now(timezone.utc).isoformat()
+    def _write(self, data: dict[str, Any]) -> None:
+        data["last_modified"] = datetime.now(UTC).isoformat()
         try:
             with open(self._path, "w", encoding="utf-8") as fh:
                 json.dump(data, fh, indent=2, ensure_ascii=False)
@@ -54,18 +55,18 @@ class WatchlistStore:
 
     # -- public API --
 
-    def get_items(self) -> List[Dict[str, Any]]:
+    def get_items(self) -> list[dict[str, Any]]:
         """Return all watchlist items."""
         with self._lock:
             data = self._read()
             return data.get("items", [])
 
-    def add_item(self, ticker: str, notes: Optional[str] = None) -> Dict[str, Any]:
+    def add_item(self, ticker: str, notes: str | None = None) -> dict[str, Any]:
         """Add a ticker to the watchlist. Returns the created item."""
         item = {
             "id": str(uuid.uuid4()),
             "ticker": ticker.upper(),
-            "added_date": datetime.now(timezone.utc).strftime("%Y-%m-%d"),
+            "added_date": datetime.now(UTC).strftime("%Y-%m-%d"),
             "notes": notes or "",
         }
         with self._lock:

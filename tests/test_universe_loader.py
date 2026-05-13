@@ -1,8 +1,9 @@
 """Tests for the PEA universe loader."""
+
 from __future__ import annotations
 
 from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pandas as pd
 import pytest
@@ -56,9 +57,7 @@ class TestLoadPeaUniverse:
     def test_static_only_when_yfinance_disabled(self, tmp_path: Path) -> None:
         csv = tmp_path / "static.csv"
         _write_csv(csv, ["MC.PA", "TTE.PA"])
-        out = universe_loader.load_pea_universe(
-            use_yfinance=False, static_path=csv, persist_path=None
-        )
+        out = universe_loader.load_pea_universe(use_yfinance=False, static_path=csv, persist_path=None)
         assert out == ["MC.PA", "TTE.PA"]
 
     def test_dedupe_union(self, tmp_path: Path) -> None:
@@ -72,9 +71,7 @@ class TestLoadPeaUniverse:
             "_load_etf_holdings",
             return_value=["MC.PA", "AI.PA", "BARE_SYMBOL_NO_DOT"],
         ):
-            out = universe_loader.load_pea_universe(
-                use_yfinance=True, static_path=csv, persist_path=None
-            )
+            out = universe_loader.load_pea_universe(use_yfinance=True, static_path=csv, persist_path=None)
         assert out == ["MC.PA", "TTE.PA", "AI.PA"]
         assert "BARE_SYMBOL_NO_DOT" not in out
 
@@ -91,9 +88,7 @@ class TestLoadPeaUniverse:
             # the static list. (The current implementation wraps each ETF
             # in try/except internally.)
             try:
-                out = universe_loader.load_pea_universe(
-                    use_yfinance=True, static_path=csv, persist_path=None
-                )
+                out = universe_loader.load_pea_universe(use_yfinance=True, static_path=csv, persist_path=None)
             except RuntimeError:
                 pytest.fail("load_pea_universe should not propagate yfinance failures")
         assert out == ["MC.PA"]
@@ -102,9 +97,7 @@ class TestLoadPeaUniverse:
         csv = tmp_path / "static.csv"
         persist = tmp_path / "resolved.csv"
         _write_csv(csv, ["MC.PA", "TTE.PA"])
-        universe_loader.load_pea_universe(
-            use_yfinance=False, static_path=csv, persist_path=persist
-        )
+        universe_loader.load_pea_universe(use_yfinance=False, static_path=csv, persist_path=persist)
         assert persist.exists()
         loaded = pd.read_csv(persist)
         assert list(loaded["ticker"]) == ["MC.PA", "TTE.PA"]

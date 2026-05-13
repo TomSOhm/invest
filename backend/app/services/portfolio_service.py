@@ -15,10 +15,11 @@ Cache strategy (T1):
 - update_position(): live fetch for the affected ticker only.
 - Per-ticker try/except prevents one bad ticker from 500-ing the whole list.
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict, List, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -46,7 +47,7 @@ class PortfolioService:
         self._fetcher = fetcher
         self._scorer = scorer
 
-    def get_portfolio(self, horizon: str = "long_term") -> Dict[str, Any]:
+    def get_portfolio(self, horizon: str = "long_term") -> dict[str, Any]:
         """
         Load all positions, enrich with cached data, scoring, and P&L.
 
@@ -65,7 +66,7 @@ class PortfolioService:
         """
         return self._build_enriched_response(horizon=horizon, cache_only=True)
 
-    def refresh(self, horizon: str = "long_term") -> Dict[str, Any]:
+    def refresh(self, horizon: str = "long_term") -> dict[str, Any]:
         """
         Force-refresh: invalidate cache for all stored tickers and re-fetch live.
 
@@ -84,7 +85,7 @@ class PortfolioService:
             self._fetcher._cache.invalidate(f"ticker_{ticker}")
         return self._build_enriched_response(horizon=horizon, cache_only=False)
 
-    def add_position(self, req: AddPositionRequest) -> Dict[str, Any]:
+    def add_position(self, req: AddPositionRequest) -> dict[str, Any]:
         """Add a position to the portfolio store and trigger a live fetch for it."""
         stored = self._store.add_position(
             ticker=req.ticker,
@@ -108,9 +109,7 @@ class PortfolioService:
 
         return stored
 
-    def update_position(
-        self, position_id: str, req: UpdatePositionRequest
-    ) -> Optional[Dict[str, Any]]:
+    def update_position(self, position_id: str, req: UpdatePositionRequest) -> dict[str, Any] | None:
         """Update a position in the store and refresh live data for that ticker."""
         updates = req.model_dump(exclude_none=True)
         updated = self._store.update_position(position_id, updates)
@@ -124,9 +123,7 @@ class PortfolioService:
                     self._fetcher._cache.invalidate(f"ticker_{ticker}")
                     self._fetcher.fetch_single(ticker, cache_only=False)
                 except Exception as exc:
-                    logger.warning(
-                        f"Live fetch failed for updated position {ticker}: {exc}."
-                    )
+                    logger.warning(f"Live fetch failed for updated position {ticker}: {exc}.")
 
         return updated
 
@@ -138,9 +135,7 @@ class PortfolioService:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _build_enriched_response(
-        self, horizon: str = "long_term", cache_only: bool = True
-    ) -> Dict[str, Any]:
+    def _build_enriched_response(self, horizon: str = "long_term", cache_only: bool = True) -> dict[str, Any]:
         """
         Build the full enriched portfolio response.
 
@@ -157,33 +152,25 @@ class PortfolioService:
             return {
                 "positions": [],
                 "summary": self._empty_summary(),
-                "last_refreshed": datetime.now(timezone.utc).isoformat(),
+                "last_refreshed": datetime.now(UTC).isoformat(),
                 "horizon": horizon,
             }
 
         tickers = list({p["ticker"] for p in raw_positions})
         mode = "cache-only" if cache_only else "force-live"
-        logger.info(
-            f"Enriching {len(raw_positions)} positions "
-            f"({len(tickers)} unique tickers) [{mode}]"
-        )
+        logger.info(f"Enriching {len(raw_positions)} positions ({len(tickers)} unique tickers) [{mode}]")
 
         # Fetch data per ticker
-        live_data: Dict[str, Dict[str, Any]] = {}
+        live_data: dict[str, dict[str, Any]] = {}
         for ticker in tickers:
             try:
-                live_data[ticker] = self._fetcher.fetch_single(
-                    ticker, cache_only=cache_only
-                )
+                live_data[ticker] = self._fetcher.fetch_single(ticker, cache_only=cache_only)
             except Exception as exc:
-                logger.warning(
-                    f"fetch_single failed for portfolio ticker {ticker}: {exc}. "
-                    "Using empty row."
-                )
+                logger.warning(f"fetch_single failed for portfolio ticker {ticker}: {exc}. Using empty row.")
                 live_data[ticker] = {}
 
         # Score each ticker
-        scored: Dict[str, Dict[str, Any]] = {}
+        scored: dict[str, dict[str, Any]] = {}
         for ticker, data in live_data.items():
             if not data:
                 scored[ticker] = {}
@@ -196,21 +183,19 @@ class PortfolioService:
                 scored[ticker] = {}
 
         # Fetch analyst ratings -- only in force-live mode
-        analyst_data: Dict[str, Optional[Dict[str, Any]]] = {}
+        analyst_data: dict[str, dict[str, Any] | None] = {}
         if not cache_only:
             for ticker in tickers:
                 try:
                     analyst_data[ticker] = self._fetcher.fetch_analyst_ratings(ticker)
                 except Exception as exc:
-                    logger.warning(
-                        f"fetch_analyst_ratings failed for {ticker}: {exc}"
-                    )
+                    logger.warning(f"fetch_analyst_ratings failed for {ticker}: {exc}")
                     analyst_data[ticker] = None
         else:
             analyst_data = {ticker: None for ticker in tickers}
 
         # Build enriched positions
-        enriched: List[Dict[str, Any]] = []
+        enriched: list[dict[str, Any]] = []
         for pos in raw_positions:
             ticker = pos["ticker"]
             try:
@@ -224,23 +209,22 @@ class PortfolioService:
                 cost_basis = quantity * buy_price
                 market_value = quantity * current_price if current_price else None
                 gain_loss = (market_value - cost_basis) if market_value is not None else None
-                gain_loss_pct = (
-                    (gain_loss / cost_basis * 100)
-                    if gain_loss is not None and cost_basis > 0
-                    else None
-                )
+                gain_loss_pct = (gain_loss / cost_basis * 100) if gain_loss is not None and cost_basis > 0 else None
 
                 high_52 = self._num(ld.get("FiftyTwoWeekHigh"))
-                fifty_two_pct: Optional[float] = None
+                fifty_two_pct: float | None = None
                 if current_price and high_52 and high_52 > 0:
                     fifty_two_pct = round((current_price / high_52 - 1) * 100, 1)
 
-                analyst_rating: Optional[str] = None
-                analyst_target: Optional[float] = None
+                analyst_rating: str | None = None
+                analyst_target: float | None = None
                 if an:
                     total = (
-                        an.get("buy", 0) + an.get("hold", 0) + an.get("sell", 0)
-                        + an.get("strong_buy", 0) + an.get("strong_sell", 0)
+                        an.get("buy", 0)
+                        + an.get("hold", 0)
+                        + an.get("sell", 0)
+                        + an.get("strong_buy", 0)
+                        + an.get("strong_sell", 0)
                     )
                     if total > 0:
                         buys = an.get("strong_buy", 0) + an.get("buy", 0)
@@ -259,93 +243,110 @@ class PortfolioService:
                 mt = h.get("medium_term", {})
                 st = h.get("short_term", {})
 
-                enriched.append({
-                    "id": pos["id"],
-                    "ticker": ticker,
-                    "name": self._str(ld.get("Name")) or ticker,
-                    "sector": self._str(ld.get("Sector")),
-                    "country": self._str(ld.get("Country")),
-                    "account_type": pos.get("account_type", "pea"),
-                    "quantity": quantity,
-                    "buy_price": buy_price,
-                    "buy_date": pos.get("buy_date"),
-                    "current_price": current_price,
-                    "market_value": round(market_value, 2) if market_value is not None else None,
-                    "cost_basis": round(cost_basis, 2),
-                    "gain_loss": round(gain_loss, 2) if gain_loss is not None else None,
-                    "gain_loss_pct": round(gain_loss_pct, 2) if gain_loss_pct is not None else None,
-                    "weight_pct": None,  # Computed after all positions
-                    "pe": self._num(ld.get("PE")),
-                    "pb": self._num(ld.get("PB")),
-                    "ps": self._num(ld.get("PS")),
-                    "roe": self._num(ld.get("ROE")),
-                    "roa": self._num(ld.get("ROA")),
-                    "roic": self._num(ld.get("ROIC")),
-                    "operating_margin": self._num(ld.get("OperatingMargin")),
-                    "net_margin": self._num(ld.get("NetMargin")),
-                    "revenue_growth": self._num(ld.get("RevenueGrowth")),
-                    "div_yield": self._num(ld.get("DivYield")),
-                    # Three-horizon scoring
-                    "score_lt": lt.get("score"),
-                    "score_mt": mt.get("score"),
-                    "score_st": st.get("score"),
-                    "signal_lt": lt.get("signal"),
-                    "signal_mt": mt.get("signal"),
-                    "signal_st": st.get("signal"),
-                    # Quality
-                    "piotroski_f": sc.get("piotroski_f"),
-                    "altman_z": sc.get("altman_z"),
-                    "graham_number": sc.get("graham_number"),
-                    "graham_mos": sc.get("graham_mos"),
-                    "dcf_mos_mid": sc.get("dcf", {}).get("mos_mid"),
-                    # PEA
-                    "pea_eligible": bool(ld.get("PEA", False)),
-                    "pea_pme_eligible": bool(ld.get("PEA_PME", False)),
-                    # Extra
-                    "notes": pos.get("notes"),
-                    "forward_pe": self._num(ld.get("ForwardPE")),
-                    "peg": self._num(ld.get("PEG")),
-                    "analyst_rating": analyst_rating,
-                    "analyst_target_price": analyst_target,
-                    "fifty_two_week_high_pct": fifty_two_pct,
-                })
-            except Exception as exc:
-                logger.warning(
-                    f"Enrichment failed for portfolio ticker {ticker}: {exc}. "
-                    "Inserting degraded row."
+                enriched.append(
+                    {
+                        "id": pos["id"],
+                        "ticker": ticker,
+                        "name": self._str(ld.get("Name")) or ticker,
+                        "sector": self._str(ld.get("Sector")),
+                        "country": self._str(ld.get("Country")),
+                        "account_type": pos.get("account_type", "pea"),
+                        "quantity": quantity,
+                        "buy_price": buy_price,
+                        "buy_date": pos.get("buy_date"),
+                        "current_price": current_price,
+                        "market_value": round(market_value, 2) if market_value is not None else None,
+                        "cost_basis": round(cost_basis, 2),
+                        "gain_loss": round(gain_loss, 2) if gain_loss is not None else None,
+                        "gain_loss_pct": round(gain_loss_pct, 2) if gain_loss_pct is not None else None,
+                        "weight_pct": None,  # Computed after all positions
+                        "pe": self._num(ld.get("PE")),
+                        "pb": self._num(ld.get("PB")),
+                        "ps": self._num(ld.get("PS")),
+                        "roe": self._num(ld.get("ROE")),
+                        "roa": self._num(ld.get("ROA")),
+                        "roic": self._num(ld.get("ROIC")),
+                        "operating_margin": self._num(ld.get("OperatingMargin")),
+                        "net_margin": self._num(ld.get("NetMargin")),
+                        "revenue_growth": self._num(ld.get("RevenueGrowth")),
+                        "div_yield": self._num(ld.get("DivYield")),
+                        # Three-horizon scoring
+                        "score_lt": lt.get("score"),
+                        "score_mt": mt.get("score"),
+                        "score_st": st.get("score"),
+                        "signal_lt": lt.get("signal"),
+                        "signal_mt": mt.get("signal"),
+                        "signal_st": st.get("signal"),
+                        # Quality
+                        "piotroski_f": sc.get("piotroski_f"),
+                        "altman_z": sc.get("altman_z"),
+                        "graham_number": sc.get("graham_number"),
+                        "graham_mos": sc.get("graham_mos"),
+                        "dcf_mos_mid": sc.get("dcf", {}).get("mos_mid"),
+                        # PEA
+                        "pea_eligible": bool(ld.get("PEA", False)),
+                        "pea_pme_eligible": bool(ld.get("PEA_PME", False)),
+                        # Extra
+                        "notes": pos.get("notes"),
+                        "forward_pe": self._num(ld.get("ForwardPE")),
+                        "peg": self._num(ld.get("PEG")),
+                        "analyst_rating": analyst_rating,
+                        "analyst_target_price": analyst_target,
+                        "fifty_two_week_high_pct": fifty_two_pct,
+                    }
                 )
+            except Exception as exc:
+                logger.warning(f"Enrichment failed for portfolio ticker {ticker}: {exc}. Inserting degraded row.")
                 quantity = pos["quantity"]
                 buy_price = pos["buy_price"]
-                enriched.append({
-                    "id": pos["id"],
-                    "ticker": ticker,
-                    "name": ticker,
-                    "sector": None,
-                    "country": None,
-                    "account_type": pos.get("account_type", "pea"),
-                    "quantity": quantity,
-                    "buy_price": buy_price,
-                    "buy_date": pos.get("buy_date"),
-                    "current_price": None,
-                    "market_value": None,
-                    "cost_basis": round(quantity * buy_price, 2),
-                    "gain_loss": None,
-                    "gain_loss_pct": None,
-                    "weight_pct": None,
-                    "pe": None, "pb": None, "ps": None,
-                    "roe": None, "roa": None, "roic": None,
-                    "operating_margin": None, "net_margin": None,
-                    "revenue_growth": None, "div_yield": None,
-                    "score_lt": None, "score_mt": None, "score_st": None,
-                    "signal_lt": None, "signal_mt": None, "signal_st": None,
-                    "piotroski_f": None, "altman_z": None,
-                    "graham_number": None, "graham_mos": None, "dcf_mos_mid": None,
-                    "pea_eligible": False, "pea_pme_eligible": False,
-                    "notes": pos.get("notes"),
-                    "forward_pe": None, "peg": None,
-                    "analyst_rating": None, "analyst_target_price": None,
-                    "fifty_two_week_high_pct": None,
-                })
+                enriched.append(
+                    {
+                        "id": pos["id"],
+                        "ticker": ticker,
+                        "name": ticker,
+                        "sector": None,
+                        "country": None,
+                        "account_type": pos.get("account_type", "pea"),
+                        "quantity": quantity,
+                        "buy_price": buy_price,
+                        "buy_date": pos.get("buy_date"),
+                        "current_price": None,
+                        "market_value": None,
+                        "cost_basis": round(quantity * buy_price, 2),
+                        "gain_loss": None,
+                        "gain_loss_pct": None,
+                        "weight_pct": None,
+                        "pe": None,
+                        "pb": None,
+                        "ps": None,
+                        "roe": None,
+                        "roa": None,
+                        "roic": None,
+                        "operating_margin": None,
+                        "net_margin": None,
+                        "revenue_growth": None,
+                        "div_yield": None,
+                        "score_lt": None,
+                        "score_mt": None,
+                        "score_st": None,
+                        "signal_lt": None,
+                        "signal_mt": None,
+                        "signal_st": None,
+                        "piotroski_f": None,
+                        "altman_z": None,
+                        "graham_number": None,
+                        "graham_mos": None,
+                        "dcf_mos_mid": None,
+                        "pea_eligible": False,
+                        "pea_pme_eligible": False,
+                        "notes": pos.get("notes"),
+                        "forward_pe": None,
+                        "peg": None,
+                        "analyst_rating": None,
+                        "analyst_target_price": None,
+                        "fifty_two_week_high_pct": None,
+                    }
+                )
 
         # Compute weight percentages
         total_value = sum(p["market_value"] for p in enriched if p["market_value"] is not None)
@@ -359,13 +360,11 @@ class PortfolioService:
         return {
             "positions": enriched,
             "summary": summary,
-            "last_refreshed": datetime.now(timezone.utc).isoformat(),
+            "last_refreshed": datetime.now(UTC).isoformat(),
             "horizon": horizon,
         }
 
-    def _compute_summary(
-        self, positions: List[Dict[str, Any]], horizon: str = "long_term"
-    ) -> Dict[str, Any]:
+    def _compute_summary(self, positions: list[dict[str, Any]], horizon: str = "long_term") -> dict[str, Any]:
         """Aggregate portfolio statistics."""
         if not positions:
             return self._empty_summary()
@@ -386,9 +385,9 @@ class PortfolioService:
             "short_term": "signal_st",
         }.get(horizon, "signal_lt")
 
-        sector_alloc: Dict[str, float] = {}
-        country_alloc: Dict[str, float] = {}
-        signal_dist: Dict[str, int] = {}
+        sector_alloc: dict[str, float] = {}
+        country_alloc: dict[str, float] = {}
+        signal_dist: dict[str, int] = {}
         pea_value = 0.0
         cto_value = 0.0
 
@@ -427,7 +426,7 @@ class PortfolioService:
         }
 
     @staticmethod
-    def _empty_summary() -> Dict[str, Any]:
+    def _empty_summary() -> dict[str, Any]:
         return {
             "total_value": 0.0,
             "total_cost": 0.0,
@@ -443,7 +442,7 @@ class PortfolioService:
         }
 
     @staticmethod
-    def _num(value: Any) -> Optional[float]:
+    def _num(value: Any) -> float | None:
         """Convert a value to float, returning None for NaN/None/invalid."""
         if value is None:
             return None
@@ -456,7 +455,7 @@ class PortfolioService:
             return None
 
     @staticmethod
-    def _str(value: Any) -> Optional[str]:
+    def _str(value: Any) -> str | None:
         """Coerce a value to str, returning None for NaN/None/empty.
 
         pandas NaN is a truthy float, so plain ``or`` fallbacks let it through

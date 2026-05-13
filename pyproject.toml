@@ -1,3 +1,11 @@
+[project]
+name = "invest-solo"
+version = "0.4.0"
+description = "Quantitative fundamental analysis platform for PEA-eligible and global stocks"
+requires-python = ">=3.13"
+readme = "README.md"
+license = { text = "Apache-2.0" }
+
 [tool.pytest.ini_options]
 minversion = "8.0"
 testpaths = ["tests"]
@@ -12,23 +20,33 @@ markers = [
 
 [dependency-groups]
 dev = [
-    "fastapi>=0.115.0",
+    "fastapi>=0.136.1",
     "httpx>=0.27.0",
     "loguru>=0.7",
     "numpy>=1.24.0",
     "pandas>=2.1.0",
-    "pydantic>=2.5.0",
-    "python-dotenv>=1.0",
+    "pydantic>=2.13.4",
+    "python-dotenv>=1.2.2",
     "pyyaml>=6.0",
     "uvicorn[standard]>=0.34.0",
     "yfinance>=0.2.40",
     "ruff>=0.6",
+    "pytest>=8.0",
+    "pytest-mock>=3.12",
+    "pytest-asyncio>=0.24",
+    "pyarrow>=14.0",
+    "openpyxl>=3.1",
 ]
 
 [tool.ruff]
 line-length = 120
-target-version = "py311"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "W", "B", "UP"]
-ignore = ["E501"]
+# E501 line-length handled by ruff format
+# B008 mutable default args via pd.Timestamp() are intentional in test/backtest fixtures
+# E402 module-level import not at top: src/reporting/* uses sys.path.insert() before imports
+# F822 undefined-export: __all__ may reference re-exported symbols not statically visible
+# E741 ambiguous variable name 'l': legacy single-letter loop variables, low value to rename
+ignore = ["E501", "B008", "E402", "F822", "E741"]

@@ -23,13 +23,13 @@ Public API
     peers. ``inverse=True`` flips the rank so lower raw values produce
     higher scores (e.g. P/E, P/B where lower-is-better).
 """
+
 from __future__ import annotations
 
 from typing import Literal
 
 import numpy as np
 import pandas as pd
-
 
 __all__ = ["score_sector_relative"]
 
@@ -102,9 +102,7 @@ def score_sector_relative(
         # Caller asked for a metric we don't have. Return NaN series.
         return pd.Series(np.nan, index=df.index, dtype="float64")
     if fallback_universe != "global":
-        raise ValueError(
-            f"fallback_universe={fallback_universe!r} not supported; only 'global' in M3"
-        )
+        raise ValueError(f"fallback_universe={fallback_universe!r} not supported; only 'global' in M3")
 
     metric_series = pd.to_numeric(df[metric], errors="coerce")
     sectors = df.get(sector_col)
@@ -119,11 +117,7 @@ def score_sector_relative(
     # Step 3: identify which sectors have enough peers.
     sectors_clean = sectors.fillna("").astype(str)
     # Count non-NaN metric values per sector (only rows that contribute).
-    counts = (
-        metric_series.notna()
-        .groupby(sectors_clean)
-        .sum()
-    )
+    counts = metric_series.notna().groupby(sectors_clean).sum()
     big_enough = set(counts[counts >= min_n].index)
     # Empty sector ("") never qualifies — no peers to compare to.
     big_enough.discard("")

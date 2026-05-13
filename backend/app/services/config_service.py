@@ -2,7 +2,8 @@
 Invest Solo -- Configuration Service
 Thin wrapper that exposes settings.yaml as a typed singleton.
 """
-from backend.app.config import settings, AppConfig
+
+from backend.app.config import AppConfig, settings
 
 
 def get_settings() -> AppConfig:

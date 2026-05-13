@@ -2,10 +2,11 @@
 Invest Solo -- Simple File-Based Cache Service
 Stores JSON payloads in data/cache/ with TTL support.
 """
+
 import json
 import time
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any
 
 from loguru import logger
 
@@ -15,7 +16,7 @@ from backend.app.config import PROJECT_ROOT
 class CacheService:
     """File-based JSON cache with TTL expiration."""
 
-    def __init__(self, cache_dir: Optional[Path] = None) -> None:
+    def __init__(self, cache_dir: Path | None = None) -> None:
         self._cache_dir = cache_dir or (PROJECT_ROOT / "data" / "cache")
         self._cache_dir.mkdir(parents=True, exist_ok=True)
 
@@ -24,13 +25,13 @@ class CacheService:
         safe_key = key.replace("/", "_").replace("\\", "_").replace(":", "_")
         return self._cache_dir / f"{safe_key}.json"
 
-    def get(self, key: str) -> Optional[Dict[str, Any]]:
+    def get(self, key: str) -> dict[str, Any] | None:
         """Retrieve a cached payload. Returns None if expired or missing."""
         path = self._key_to_path(key)
         if not path.exists():
             return None
         try:
-            with open(path, "r", encoding="utf-8") as fh:
+            with open(path, encoding="utf-8") as fh:
                 envelope = json.load(fh)
             expires_at = envelope.get("expires_at", 0)
             if time.time() > expires_at:
@@ -42,7 +43,7 @@ class CacheService:
             logger.warning(f"Cache read error for key={key}: {exc}")
             return None
 
-    def set(self, key: str, payload: Dict[str, Any], ttl_seconds: int = 14400) -> None:
+    def set(self, key: str, payload: dict[str, Any], ttl_seconds: int = 14400) -> None:
         """Store a payload with TTL (default 4 hours = 14400 seconds)."""
         path = self._key_to_path(key)
         envelope = {

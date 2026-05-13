@@ -1,11 +1,11 @@
 """Tests for src/analysis/momentum.py (M9)."""
+
 from __future__ import annotations
 
 import math
 
 import numpy as np
 import pandas as pd
-import pytest
 
 from src.analysis.momentum import (
     above_50dma,
@@ -103,7 +103,6 @@ def test_golden_cross_falling():
 def test_volume_surge_ratio_2():
     """5d-avg=200, 90d-avg approx 100 -> ratio approx 2.0."""
     # Build 90-element series: first 85 points at 100, last 5 at 200.
-    n = 90
     values = np.array([100.0] * 85 + [200.0] * 5)
     series = pd.Series(values)
     avg_5 = 200.0
@@ -208,8 +207,13 @@ def test_momentum_signals_df_shape_and_columns():
         market_history=market,
     )
     expected_cols = {
-        "Momentum_12_1", "RS_3m", "Above_50DMA", "Above_200DMA",
-        "Golden_Cross", "Volume_Surge", "Momentum_Score",
+        "Momentum_12_1",
+        "RS_3m",
+        "Above_50DMA",
+        "Above_200DMA",
+        "Golden_Cross",
+        "Volume_Surge",
+        "Momentum_Score",
     }
     assert expected_cols.issubset(set(out.columns))
     assert list(out.index) == ["AAPL", "NVDA"]

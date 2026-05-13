@@ -22,7 +22,6 @@ import {
   formatPercent,
   formatNumber,
   formatDate,
-  formatLargeNumber,
 } from "@/lib/formatters";
 import { ACCOUNT_TYPE_LABELS } from "@/lib/constants";
 import SignalBadge from "@/components/ui/SignalBadge";
@@ -519,6 +518,24 @@ function ExpandedRow({
 }
 
 // ---------------------------------------------------------------------------
+// Sort header icon (hoisted out of PortfolioPage so React does not treat it as
+// a new component on every render and reset its children's state).
+// ---------------------------------------------------------------------------
+
+function SortIcon({
+  col,
+  sortKey,
+  sortDesc,
+}: {
+  col: string;
+  sortKey: string;
+  sortDesc: boolean;
+}) {
+  if (sortKey !== col) return <ChevronDown size={12} className="opacity-30" />;
+  return sortDesc ? <ChevronDown size={12} /> : <ChevronUp size={12} />;
+}
+
+// ---------------------------------------------------------------------------
 // Main page
 // ---------------------------------------------------------------------------
 
@@ -573,11 +590,6 @@ export default function PortfolioPage() {
       setSortKey(key);
       setSortDesc(true);
     }
-  }
-
-  function SortIcon({ col }: { col: string }) {
-    if (sortKey !== col) return <ChevronDown size={12} className="opacity-30" />;
-    return sortDesc ? <ChevronDown size={12} /> : <ChevronUp size={12} />;
   }
 
   // Derived score column key
@@ -677,12 +689,12 @@ export default function PortfolioPage() {
                 <tr>
                   <th className={thCls} onClick={() => handleSort("ticker")}>
                     <span className="flex items-center gap-1">
-                      Ticker <SortIcon col="ticker" />
+                      Ticker <SortIcon col="ticker" sortKey={sortKey} sortDesc={sortDesc} />
                     </span>
                   </th>
                   <th className={thCls} onClick={() => handleSort("name")}>
                     <span className="flex items-center gap-1">
-                      Name <SortIcon col="name" />
+                      Name <SortIcon col="name" sortKey={sortKey} sortDesc={sortDesc} />
                     </span>
                   </th>
                   <th
@@ -690,7 +702,7 @@ export default function PortfolioPage() {
                     onClick={() => handleSort("current_price")}
                   >
                     <span className="flex items-center justify-end gap-1">
-                      Price <SortIcon col="current_price" />
+                      Price <SortIcon col="current_price" sortKey={sortKey} sortDesc={sortDesc} />
                     </span>
                   </th>
                   <th
@@ -698,7 +710,7 @@ export default function PortfolioPage() {
                     onClick={() => handleSort("quantity")}
                   >
                     <span className="flex items-center justify-end gap-1">
-                      Qty <SortIcon col="quantity" />
+                      Qty <SortIcon col="quantity" sortKey={sortKey} sortDesc={sortDesc} />
                     </span>
                   </th>
                   <th
@@ -706,7 +718,7 @@ export default function PortfolioPage() {
                     onClick={() => handleSort("cost_basis")}
                   >
                     <span className="flex items-center justify-end gap-1">
-                      Cost <SortIcon col="cost_basis" />
+                      Cost <SortIcon col="cost_basis" sortKey={sortKey} sortDesc={sortDesc} />
                     </span>
                   </th>
                   <th
@@ -714,7 +726,7 @@ export default function PortfolioPage() {
                     onClick={() => handleSort("market_value")}
                   >
                     <span className="flex items-center justify-end gap-1">
-                      Value <SortIcon col="market_value" />
+                      Value <SortIcon col="market_value" sortKey={sortKey} sortDesc={sortDesc} />
                     </span>
                   </th>
                   <th
@@ -722,7 +734,7 @@ export default function PortfolioPage() {
                     onClick={() => handleSort("gain_loss_pct")}
                   >
                     <span className="flex items-center justify-end gap-1">
-                      P&L% <SortIcon col="gain_loss_pct" />
+                      P&L% <SortIcon col="gain_loss_pct" sortKey={sortKey} sortDesc={sortDesc} />
                       <MetricInfo metricId="gain_loss_pct" size={11} />
                     </span>
                   </th>
@@ -731,7 +743,7 @@ export default function PortfolioPage() {
                     onClick={() => handleSort("weight_pct")}
                   >
                     <span className="flex items-center justify-end gap-1">
-                      Weight <SortIcon col="weight_pct" />
+                      Weight <SortIcon col="weight_pct" sortKey={sortKey} sortDesc={sortDesc} />
                       <MetricInfo metricId="weight_pct" size={11} />
                     </span>
                   </th>
@@ -741,7 +753,7 @@ export default function PortfolioPage() {
                   >
                     <span className="flex items-center gap-1">
                       Score ({horizon === "long_term" ? "LT" : horizon === "medium_term" ? "MT" : "ST"})
-                      <SortIcon col={scoreKey} />
+                      <SortIcon col={scoreKey} sortKey={sortKey} sortDesc={sortDesc} />
                       <MetricInfo
                         metricId={
                           horizon === "long_term"

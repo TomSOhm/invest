@@ -2,6 +2,7 @@
 Invest Solo -- FastAPI Dependency Injection
 Creates service singletons and provides them via Depends() callables.
 """
+
 from functools import lru_cache
 
 from backend.app.services.cache_service import CacheService
@@ -14,10 +15,10 @@ from backend.app.services.watchlist_service import WatchlistService
 from backend.app.storage.portfolio_store import PortfolioStore
 from backend.app.storage.watchlist_store import WatchlistStore
 
-
 # ---------------------------------------------------------------------------
 # Singletons (created once, reused for all requests)
 # ---------------------------------------------------------------------------
+
 
 @lru_cache(maxsize=1)
 def _get_cache_service() -> CacheService:
@@ -78,6 +79,7 @@ def _get_company_service() -> CompanyService:
 # ---------------------------------------------------------------------------
 # Depends() callables for FastAPI router functions
 # ---------------------------------------------------------------------------
+
 
 def get_cache_service() -> CacheService:
     return _get_cache_service()

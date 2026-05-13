@@ -28,13 +28,13 @@ All public functions return NaN (or NaN-filled dicts) when inputs are
 incomplete. Callers should NOT rely on exceptions — check ``warnings``
 in ``dcf_with_sensitivity``'s output instead.
 """
+
 from __future__ import annotations
 
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import numpy as np
-
 
 __all__ = [
     "compute_wacc",
@@ -153,7 +153,7 @@ def build_revenue_glide(
     near_term_growth: float,
     terminal_growth: float = 0.025,
     n_years: int = 5,
-) -> List[float]:
+) -> list[float]:
     """Linearly fade ``near_term_growth`` toward ``terminal_growth`` over n years.
 
     The first year uses ``near_term_growth`` (clamped at ±50%); the last
@@ -189,7 +189,7 @@ def build_revenue_glide(
 
 def project_fcf(
     fcf_t0: float,
-    revenue_growth_glide: List[float],
+    revenue_growth_glide: list[float],
     fcf_margin: float,
     revenue_t0: float,
 ) -> np.ndarray:
@@ -331,7 +331,7 @@ def intrinsic_value_per_share(
 # ──────────────────────────────────────────────────────────────────────────────
 
 
-_DEFAULT_DCF_SETTINGS: Dict[str, float] = {
+_DEFAULT_DCF_SETTINGS: dict[str, float] = {
     "projection_years": 5,
     "terminal_growth_rate": 0.025,
     "risk_free_rate": 0.03,
@@ -340,7 +340,7 @@ _DEFAULT_DCF_SETTINGS: Dict[str, float] = {
 }
 
 
-def _resolve_settings(settings: Optional[Dict[str, Any]]) -> Dict[str, float]:
+def _resolve_settings(settings: dict[str, Any] | None) -> dict[str, float]:
     """Merge caller-supplied DCF settings (e.g. ``settings.yaml`` ``valuation.dcf`` block)
     with the module-level defaults. Caller wins on conflict.
     """
@@ -359,11 +359,11 @@ def _resolve_settings(settings: Optional[Dict[str, Any]]) -> Dict[str, float]:
 
 
 def dcf_with_sensitivity(
-    inputs: Dict[str, Any],
+    inputs: dict[str, Any],
     wacc_delta: float = 0.01,
     tgr_delta: float = 0.005,
-    settings: Optional[Dict[str, Any]] = None,
-) -> Dict[str, Any]:
+    settings: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     """Two-stage DCF with a 3x3 WACC × TGR sensitivity grid.
 
     Parameters
@@ -413,9 +413,9 @@ def dcf_with_sensitivity(
     This is the convention activated by SIGNAL_THRESHOLDS in M6.
     """
     cfg = _resolve_settings(settings)
-    warnings: List[str] = []
+    warnings: list[str] = []
 
-    nan_result: Dict[str, Any] = {
+    nan_result: dict[str, Any] = {
         "wacc_base": float("nan"),
         "tgr_base": float(cfg["terminal_growth_rate"]),
         "intrinsic_low": float("nan"),
@@ -459,9 +459,7 @@ def dcf_with_sensitivity(
         warnings.append("FCF margin not derivable (need FCFMargin or FCF+Revenue)")
         return nan_result
     if fcf_margin <= 0:
-        warnings.append(
-            f"Non-positive FCF margin ({fcf_margin:.3f}); DCF assumes positive future cash flows"
-        )
+        warnings.append(f"Non-positive FCF margin ({fcf_margin:.3f}); DCF assumes positive future cash flows")
         # We continue: the grid will compute (negative) values that still
         # convey the directional message "this firm doesn't generate cash".
 
@@ -484,9 +482,7 @@ def dcf_with_sensitivity(
     # ---------- Revenue glide ----------
     glide_override = inputs.get("RevenueGlide")
     if isinstance(glide_override, list) and len(glide_override) >= 1:
-        revenue_glide = [
-            _to_float(x, default=tgr_base) for x in glide_override
-        ]
+        revenue_glide = [_to_float(x, default=tgr_base) for x in glide_override]
     else:
         revenue_glide = build_revenue_glide(
             near_term_growth=revenue_growth,
@@ -494,9 +490,7 @@ def dcf_with_sensitivity(
             n_years=5,
         )
         if not _is_finite(revenue_growth):
-            warnings.append(
-                "RevenueGrowth missing — glide flat at terminal rate (conservative)"
-            )
+            warnings.append("RevenueGrowth missing — glide flat at terminal rate (conservative)")
 
     # ---------- Net debt ----------
     net_debt = total_debt - cash
@@ -509,8 +503,8 @@ def dcf_with_sensitivity(
     wacc_labels = ["wacc-", "wacc", "wacc+"]
     tgr_labels = ["tgr-", "tgr", "tgr+"]
 
-    scenarios: Dict[str, float] = {}
-    grid_values: List[float] = []
+    scenarios: dict[str, float] = {}
+    grid_values: list[float] = []
     mid_value = float("nan")
 
     invalid_terminal = False
@@ -561,6 +555,7 @@ def dcf_with_sensitivity(
 
     # ---------- Margin of safety vs. price ----------
     if _is_finite(price) and price > 0:
+
         def _mos(iv: float) -> float:
             return (iv - price) / price if _is_finite(iv) else float("nan")
 

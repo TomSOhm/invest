@@ -9,9 +9,8 @@ The bulk variant ``momentum_signals_df`` produces the column block joined
 back onto the scoring universe in ``score_universe`` (M9 hook -- see
 src/analysis/scoring_engine.py).
 """
-from __future__ import annotations
 
-from typing import Dict, Optional
+from __future__ import annotations
 
 import numpy as np
 import pandas as pd
@@ -64,7 +63,7 @@ def momentum_12_1(prices) -> float:
         return float("nan")
 
     p_recent = series.iloc[-TRADING_DAYS_MONTH - 1]  # ~21 trading days ago
-    p_old = series.iloc[-TRADING_DAYS_YEAR]          # ~252 trading days ago
+    p_old = series.iloc[-TRADING_DAYS_YEAR]  # ~252 trading days ago
 
     if not (np.isfinite(p_recent) and np.isfinite(p_old) and p_old > 0):
         return float("nan")
@@ -251,8 +250,8 @@ def _extract_close_volume(df: pd.DataFrame) -> tuple:
 
 
 def momentum_signals_df(
-    price_history_map: Dict[str, pd.DataFrame],
-    market_history: Optional[pd.DataFrame] = None,
+    price_history_map: dict[str, pd.DataFrame],
+    market_history: pd.DataFrame | None = None,
 ) -> pd.DataFrame:
     """Compute the momentum signal block for a universe.
 
@@ -272,7 +271,7 @@ def momentum_signals_df(
         Momentum_12_1, RS_3m, Above_50DMA, Above_200DMA, Golden_Cross,
         Volume_Surge, Momentum_Score
     """
-    market_close: Optional[pd.Series]
+    market_close: pd.Series | None
     if market_history is not None and not market_history.empty:
         market_close, _ = _extract_close_volume(market_history)
     else:
@@ -281,21 +280,28 @@ def momentum_signals_df(
     rows = []
     for ticker, df in price_history_map.items():
         close, volume = _extract_close_volume(df)
-        rows.append({
-            "Ticker": ticker,
-            "Momentum_12_1": momentum_12_1(close),
-            "RS_3m": relative_strength_3m(close, market_close) if market_close is not None else float("nan"),
-            "Above_50DMA": above_50dma(close),
-            "Above_200DMA": above_200dma(close),
-            "Golden_Cross": golden_cross(close),
-            "Volume_Surge": volume_surge(volume),
-            "Momentum_Score": momentum_score(close, market_close, volume),
-        })
+        rows.append(
+            {
+                "Ticker": ticker,
+                "Momentum_12_1": momentum_12_1(close),
+                "RS_3m": relative_strength_3m(close, market_close) if market_close is not None else float("nan"),
+                "Above_50DMA": above_50dma(close),
+                "Above_200DMA": above_200dma(close),
+                "Golden_Cross": golden_cross(close),
+                "Volume_Surge": volume_surge(volume),
+                "Momentum_Score": momentum_score(close, market_close, volume),
+            }
+        )
     if not rows:
         return pd.DataFrame(
             columns=[
-                "Momentum_12_1", "RS_3m", "Above_50DMA", "Above_200DMA",
-                "Golden_Cross", "Volume_Surge", "Momentum_Score",
+                "Momentum_12_1",
+                "RS_3m",
+                "Above_50DMA",
+                "Above_200DMA",
+                "Golden_Cross",
+                "Volume_Surge",
+                "Momentum_Score",
             ]
         )
     return pd.DataFrame(rows).set_index("Ticker")

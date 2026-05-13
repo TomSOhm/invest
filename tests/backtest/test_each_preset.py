@@ -16,6 +16,7 @@ preset is annotated with ``experimental=True`` (see settings.yaml /
 horizon_presets.py) when its alpha cannot be reliably gated. The
 documented gate is the ``experimental`` flag, not the test outcome.
 """
+
 from __future__ import annotations
 
 import math
@@ -27,7 +28,6 @@ from backend.app.services.backtest.walk_forward import (
     BacktestConfig,
     WalkForwardBacktest,
 )
-
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Test parameters
@@ -80,8 +80,7 @@ def _assert_result_well_formed(result):
     assert not result.benchmark_curve.empty, "benchmark curve empty"
     # Equity curve aligned to benchmark master index.
     assert len(result.equity_curve) == len(result.benchmark_curve), (
-        f"equity ({len(result.equity_curve)}) and benchmark "
-        f"({len(result.benchmark_curve)}) lengths differ"
+        f"equity ({len(result.equity_curve)}) and benchmark ({len(result.benchmark_curve)}) lengths differ"
     )
     assert _expected_summary_keys().issubset(result.summary.keys())
     # Initial value of equity curve equals initial capital.
@@ -191,9 +190,7 @@ def test_alpha_with_outperforming_synthetic(alpha_fetcher, sp500_tickers, sp500_
         f"strategy total_return = {result.summary['total_return']:.2%} -- expected > 0"
     )
     # Sharpe should be finite when the basket actually trades.
-    assert math.isfinite(result.summary["sharpe"]), (
-        f"sharpe is non-finite: {result.summary['sharpe']!r}"
-    )
+    assert math.isfinite(result.summary["sharpe"]), f"sharpe is non-finite: {result.summary['sharpe']!r}"
 
 
 def test_position_log_structure(synthetic_fetcher, pea_tickers, pea_universe_df):

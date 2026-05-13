@@ -3,14 +3,12 @@
 Outputs a JSON+CSV report so the M5 final-report can show per-ticker values.
 This is a one-shot diagnostic, not part of the test suite.
 """
+
 from __future__ import annotations
 
-import json
-import math
 import sys
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -44,6 +42,7 @@ def main() -> int:
     # risk_score_real also reads Altman_Z if present; we compute it lazily.
     if "Altman_Z" not in df.columns:
         from src.analysis.scoring_engine import altman_z_score
+
         df["Altman_Z"] = df.apply(altman_z_score, axis=1)
     risk = risk_score_real(df, price_history_map=None)
 

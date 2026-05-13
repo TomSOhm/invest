@@ -7,14 +7,14 @@ Key changes vs M9:
 - Legacy composite_score / signal removed from response
 - Uses 1-row DataFrame through score_universe to get M7 horizon columns
 """
+
 from __future__ import annotations
 
-from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from datetime import UTC, datetime
+from typing import Any
 
 import numpy as np
 import pandas as pd
-from loguru import logger
 
 from backend.app.services import screener_cache
 from backend.app.services.data_fetcher import DataFetcher
@@ -28,7 +28,7 @@ class CompanyService:
         self._fetcher = fetcher
         self._scorer = scorer
 
-    def get_detail(self, ticker: str) -> Dict[str, Any]:
+    def get_detail(self, ticker: str) -> dict[str, Any]:
         """
         Full company detail: metrics + three-horizon scoring + DCF + quality
         + risk + momentum blocks + analyst ratings + PEA status.
@@ -56,7 +56,7 @@ class CompanyService:
 
         current_price = self._num(data.get("Price"))
         high_52 = self._num(data.get("FiftyTwoWeekHigh"))
-        fifty_two_pct: Optional[float] = None
+        fifty_two_pct: float | None = None
         if current_price and high_52 and high_52 > 0:
             fifty_two_pct = round((current_price / high_52 - 1) * 100, 1)
 
@@ -147,16 +147,16 @@ class CompanyService:
             "analyst_ratings": analyst,
             "data_completeness": scoring.get("data_completeness", 0.0),
             "data_source": "yfinance",
-            "last_updated": datetime.now(timezone.utc).isoformat(),
+            "last_updated": datetime.now(UTC).isoformat(),
             "score_source": score_source,
         }
 
-    def get_metrics(self, ticker: str) -> Dict[str, Any]:
+    def get_metrics(self, ticker: str) -> dict[str, Any]:
         """Return only the raw metrics portion of company detail."""
         detail = self.get_detail(ticker)
         return detail["metrics"]
 
-    def get_horizon(self, ticker: str, horizon: str) -> Dict[str, Any]:
+    def get_horizon(self, ticker: str, horizon: str) -> dict[str, Any]:
         """
         Return the selected horizon's scoring block plus DCF valuation.
 
@@ -180,7 +180,7 @@ class CompanyService:
         }
 
     @staticmethod
-    def _num(value: Any) -> Optional[float]:
+    def _num(value: Any) -> float | None:
         """Convert a value to float, returning None for NaN/None/invalid."""
         if value is None:
             return None
@@ -193,7 +193,7 @@ class CompanyService:
             return None
 
     @staticmethod
-    def _str(value: Any) -> Optional[str]:
+    def _str(value: Any) -> str | None:
         """Coerce a value to str, returning None for NaN/None/empty.
 
         pandas NaN is a truthy float, so plain ``or`` fallbacks let it through
