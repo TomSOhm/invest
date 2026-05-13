@@ -244,8 +244,11 @@ class TestQuotaCounter:
             ]
             fmp_fetcher.fetch_quote("AAPL")
 
-        assert quota_tracker.get_count() == initial + 1, (
-            f"Expected count {initial + 1}, got {quota_tracker.get_count()}"
+        # Post /stable/ migration, fetch_quote pulls from three endpoints:
+        # /quote (base) + /profile (beta, avg volume) + /ratios-ttm (PE).
+        # Each successful call increments the quota tracker by 1.
+        assert quota_tracker.get_count() == initial + 3, (
+            f"Expected count {initial + 3}, got {quota_tracker.get_count()}"
         )
 
     def test_quota_exhausted_skips_fmp(
