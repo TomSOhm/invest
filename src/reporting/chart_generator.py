@@ -209,6 +209,8 @@ def generate_all_charts(scored_df, output_dir):
 
 
 if __name__ == "__main__":
+    from pathlib import Path
     df = get_universe_dataframe()
     scored = score_universe(df)
-    generate_all_charts(scored, "/home/claude/invest/charts")
+    out_dir = Path(__file__).resolve().parents[2] / "data" / "charts"
+    generate_all_charts(scored, str(out_dir))

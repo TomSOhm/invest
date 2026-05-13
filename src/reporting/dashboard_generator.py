@@ -365,6 +365,9 @@ function filterSignal(signal, btn) {{
 
 
 if __name__ == "__main__":
+    from pathlib import Path
     df = get_universe_dataframe()
     scored = score_universe(df)
-    generate_dashboard(scored, "/home/claude/invest/dashboard.html")
+    out_path = Path(__file__).resolve().parents[2] / "data" / "dashboard.html"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    generate_dashboard(scored, str(out_path))

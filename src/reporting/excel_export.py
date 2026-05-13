@@ -98,6 +98,9 @@ def generate_excel(scored_df, output_path):
 
 
 if __name__ == "__main__":
+    from pathlib import Path
     df = get_universe_dataframe()
     scored = score_universe(df)
-    generate_excel(scored, "/home/claude/invest/screener_results.xlsx")
+    out_path = Path(__file__).resolve().parents[2] / "data" / "screener_results.xlsx"
+    out_path.parent.mkdir(parents=True, exist_ok=True)
+    generate_excel(scored, str(out_path))
