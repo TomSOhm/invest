@@ -1,7 +1,7 @@
 # LEGACY — kept for Docker/CI compatibility.
 # Source of truth is now pyproject.toml [dependency-groups] dev + uv.lock.
 # Local dev should use `make install` (which runs `uv sync --group dev`).
-fastapi>=0.115.0
+fastapi>=0.136.1
 uvicorn[standard]>=0.34.0
 pydantic>=2.5.0
 pyyaml>=6.0
