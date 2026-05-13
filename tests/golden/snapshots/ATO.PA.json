@@ -40,7 +40,7 @@
   "score_lt": 44.1,
   "score_mt": 46.0,
   "score_st": 41.0,
-  "signal_lt": "Insufficient Data",
+  "signal_lt": "Hold",
   "signal_mt": "Hold",
   "signal_st": "Insufficient Data"
 }

@@ -229,14 +229,21 @@ def _check_gates(
 # When any of these fire, force the signal to "Insufficient Data" regardless of
 # composite — the composite is built on the few categories that happen to be
 # present, so a high score is meaningless.
+#
+# NOT included on purpose:
+#   missing_years_listed   – metadata only. yfinance often doesn't expose
+#                            firstTradeDateEpochUtc for non-US tickers, but a
+#                            missing listing date isn't a scoring-quality issue.
+#                            Surfaces in blockers[] for transparency; caps signal
+#                            at Hold via the catch-all below, never escalates to
+#                            "Insufficient Data".
+#   missing_avg_volume     – same: liquidity metric, not a scoring input.
 _DATA_QUALITY_BLOCKERS = frozenset(
     {
         "min_data_completeness",
         "missing_data_completeness",
         "missing_altman_z",
         "missing_market_cap",
-        "missing_years_listed",
-        "missing_avg_volume",
         "missing_realized_vol_1y",
         "missing_momentum",
     }
