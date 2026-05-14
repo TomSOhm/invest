@@ -2,7 +2,7 @@
 
 import clsx from "clsx";
 import type { DCFValuation } from "@/lib/types";
-import { formatCurrency, formatPercent } from "@/lib/formatters";
+import { formatCurrency } from "@/lib/formatters";
 import MoSBar from "./MoSBar";
 import { AlertTriangle } from "lucide-react";
 import MetricInfo from "./MetricInfo";

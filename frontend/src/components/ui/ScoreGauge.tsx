@@ -28,7 +28,6 @@ export default function ScoreGauge({ score, size = 80 }: ScoreGaugeProps) {
   const offset = semiCircumference - (clampedScore / 100) * semiCircumference;
 
   const cx = size / 2;
-  const cy = size / 2 + radius / 4;
 
   return (
     <div className="relative flex flex-col items-center" style={{ width: size }}>

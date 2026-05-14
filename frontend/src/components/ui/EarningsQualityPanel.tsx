@@ -3,7 +3,6 @@
 import clsx from "clsx";
 import { Check, X, AlertTriangle } from "lucide-react";
 import type { QualitySignals } from "@/lib/types";
-import { formatNumber, formatPercent, formatCurrency } from "@/lib/formatters";
 import MetricInfo from "./MetricInfo";
 
 interface EarningsQualityPanelProps {

@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { CheckCircle, XCircle, ChevronDown, ChevronUp } from "lucide-react";
-import clsx from "clsx";
 import type { Horizon, HorizonScoring } from "@/lib/types";
-import { signalToBgColor, scoreToColor } from "@/lib/constants";
+import { scoreToColor } from "@/lib/constants";
 import SignalBadge from "./SignalBadge";
 import MetricInfo from "./MetricInfo";
 

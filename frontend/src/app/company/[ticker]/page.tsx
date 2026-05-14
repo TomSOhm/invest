@@ -31,7 +31,7 @@ import MetricInfo from "@/components/ui/MetricInfo";
 import SourceSelector from "@/components/ui/SourceSelector";
 import AnalystTargetsPanel from "@/components/ui/AnalystTargetsPanel";
 import { useDataSource } from "@/hooks/useDataSource";
-import type { AnalystRatings, RiskSignals, SubScores } from "@/lib/types";
+import type { RiskSignals, SubScores } from "@/lib/types";
 import clsx from "clsx";
 
 // Metric row inside a card

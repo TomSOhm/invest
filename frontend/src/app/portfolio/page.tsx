@@ -394,13 +394,7 @@ function EditPositionModal({
 // Expanded row
 // ---------------------------------------------------------------------------
 
-function ExpandedRow({
-  pos,
-  horizon,
-}: {
-  pos: PortfolioPosition;
-  horizon: Horizon;
-}) {
+function ExpandedRow({ pos }: { pos: PortfolioPosition }) {
   const metricGroup = (
     label: string,
     items: { label: string; value: string; good?: boolean | null }[]
@@ -897,7 +891,7 @@ export default function PortfolioPage() {
                     isExpanded && (
                       <tr key={`${pos.id}-expand`}>
                         <td colSpan={12} className="p-0">
-                          <ExpandedRow pos={pos} horizon={horizon} />
+                          <ExpandedRow pos={pos} />
                         </td>
                       </tr>
                     ),

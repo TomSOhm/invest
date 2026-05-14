@@ -26,12 +26,6 @@ const FALLBACK_PRESETS: PresetMeta[] = [
   { name: "global", horizon: "long_term", description: "Global Best" },
 ];
 
-function getScoreForHorizon(item: ScreenerResultItem, horizon: Horizon): number {
-  if (horizon === "long_term") return item.score_lt;
-  if (horizon === "medium_term") return item.score_mt;
-  return item.score_st;
-}
-
 function getSignalForHorizon(item: ScreenerResultItem, horizon: Horizon): string {
   if (horizon === "long_term") return item.signal_lt;
   if (horizon === "medium_term") return item.signal_mt;
@@ -510,7 +504,6 @@ export default function ScreenerPage() {
                         </tr>
                       )}
                       {results.results.map((item) => {
-                        const activeScore = getScoreForHorizon(item, horizon);
                         const activeSignal = getSignalForHorizon(item, horizon);
                         const keyMetric = getKeyMetricForHorizon(item, horizon);
 
