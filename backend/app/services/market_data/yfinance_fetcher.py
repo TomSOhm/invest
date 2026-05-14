@@ -983,6 +983,132 @@ class YFinanceDataFetcher:
             }
 
     # ------------------------------------------------------------------
+    # yfinance.calendars surface (sub-project 3) — forward events + dividends
+    # ------------------------------------------------------------------
+
+    def fetch_calendar(self, ticker: str) -> dict[str, Any]:
+        """Forward-looking earnings + dividend events from ``tk.calendar``.
+
+        Source: ``tk.calendar`` (yfinance dict).  Returns the same fixed
+        shape regardless of whether yfinance populated every key — missing
+        fields become ``None``.  Cached for 6h.  Display-only payload.
+        """
+        cache_key = f"yf:calendar:{ticker}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        out: dict[str, Any] = {
+            "next_earnings_date": None,
+            "next_earnings_eps_estimate": None,
+            "next_earnings_eps_low": None,
+            "next_earnings_eps_high": None,
+            "next_earnings_revenue_estimate": None,
+            "dividend_date": None,
+            "ex_dividend_date": None,
+        }
+        try:
+            cal = yf.Ticker(ticker).calendar
+            if not cal:
+                self._cache.set(cache_key, out, ttl_seconds=21600)
+                return out
+
+            earnings_dates = cal.get("Earnings Date")
+            if isinstance(earnings_dates, list) and earnings_dates:
+                first = earnings_dates[0]
+                if hasattr(first, "isoformat"):
+                    out["next_earnings_date"] = first.isoformat()
+
+            out["next_earnings_eps_estimate"] = _safe_float(cal.get("Earnings Average"))
+            out["next_earnings_eps_low"] = _safe_float(cal.get("Earnings Low"))
+            out["next_earnings_eps_high"] = _safe_float(cal.get("Earnings High"))
+            out["next_earnings_revenue_estimate"] = _safe_float(cal.get("Revenue Average"))
+
+            div_date = cal.get("Dividend Date")
+            if hasattr(div_date, "isoformat"):
+                out["dividend_date"] = div_date.isoformat()
+            ex_div = cal.get("Ex-Dividend Date")
+            if hasattr(ex_div, "isoformat"):
+                out["ex_dividend_date"] = ex_div.isoformat()
+        except Exception as exc:
+            logger.debug(f"yfinance fetch_calendar failed for {ticker}: {exc}")
+        self._cache.set(cache_key, out, ttl_seconds=21600)
+        return out
+
+    def fetch_dividends(
+        self,
+        ticker: str,
+        years: int = 5,
+    ) -> list[dict[str, Any]]:
+        """Last ``years`` years of dividend payments from ``tk.dividends``.
+
+        ``years`` is clamped to ``[1, 20]`` to bound cache size.  Index is
+        tz-aware (US/Eastern) on yfinance Series; we strip tz before slicing
+        so the API payload exposes pure ``YYYY-MM-DD`` dates and downstream
+        consumers don't see Eastern-time offsets.  Cached for 6h.
+        """
+        years = max(1, min(int(years), 20))
+        cache_key = f"yf:dividends:{ticker}:{years}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        out: list[dict[str, Any]] = []
+        try:
+            series = yf.Ticker(ticker).dividends
+            if series is None or len(series) == 0:
+                self._cache.set(cache_key, out, ttl_seconds=21600)
+                return out
+
+            idx = series.index
+            if isinstance(idx, pd.DatetimeIndex) and idx.tz is not None:
+                series = series.copy()
+                series.index = idx.tz_localize(None)
+
+            cutoff = pd.Timestamp.now("UTC").tz_localize(None) - pd.DateOffset(years=years)
+            filtered = series[series.index >= cutoff].sort_index()
+            for ts, amount in filtered.items():
+                amt = _safe_float(amount)
+                if amt is None:
+                    continue
+                ex_date = ts.strftime("%Y-%m-%d") if hasattr(ts, "strftime") else str(ts)
+                out.append({"ex_date": ex_date, "amount": amt})
+        except Exception as exc:
+            logger.debug(f"yfinance fetch_dividends failed for {ticker}: {exc}")
+        self._cache.set(cache_key, out, ttl_seconds=21600)
+        return out
+
+    def fetch_info_yields(self, ticker: str) -> dict[str, float | None]:
+        """Dividend yield + rate scalars from ``tk.info``.
+
+        Returns the 4 dividend-related scalars yfinance exposes on the
+        ``info`` dict.  Each is coerced via ``_safe_float`` and falls back
+        to ``None`` on missing / non-finite values.  Cached for 6h.
+        """
+        cache_key = f"yf:info_yields:{ticker}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        out: dict[str, float | None] = {
+            "dividend_yield": None,
+            "dividend_rate": None,
+            "trailing_annual_dividend_rate": None,
+            "trailing_annual_dividend_yield": None,
+        }
+        try:
+            info = yf.Ticker(ticker).info or {}
+            out["dividend_yield"] = _safe_float(info.get("dividendYield"))
+            out["dividend_rate"] = _safe_float(info.get("dividendRate"))
+            out["trailing_annual_dividend_rate"] = _safe_float(
+                info.get("trailingAnnualDividendRate")
+            )
+            out["trailing_annual_dividend_yield"] = _safe_float(
+                info.get("trailingAnnualDividendYield")
+            )
+        except Exception as exc:
+            logger.debug(f"yfinance fetch_info_yields failed for {ticker}: {exc}")
+        self._cache.set(cache_key, out, ttl_seconds=21600)
+        return out
+
+    # ------------------------------------------------------------------
     # Composite fetch (used by HybridDataFetcher for the full scoring row)
     # ------------------------------------------------------------------
 

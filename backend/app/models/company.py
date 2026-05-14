@@ -77,6 +77,43 @@ class AnalystRatings(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Company calendar (sub-project 3 — yfinance.calendars enrichment)
+# ---------------------------------------------------------------------------
+
+
+class DividendInfo(BaseModel):
+    """One historical dividend payment."""
+
+    ex_date: str
+    amount: float
+
+
+class CompanyCalendar(BaseModel):
+    """Forward-looking earnings + dividend events and recent dividend history.
+
+    All fields optional — non-US tickers may have partial coverage and recent
+    IPOs may have no dividend history at all.
+    """
+
+    # Next earnings event
+    next_earnings_date: str | None = None
+    next_earnings_eps_estimate: float | None = None
+    next_earnings_eps_low: float | None = None
+    next_earnings_eps_high: float | None = None
+    next_earnings_revenue_estimate: float | None = None
+
+    # Next dividend event
+    dividend_date: str | None = None
+    ex_dividend_date: str | None = None
+    dividend_amount: float | None = None
+    dividend_yield: float | None = None
+    dividend_rate: float | None = None
+
+    # Dividend history (last ~5y, by ex-date asc)
+    dividends_5y: list[DividendInfo] = Field(default_factory=list)
+
+
+# ---------------------------------------------------------------------------
 # Raw financial metrics
 # ---------------------------------------------------------------------------
 
