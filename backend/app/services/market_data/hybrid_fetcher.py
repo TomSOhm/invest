@@ -755,6 +755,64 @@ class HybridDataFetcher:
             "earnings_history": history,
         }
 
+    def fetch_calendar(
+        self,
+        ticker: str,
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
+        """Forward events + dividend history (sub-project 3 — display-only).
+
+        yfinance is the only backing source; FMP calendar endpoints are
+        intentionally unwired. The ``source`` parameter is honored for
+        cache-key isolation only, so callers running yfinance/fmp/hybrid
+        side-by-side don't cross-contaminate their results.
+
+        Returns the ``CompanyCalendar`` Pydantic shape as a plain dict.
+        Individual yfinance fetcher failures degrade gracefully and never
+        block the other two fetchers.
+        """
+        from backend.app.services.market_data.types import is_valid_source
+
+        if not is_valid_source(source):
+            raise ValueError(f"Unknown source {source!r}")
+
+        cache_key = f"calendar:{source}:{ticker}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+
+        try:
+            cal = self._yf.fetch_calendar(ticker)
+        except Exception as exc:
+            logger.debug(f"hybrid fetch_calendar (yf.calendar) failed for {ticker}: {exc}")
+            cal = {}
+        try:
+            divs = self._yf.fetch_dividends(ticker, years=5)
+        except Exception as exc:
+            logger.debug(f"hybrid fetch_calendar (yf.dividends) failed for {ticker}: {exc}")
+            divs = []
+        try:
+            yields = self._yf.fetch_info_yields(ticker)
+        except Exception as exc:
+            logger.debug(f"hybrid fetch_calendar (yf.info_yields) failed for {ticker}: {exc}")
+            yields = {}
+
+        out: dict[str, Any] = {
+            "next_earnings_date": cal.get("next_earnings_date"),
+            "next_earnings_eps_estimate": cal.get("next_earnings_eps_estimate"),
+            "next_earnings_eps_low": cal.get("next_earnings_eps_low"),
+            "next_earnings_eps_high": cal.get("next_earnings_eps_high"),
+            "next_earnings_revenue_estimate": cal.get("next_earnings_revenue_estimate"),
+            "dividend_date": cal.get("dividend_date"),
+            "ex_dividend_date": cal.get("ex_dividend_date"),
+            "dividend_amount": divs[-1]["amount"] if divs else None,
+            "dividend_yield": yields.get("dividend_yield"),
+            "dividend_rate": yields.get("dividend_rate"),
+            "dividends_5y": divs,
+        }
+        self._cache.set(cache_key, out, ttl_seconds=21600)  # 6h
+        return out
+
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
