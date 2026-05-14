@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, TrendingUp, TrendingDown } from "lucide-react";
 import { useCompany } from "@/hooks/useCompany";
+import { useCompanyCalendar } from "@/hooks/useCompanyCalendar";
 import { useCompanyPriceHistory } from "@/hooks/useCompanyPriceHistory";
 import PriceChart from "@/components/ui/PriceChart";
+import UpcomingEventsTile from "@/components/ui/UpcomingEventsTile";
 import ChartMetricsPanel from "@/components/ui/ChartMetricsPanel";
 import PeriodSelector from "@/components/ui/PeriodSelector";
 import BenchmarkSelector from "@/components/ui/BenchmarkSelector";
@@ -186,6 +188,7 @@ export default function CompanyPage() {
     period,
     benchmark,
   );
+  const { data: calendarData } = useCompanyCalendar(ticker, source);
   const benchmarkLabel =
     BENCHMARK_OPTIONS.find((o) => o.ticker === benchmark)?.label ?? null;
 
@@ -303,6 +306,7 @@ export default function CompanyPage() {
             )}
           </div>
         </div>
+        <UpcomingEventsTile calendar={calendarData} />
         <div className="text-right">
           <div className="text-2xl font-bold font-mono text-slate-900 dark:text-slate-100">
             {formatCurrency(currentPrice)}
@@ -360,6 +364,12 @@ export default function CompanyPage() {
               benchmarkCandles={priceData.benchmark_candles}
               movingAverages={priceData.moving_averages}
               benchmarkLabel={benchmark ? benchmarkLabel : null}
+              earnings={(analyst_ratings?.earnings_history ?? []).map((r) => ({
+                date: r.date,
+                eps_actual: r.eps_actual,
+                eps_estimate: r.eps_estimate,
+                surprise_pct: r.surprise_pct,
+              }))}
             />
             <ChartMetricsPanel
               metrics={priceData.metrics}
