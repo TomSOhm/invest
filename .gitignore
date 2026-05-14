@@ -14,6 +14,7 @@
 .env
 *.env
 config/secrets/
+.coverage
 
 # Data (large files, local only)
 data/
