@@ -184,35 +184,37 @@ _SUFFIX_MAP: dict[str, str] = {
 # paid plans. We short-circuit the FMP fetcher for them so we don't waste
 # quota or pollute the dashboard with 100%-bad-request noise. Hybrid fetcher
 # catches FMPQuotaExceeded and routes those tickers straight to yfinance.
-_NON_US_SUFFIXES: frozenset[str] = frozenset({
-    ".PA",  # Paris (Euronext)
-    ".AS",  # Amsterdam
-    ".AMS",  # Amsterdam (FMP mapped form)
-    ".BR",  # Brussels
-    ".LS",  # Lisbon
-    ".DE",  # Frankfurt (XETRA)
-    ".F",  # Frankfurt floor
-    ".MI",  # Milan
-    ".MC",  # Madrid
-    ".SW",  # SIX Swiss
-    ".L",  # London (LSE)
-    ".ST",  # Stockholm
-    ".CO",  # Copenhagen
-    ".HE",  # Helsinki
-    ".OL",  # Oslo
-    ".VI",  # Vienna
-    ".IR",  # Dublin
-    ".WA",  # Warsaw
-    ".PR",  # Prague
-    ".AT",  # Athens
-    ".T",  # Tokyo
-    ".HK",  # Hong Kong
-    ".SS",  # Shanghai
-    ".SZ",  # Shenzhen
-    ".AX",  # Sydney (ASX)
-    ".TO",  # Toronto (TSX)
-    ".V",  # Vancouver (TSX-V)
-})
+_NON_US_SUFFIXES: frozenset[str] = frozenset(
+    {
+        ".PA",  # Paris (Euronext)
+        ".AS",  # Amsterdam
+        ".AMS",  # Amsterdam (FMP mapped form)
+        ".BR",  # Brussels
+        ".LS",  # Lisbon
+        ".DE",  # Frankfurt (XETRA)
+        ".F",  # Frankfurt floor
+        ".MI",  # Milan
+        ".MC",  # Madrid
+        ".SW",  # SIX Swiss
+        ".L",  # London (LSE)
+        ".ST",  # Stockholm
+        ".CO",  # Copenhagen
+        ".HE",  # Helsinki
+        ".OL",  # Oslo
+        ".VI",  # Vienna
+        ".IR",  # Dublin
+        ".WA",  # Warsaw
+        ".PR",  # Prague
+        ".AT",  # Athens
+        ".T",  # Tokyo
+        ".HK",  # Hong Kong
+        ".SS",  # Shanghai
+        ".SZ",  # Shenzhen
+        ".AX",  # Sydney (ASX)
+        ".TO",  # Toronto (TSX)
+        ".V",  # Vancouver (TSX-V)
+    }
+)
 
 
 def _is_us_ticker(ticker: str) -> bool:
