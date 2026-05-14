@@ -199,6 +199,8 @@ export interface CompanyCalendar {
   dividend_amount: number | null;
   dividend_yield: number | null;
   dividend_rate: number | null;
+  trailing_annual_dividend_rate: number | null;
+  trailing_annual_dividend_yield: number | null;
   dividends_5y: DividendInfo[];
 }
 

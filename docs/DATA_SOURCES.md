@@ -316,6 +316,47 @@ The `fetch_analyst_ratings` return shape grew six new optional fields exposed on
 
 **Source routing:** all 6 new methods are yfinance-only (FMP analyst endpoints are not wired). Existing FMP-first hybrid path for price *targets* (`target_low/mean/high/median`) is preserved.
 
+## 9.4c. yfinance.calendars surface (sub-project 3)
+
+Sub-project 3 adds a forward-looking calendar + dividend-history panel to the
+company detail page. **Display-only**: no changes to `SCORING_COLUMNS` /
+`EXTRA_FIELDS` / `scoring_service` — purely a UI enrichment.
+
+Three new methods on `YFinanceDataFetcher` (cache TTL 6h each):
+
+| Method | yfinance source | Returns |
+|--------|-----------------|---------|
+| `fetch_calendar(ticker)` | `tk.calendar` (dict) | `dict` with `next_earnings_date`, `next_earnings_eps_estimate`, `next_earnings_eps_low`, `next_earnings_eps_high`, `next_earnings_revenue_estimate`, `dividend_date`, `ex_dividend_date`. All `None` when yfinance returns an empty dict. |
+| `fetch_dividends(ticker, years=5)` | `tk.dividends` (pd.Series) | `list[{ex_date, amount}]` filtered to the last `years`. `years` is clamped to `[1, 20]`. The US/Eastern `DatetimeIndex` is tz-stripped before serialization. |
+| `fetch_info_yields(ticker)` | `tk.info` | `dict` with `dividend_yield`, `dividend_rate`, `trailing_annual_dividend_rate`, `trailing_annual_dividend_yield`. All values pass through `_safe_float` (returns `None` on coercion failure). |
+
+**Cache keys** (6h TTL each):
+
+- `yf:calendar:{ticker}`
+- `yf:dividends:{ticker}:{years}`
+- `yf:info_yields:{ticker}`
+
+**New API endpoint.** `GET /api/company/{ticker}/calendar?source=…` returns a
+`CompanyCalendar` Pydantic shape assembled at
+`HybridDataFetcher.fetch_calendar` (cache key `calendar:{source}:{ticker}`).
+The `source` query param is honored for **cache isolation only** — internally
+the assembler always routes to yfinance (FMP has no equivalent calendar
+endpoint wired). The cache split prevents cross-source bleed when the user
+toggles the source selector.
+
+**`tk.earnings_dates` is intentionally NOT used.** It raises `ImportError`
+without `lxml` installed (verified live on yfinance 1.3.0). Past earnings
+dates are instead sourced from `tk.earnings_history` (already fetched in
+sub-project 2) and overlaid on the `PriceChart` as `ReferenceDot` markers.
+This avoids adding `lxml` to the runtime dependency surface.
+
+**Non-US ticker coverage.** `tk.calendar` is partial for `AIR.PA` (Airbus —
+EPS estimates present, revenue estimate often missing). Dividend history is
+thin for some EU / JP tickers. `CRWD` (CrowdStrike) has no dividend at all.
+The endpoint degrades gracefully: all calendar fields fall back to `None` and
+the dividend list is empty. The frontend hides empty sections rather than
+rendering "N/A" rows.
+
 ## 9.5. Company chart endpoint
 
 `GET /api/company/{ticker}/price-history?period=&benchmark=`

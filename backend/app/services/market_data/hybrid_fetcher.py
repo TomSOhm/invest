@@ -808,6 +808,8 @@ class HybridDataFetcher:
             "dividend_amount": divs[-1]["amount"] if divs else None,
             "dividend_yield": yields.get("dividend_yield"),
             "dividend_rate": yields.get("dividend_rate"),
+            "trailing_annual_dividend_rate": yields.get("trailing_annual_dividend_rate"),
+            "trailing_annual_dividend_yield": yields.get("trailing_annual_dividend_yield"),
             "dividends_5y": divs,
         }
         self._cache.set(cache_key, out, ttl_seconds=21600)  # 6h

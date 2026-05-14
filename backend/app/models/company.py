@@ -108,6 +108,8 @@ class CompanyCalendar(BaseModel):
     dividend_amount: float | None = None
     dividend_yield: float | None = None
     dividend_rate: float | None = None
+    trailing_annual_dividend_rate: float | None = None
+    trailing_annual_dividend_yield: float | None = None
 
     # Dividend history (last ~5y, by ex-date asc)
     dividends_5y: list[DividendInfo] = Field(default_factory=list)

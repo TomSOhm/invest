@@ -65,6 +65,8 @@ def test_fetch_calendar_routes_through_yfinance(hybrid: HybridDataFetcher) -> No
     assert out["next_earnings_date"] == "2026-07-30"
     assert out["dividend_yield"] == pytest.approx(0.0046)
     assert out["dividend_amount"] == pytest.approx(0.27)  # latest dividend
+    assert out["trailing_annual_dividend_rate"] == pytest.approx(1.05)
+    assert out["trailing_annual_dividend_yield"] == pytest.approx(0.0044)
     assert out["dividends_5y"] == _DIVS_PAYLOAD
     mock_cal.assert_called_once_with("AAPL")
     mock_div.assert_called_once()
@@ -119,3 +121,42 @@ def test_fetch_calendar_empty_dividends_default_amount_none(hybrid: HybridDataFe
         out = hybrid.fetch_calendar("CRWD", source="hybrid")
     assert out["dividend_amount"] is None
     assert out["dividends_5y"] == []
+
+
+def test_fetch_calendar_invalid_source_raises_value_error(
+    hybrid: HybridDataFetcher,
+) -> None:
+    with pytest.raises(ValueError):
+        hybrid.fetch_calendar("AAPL", source="bogus")
+
+
+def test_fetch_calendar_yf_dividends_raises_returns_empty_list(
+    hybrid: HybridDataFetcher,
+) -> None:
+    """fetch_dividends failure does not block calendar + yields."""
+    with (
+        patch.object(hybrid._yf, "fetch_calendar", return_value=_CAL_PAYLOAD),
+        patch.object(hybrid._yf, "fetch_dividends", side_effect=RuntimeError("boom")),
+        patch.object(hybrid._yf, "fetch_info_yields", return_value=_YIELDS_PAYLOAD),
+    ):
+        out = hybrid.fetch_calendar("AAPL", source="hybrid")
+    assert out["next_earnings_date"] == "2026-07-30"
+    assert out["dividends_5y"] == []
+    assert out["dividend_amount"] is None
+    assert out["dividend_yield"] == pytest.approx(0.0046)
+
+
+def test_fetch_calendar_yf_info_yields_raises_returns_empty_yields(
+    hybrid: HybridDataFetcher,
+) -> None:
+    """fetch_info_yields failure does not block calendar + dividends."""
+    with (
+        patch.object(hybrid._yf, "fetch_calendar", return_value=_CAL_PAYLOAD),
+        patch.object(hybrid._yf, "fetch_dividends", return_value=_DIVS_PAYLOAD),
+        patch.object(hybrid._yf, "fetch_info_yields", side_effect=RuntimeError("boom")),
+    ):
+        out = hybrid.fetch_calendar("AAPL", source="hybrid")
+    assert out["next_earnings_date"] == "2026-07-30"
+    assert out["dividend_amount"] == pytest.approx(0.27)
+    assert out["dividend_yield"] is None
+    assert out["trailing_annual_dividend_rate"] is None

@@ -39,7 +39,9 @@ export function useCompanyCalendar(
     return () => {
       cancelled = true;
     };
-  }, [ticker, source, key]);
+    // `key` is derived from ticker+source and intentionally excluded from
+    // the dep array to avoid double-firing the effect on each input change.
+  }, [ticker, source]);
 
   const ready = result.key === key;
   return {

@@ -154,6 +154,85 @@ def test_fetch_dividends_swallows_exception(fetcher: YFinanceDataFetcher) -> Non
     assert out == []
 
 
+def test_fetch_dividends_naive_index_skips_tz_localize(
+    fetcher: YFinanceDataFetcher,
+) -> None:
+    """Naive DatetimeIndex must not call tz_localize(None) — already naive."""
+    fake_tk = MagicMock()
+    idx = pd.to_datetime(["2025-05-07", "2026-05-11"])  # no tz
+    fake_tk.dividends = pd.Series([0.26, 0.27], index=idx)
+    with patch("yfinance.Ticker", return_value=fake_tk):
+        out = fetcher.fetch_dividends("EU.TICKER", years=5)
+    assert len(out) == 2
+    assert out[-1]["ex_date"] == "2026-05-11"
+
+
+def test_fetch_dividends_returns_cached_payload_on_second_call(
+    fetcher: YFinanceDataFetcher,
+) -> None:
+    fake_tk = MagicMock()
+    idx = pd.to_datetime(["2026-05-11"]).tz_localize("US/Eastern")
+    fake_tk.dividends = pd.Series([0.27], index=idx)
+    with patch("yfinance.Ticker", return_value=fake_tk) as mock_ticker:
+        fetcher.fetch_dividends("AAPL", years=5)
+        fetcher.fetch_dividends("AAPL", years=5)
+    assert mock_ticker.call_count == 1  # second served from cache
+
+
+def test_fetch_dividends_skips_nan_amount_entries(
+    fetcher: YFinanceDataFetcher,
+) -> None:
+    """NaN amounts get filtered via _safe_float → None → continue."""
+    import numpy as np
+
+    fake_tk = MagicMock()
+    idx = pd.to_datetime(["2025-05-07", "2026-05-11"]).tz_localize("US/Eastern")
+    fake_tk.dividends = pd.Series([float("nan"), 0.27], index=idx)
+    with patch("yfinance.Ticker", return_value=fake_tk):
+        out = fetcher.fetch_dividends("AAPL", years=5)
+    # The NaN row is skipped; only the valid one survives
+    assert len(out) == 1
+    assert out[0]["amount"] == pytest.approx(0.27)
+    _ = np  # silence unused-import lint
+
+
+def test_fetch_info_yields_returns_cached_payload_on_second_call(
+    fetcher: YFinanceDataFetcher,
+) -> None:
+    fake_tk = MagicMock()
+    fake_tk.info = {"dividendYield": 0.0046}
+    with patch("yfinance.Ticker", return_value=fake_tk) as mock_ticker:
+        fetcher.fetch_info_yields("AAPL")
+        fetcher.fetch_info_yields("AAPL")
+    assert mock_ticker.call_count == 1
+
+
+def test_fetch_calendar_earnings_date_empty_list_leaves_field_none(
+    fetcher: YFinanceDataFetcher,
+) -> None:
+    """Branch: `Earnings Date` key present but empty list → no iso conversion."""
+    fake_tk = MagicMock()
+    fake_tk.calendar = {
+        "Earnings Date": [],
+        "Earnings Average": 2.10,
+    }
+    with patch("yfinance.Ticker", return_value=fake_tk):
+        out = fetcher.fetch_calendar("AAPL")
+    assert out["next_earnings_date"] is None
+    assert out["next_earnings_eps_estimate"] == 2.10
+
+
+def test_fetch_calendar_earnings_date_non_isoformat_leaves_field_none(
+    fetcher: YFinanceDataFetcher,
+) -> None:
+    """Branch: first earnings date item without isoformat method (e.g. str)."""
+    fake_tk = MagicMock()
+    fake_tk.calendar = {"Earnings Date": ["2026-07-30"]}  # plain string, no .isoformat
+    with patch("yfinance.Ticker", return_value=fake_tk):
+        out = fetcher.fetch_calendar("AAPL")
+    assert out["next_earnings_date"] is None
+
+
 # ---------------------------------------------------------------------------
 # fetch_info_yields
 # ---------------------------------------------------------------------------

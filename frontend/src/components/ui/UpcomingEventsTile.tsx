@@ -28,7 +28,7 @@ export default function UpcomingEventsTile({ calendar }: Props) {
     <div
       role="region"
       aria-label="Upcoming events"
-      className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-2 min-w-[220px]"
+      className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-3 space-y-2 w-full sm:w-auto sm:min-w-[220px] order-last sm:order-none"
     >
       <div className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
         Upcoming Events
