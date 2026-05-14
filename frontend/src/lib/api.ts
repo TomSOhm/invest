@@ -1,5 +1,6 @@
 import type {
   ChartPeriod,
+  CompanyCalendar,
   CompanyDetail,
   DataSource,
   Horizon,
@@ -133,6 +134,15 @@ export async function fetchPriceHistory(
     : "";
   return api.get<PriceHistoryResponse>(
     `/api/company/${ticker.toUpperCase()}/price-history?period=${period}${benchParam}`
+  );
+}
+
+export async function fetchCompanyCalendar(
+  ticker: string,
+  source: DataSource = "hybrid"
+): Promise<CompanyCalendar> {
+  return api.get<CompanyCalendar>(
+    `/api/company/${ticker.toUpperCase()}/calendar?source=${source}`
   );
 }
 

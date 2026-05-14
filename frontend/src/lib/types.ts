@@ -182,6 +182,26 @@ export interface EpsEstimateTrendRow {
   n_minus_90d: number | null;
 }
 
+// Sub-project 3 (yfinance.calendars enrichment)
+export interface DividendInfo {
+  ex_date: string;
+  amount: number;
+}
+
+export interface CompanyCalendar {
+  next_earnings_date: string | null;
+  next_earnings_eps_estimate: number | null;
+  next_earnings_eps_low: number | null;
+  next_earnings_eps_high: number | null;
+  next_earnings_revenue_estimate: number | null;
+  dividend_date: string | null;
+  ex_dividend_date: string | null;
+  dividend_amount: number | null;
+  dividend_yield: number | null;
+  dividend_rate: number | null;
+  dividends_5y: DividendInfo[];
+}
+
 export interface AnalystRatings {
   buy: number;
   hold: number;
