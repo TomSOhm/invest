@@ -1,4 +1,5 @@
 """Tests for the new yfinance.analysis fetcher methods + SCORING_COLUMNS additions."""
+
 from __future__ import annotations
 
 from backend.app.services.data_fetcher import EXTRA_FIELDS, SCORING_COLUMNS
@@ -7,8 +8,13 @@ from backend.app.services.data_fetcher import EXTRA_FIELDS, SCORING_COLUMNS
 def test_new_analyst_scoring_columns_declared() -> None:
     """The columns the scoring engine already reads must exist in SCORING_COLUMNS."""
     required = {
-        "EpsRevision30d", "EpsRevision90d", "SUE", "EarningsSurprise",
-        "GrowthEstimateFY", "EpsRevisionsUp30d", "EpsRevisionsDown30d",
+        "EpsRevision30d",
+        "EpsRevision90d",
+        "SUE",
+        "EarningsSurprise",
+        "GrowthEstimateFY",
+        "EpsRevisionsUp30d",
+        "EpsRevisionsDown30d",
     }
     missing = required - set(SCORING_COLUMNS)
     assert not missing, f"Missing scoring columns: {missing}"
@@ -16,8 +22,11 @@ def test_new_analyst_scoring_columns_declared() -> None:
 
 def test_new_recommendation_fields_in_extra() -> None:
     required = {
-        "RecommendationsBuy", "RecommendationsHold", "RecommendationsSell",
-        "RecommendationsStrongBuy", "RecommendationsStrongSell",
+        "RecommendationsBuy",
+        "RecommendationsHold",
+        "RecommendationsSell",
+        "RecommendationsStrongBuy",
+        "RecommendationsStrongSell",
     }
     missing = required - set(EXTRA_FIELDS)
     assert not missing
@@ -165,7 +174,13 @@ def test_fetch_upgrades_downgrades(fetcher: YFinanceDataFetcher) -> None:
 def test_fetch_all_methods_swallow_exceptions(fetcher: YFinanceDataFetcher) -> None:
     """Each fetcher should return its zero-value default on yfinance failure."""
     with patch("yfinance.Ticker", side_effect=RuntimeError("boom")):
-        assert fetcher.fetch_recommendations_summary("X") == {"strong_buy": 0, "buy": 0, "hold": 0, "sell": 0, "strong_sell": 0}
+        assert fetcher.fetch_recommendations_summary("X") == {
+            "strong_buy": 0,
+            "buy": 0,
+            "hold": 0,
+            "sell": 0,
+            "strong_sell": 0,
+        }
         assert fetcher.fetch_eps_trend("X") == []
         assert fetcher.fetch_earnings_history("X") == []
         assert fetcher.fetch_growth_estimates("X") == {"fy_growth": None, "five_year_growth": None}
@@ -186,8 +201,15 @@ def test_analyst_ratings_model_extension() -> None:
     )
 
     ar = AnalystRatings(
-        buy=20, hold=8, sell=2, strong_buy=12, strong_sell=0,
-        target_low=180.0, target_mean=220.0, target_high=260.0, target_median=215.0,
+        buy=20,
+        hold=8,
+        sell=2,
+        strong_buy=12,
+        strong_sell=0,
+        target_low=180.0,
+        target_mean=220.0,
+        target_high=260.0,
+        target_median=215.0,
         num_analysts=42,
         recent_changes=[
             AnalystChange(date="2025-04-01", firm="GS", from_grade="Hold", to_grade="Buy", action="up"),
@@ -214,4 +236,3 @@ def test_momentum_signals_eps_trend_extension() -> None:
     )
     assert m.eps_estimate_trend[0].current == 5.20
     assert m.eps_estimate_trend[0].n_minus_90d == 4.80
-

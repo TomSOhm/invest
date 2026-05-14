@@ -1,4 +1,5 @@
 """Tests for ChartService (price history + computed metrics)."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -118,7 +119,9 @@ def test_moving_averages_alignment(chart_svc: ChartService) -> None:
 
 def test_cagr_uses_calendar_days(chart_svc: ChartService) -> None:
     # 280 business days ≈ 392 calendar days > 365.25, so CAGR is set.
-    with patch.object(chart_svc._yf, "fetch_multi_price_history", return_value={"AAPL": _fake_history(n=280, drift=0.0005)}):
+    with patch.object(
+        chart_svc._yf, "fetch_multi_price_history", return_value={"AAPL": _fake_history(n=280, drift=0.0005)}
+    ):
         resp = chart_svc.get_price_history("AAPL", period="5Y", benchmark=None)
     assert resp["metrics"]["cagr"] is not None
 

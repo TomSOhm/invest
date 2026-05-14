@@ -1,4 +1,5 @@
 """Shared types for the market_data package."""
+
 from __future__ import annotations
 
 from typing import Literal

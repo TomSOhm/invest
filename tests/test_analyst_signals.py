@@ -7,6 +7,7 @@ Formulas follow the Phase 0 financial review:
 - Min 6 quarters required for a valid SUE.
 - EPS revision % = (current - past) / abs(past).
 """
+
 from __future__ import annotations
 
 import math
@@ -88,18 +89,14 @@ def test_compute_sue_excludes_current_quarter_from_sigma() -> None:
 
 
 def test_eps_revision_pct_30d() -> None:
-    trend = [
-        {"period": "0q", "current": 5.20, "n_minus_30d": 5.00, "n_minus_90d": 4.80}
-    ]
+    trend = [{"period": "0q", "current": 5.20, "n_minus_30d": 5.00, "n_minus_90d": 4.80}]
     rev_30 = compute_eps_revision_pct_from_trend(trend, days=30)
     assert rev_30 is not None
     assert math.isclose(rev_30, 0.04, abs_tol=1e-6)
 
 
 def test_eps_revision_pct_90d() -> None:
-    trend = [
-        {"period": "0q", "current": 5.20, "n_minus_30d": 5.00, "n_minus_90d": 4.80}
-    ]
+    trend = [{"period": "0q", "current": 5.20, "n_minus_30d": 5.00, "n_minus_90d": 4.80}]
     rev_90 = compute_eps_revision_pct_from_trend(trend, days=90)
     assert rev_90 is not None
     assert math.isclose(rev_90, (5.20 - 4.80) / 4.80, abs_tol=1e-6)
@@ -107,9 +104,7 @@ def test_eps_revision_pct_90d() -> None:
 
 def test_eps_revision_pct_negative_estimate_uses_abs() -> None:
     """Sign must be correct when prior estimate is negative (loss)."""
-    trend = [
-        {"period": "0q", "current": -0.30, "n_minus_30d": -0.50, "n_minus_90d": -0.40}
-    ]
+    trend = [{"period": "0q", "current": -0.30, "n_minus_30d": -0.50, "n_minus_90d": -0.40}]
     rev_30 = compute_eps_revision_pct_from_trend(trend, days=30)
     # Estimate raised from -0.50 to -0.30 → bullish → positive %
     assert rev_30 is not None
@@ -118,12 +113,7 @@ def test_eps_revision_pct_negative_estimate_uses_abs() -> None:
 
 def test_eps_revision_pct_none_when_no_data() -> None:
     assert compute_eps_revision_pct_from_trend([], days=30) is None
-    assert (
-        compute_eps_revision_pct_from_trend(
-            [{"period": "0q", "current": 5.0, "n_minus_30d": 0}], days=30
-        )
-        is None
-    )
+    assert compute_eps_revision_pct_from_trend([{"period": "0q", "current": 5.0, "n_minus_30d": 0}], days=30) is None
 
 
 # ---------------------------------------------------------------------------
@@ -139,7 +129,11 @@ def test_parse_recommendations_summary() -> None:
 
 def test_parse_recommendations_summary_empty() -> None:
     assert parse_recommendations_summary(None) == {
-        "strong_buy": 0, "buy": 0, "hold": 0, "sell": 0, "strong_sell": 0,
+        "strong_buy": 0,
+        "buy": 0,
+        "hold": 0,
+        "sell": 0,
+        "strong_sell": 0,
     }
 
 

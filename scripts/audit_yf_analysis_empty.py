@@ -1,12 +1,20 @@
 """Probe None / empty-DataFrame behavior on tickers unlikely to have full analyst coverage."""
+
 import yfinance as yf
 import pandas as pd
 
 for sym in ["ZZZZZ", "MC.PA", "VOW3.DE"]:
     print(f"\n########## {sym} ##########")
     tk = yf.Ticker(sym)
-    for attr in ["recommendations", "recommendations_summary", "upgrades_downgrades",
-                 "eps_revisions", "eps_trend", "earnings_history", "growth_estimates"]:
+    for attr in [
+        "recommendations",
+        "recommendations_summary",
+        "upgrades_downgrades",
+        "eps_revisions",
+        "eps_trend",
+        "earnings_history",
+        "growth_estimates",
+    ]:
         try:
             val = getattr(tk, attr)
         except Exception as e:

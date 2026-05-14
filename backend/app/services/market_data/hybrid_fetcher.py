@@ -147,9 +147,7 @@ class HybridDataFetcher:
         from backend.app.services.market_data.types import is_valid_source
 
         if not is_valid_source(source):
-            raise ValueError(
-                f"Unknown source {source!r}; expected one of hybrid/yfinance/fmp"
-            )
+            raise ValueError(f"Unknown source {source!r}; expected one of hybrid/yfinance/fmp")
 
         cache_key = f"{source}:{ticker}"
         cached = self._cache.get(cache_key)
@@ -328,9 +326,7 @@ class HybridDataFetcher:
 
         result: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
         result["Ticker"] = ticker
-        field_sources: dict[str, str] = {
-            col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS
-        }
+        field_sources: dict[str, str] = {col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS}
 
         for k, v in yf_row.items():
             if k in result:
@@ -391,18 +387,14 @@ class HybridDataFetcher:
             fmp_fields = self._fmp.extract_scoring_fields(ticker)
             fmp_quote = self._fmp.fetch_quote(ticker)
         except FMPQuotaExceeded as exc:
-            logger.info(
-                f"FMP quota exceeded for {ticker}: {exc}; falling back to yfinance"
-            )
+            logger.info(f"FMP quota exceeded for {ticker}: {exc}; falling back to yfinance")
             return self._fallback_to_yfinance(
                 ticker,
                 cache_key,
                 msg="FMP daily quota exhausted; using yfinance for this fetch.",
             )
         except FMPHTTPError as exc:
-            logger.warning(
-                f"FMP HTTP error for {ticker}: {exc}; falling back to yfinance"
-            )
+            logger.warning(f"FMP HTTP error for {ticker}: {exc}; falling back to yfinance")
             return self._fallback_to_yfinance(
                 ticker,
                 cache_key,
@@ -411,9 +403,7 @@ class HybridDataFetcher:
 
         result: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
         result["Ticker"] = ticker
-        field_sources: dict[str, str] = {
-            col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS
-        }
+        field_sources: dict[str, str] = {col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS}
 
         for scoring_col in _FMP_SUPPLIED_FIELDS:
             val = fmp_fields.get(scoring_col, np.nan)
@@ -488,9 +478,7 @@ class HybridDataFetcher:
 
         result: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
         result["Ticker"] = ticker
-        field_sources: dict[str, str] = {
-            col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS
-        }
+        field_sources: dict[str, str] = {col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS}
         for k, v in yf_row.items():
             if k in result:
                 result[k] = v
@@ -529,9 +517,7 @@ class HybridDataFetcher:
 
         row: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
         row["Ticker"] = ticker
-        row["field_sources"] = {
-            col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS
-        }
+        row["field_sources"] = {col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS}
         row["data_completeness"] = 0.0
         row["PEA"] = False
         row["PEA_PME"] = False

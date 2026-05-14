@@ -264,7 +264,9 @@ class TestAddItem:
 
         # Must call fetch_single exactly once for NVDA with cache_only=False
         fetcher.fetch_single.assert_called_once_with(
-            "NVDA", cache_only=False, source="hybrid",
+            "NVDA",
+            cache_only=False,
+            source="hybrid",
         )
         assert result == stored_item
 

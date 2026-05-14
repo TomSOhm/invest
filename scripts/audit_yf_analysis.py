@@ -2,8 +2,15 @@ import yfinance as yf
 import pandas as pd
 
 tk = yf.Ticker("AAPL")
-for attr in ["recommendations", "recommendations_summary", "upgrades_downgrades",
-             "eps_revisions", "eps_trend", "earnings_history", "growth_estimates"]:
+for attr in [
+    "recommendations",
+    "recommendations_summary",
+    "upgrades_downgrades",
+    "eps_revisions",
+    "eps_trend",
+    "earnings_history",
+    "growth_estimates",
+]:
     print(f"\n=== {attr} ===")
     try:
         val = getattr(tk, attr)

@@ -7,6 +7,7 @@ entry is currently ``"missing"``. Each recomputed field's provenance is
 updated to ``"computed"`` so the coverage matrix can tell the tiers apart
 (fmp / yfinance / computed / missing).
 """
+
 from __future__ import annotations
 
 from typing import Any

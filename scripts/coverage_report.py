@@ -89,7 +89,9 @@ def run_coverage(tickers: list[str], bust_cache: bool = False) -> None:
             all_results.append({"Ticker": ticker, "field_sources": {}, "data_completeness": 0.0})
 
     # Print per-ticker completeness summary
-    print(f"\n{'Ticker':<12} {'Completeness':>13} {'FMP fields':>11} {'yfinance fields':>16} {'computed':>10} {'missing':>8}")
+    print(
+        f"\n{'Ticker':<12} {'Completeness':>13} {'FMP fields':>11} {'yfinance fields':>16} {'computed':>10} {'missing':>8}"
+    )
     print("-" * 75)
     for row in all_results:
         ticker = row.get("Ticker", "?")

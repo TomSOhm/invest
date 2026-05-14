@@ -103,7 +103,9 @@ class WatchlistService:
         for ticker in tickers:
             try:
                 live_data[ticker] = self._fetcher.fetch_single(
-                    ticker, cache_only=cache_only, source=source,
+                    ticker,
+                    cache_only=cache_only,
+                    source=source,
                 )
             except Exception as exc:
                 logger.warning(f"fetch_single failed for watchlist ticker {ticker}: {exc}. Using empty row.")
@@ -128,7 +130,8 @@ class WatchlistService:
             for ticker in tickers:
                 try:
                     analyst_data[ticker] = self._fetcher.fetch_analyst_ratings(
-                        ticker, source=source,
+                        ticker,
+                        source=source,
                     )
                 except Exception as exc:
                     logger.warning(f"fetch_analyst_ratings failed for {ticker}: {exc}")

@@ -1,5 +1,6 @@
 """Tests that HybridDataFetcher injects SUE + EPS revisions + earnings surprise
 into the scoring row across all 4 fetch branches."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -39,15 +40,18 @@ _HISTORY = [
 ]
 
 _TREND = [
-    {"period": "0q", "current": 5.20, "n_minus_7d": 5.18, "n_minus_30d": 5.00,
-     "n_minus_60d": 4.95, "n_minus_90d": 4.80}
+    {"period": "0q", "current": 5.20, "n_minus_7d": 5.18, "n_minus_30d": 5.00, "n_minus_60d": 4.95, "n_minus_90d": 4.80}
 ]
 
 _REVISIONS = {
-    "up_last_7d": 1, "down_last_7d": 0,
-    "up_last_30d": 5, "down_last_30d": 1,
-    "up_last_60d": 6, "down_last_60d": 1,
-    "up_last_90d": 7, "down_last_90d": 2,
+    "up_last_7d": 1,
+    "down_last_7d": 0,
+    "up_last_30d": 5,
+    "down_last_30d": 1,
+    "up_last_60d": 6,
+    "down_last_60d": 1,
+    "up_last_90d": 7,
+    "down_last_90d": 2,
 }
 
 _GROWTH = {"fy_growth": 0.12, "five_year_growth": 0.10}
@@ -55,17 +59,33 @@ _GROWTH = {"fy_growth": 0.12, "five_year_growth": 0.10}
 
 def _yf_row() -> dict:
     return {
-        "Name": "Test Corp", "Sector": "Tech", "Country": "US", "Exchange": "NMS",
-        "Price": 100.0, "MarketCap": 1e9, "Shares": 1e7, "Revenue": 4e8,
-        "NetIncome": 5e7, "FCF": 4e7, "TotalAssets": 5e8, "TotalEquity": 2e8,
-        "TotalDebt": 1e8, "Cash": 5e7, "EBIT": 7e7, "EBITDA": 8e7,
-        "PE": 22.0, "ROE": 0.25, "PEA": False, "PEA_PME": False,
+        "Name": "Test Corp",
+        "Sector": "Tech",
+        "Country": "US",
+        "Exchange": "NMS",
+        "Price": 100.0,
+        "MarketCap": 1e9,
+        "Shares": 1e7,
+        "Revenue": 4e8,
+        "NetIncome": 5e7,
+        "FCF": 4e7,
+        "TotalAssets": 5e8,
+        "TotalEquity": 2e8,
+        "TotalDebt": 1e8,
+        "Cash": 5e7,
+        "EBIT": 7e7,
+        "EBITDA": 8e7,
+        "PE": 22.0,
+        "ROE": 0.25,
+        "PEA": False,
+        "PEA_PME": False,
     }
 
 
 def _patch_analyst(hybrid: HybridDataFetcher):
     """Apply all 4 yfinance.analysis mocks the injector consumes."""
     from contextlib import ExitStack
+
     stack = ExitStack()
     stack.enter_context(patch.object(hybrid._yf, "fetch_earnings_history", return_value=_HISTORY))
     stack.enter_context(patch.object(hybrid._yf, "fetch_eps_trend", return_value=_TREND))
@@ -91,19 +111,23 @@ def test_yfinance_branch_injects_all_analyst_signals(hybrid: HybridDataFetcher) 
 
 
 def test_hybrid_branch_also_injects(hybrid: HybridDataFetcher) -> None:
-    with patch.object(hybrid._yf, "fetch_full_row", return_value=_yf_row()), \
-         patch.object(hybrid._fmp, "extract_scoring_fields", return_value={}), \
-         patch.object(hybrid._fmp, "fetch_quote", return_value={}), \
-         _patch_analyst(hybrid):
+    with (
+        patch.object(hybrid._yf, "fetch_full_row", return_value=_yf_row()),
+        patch.object(hybrid._fmp, "extract_scoring_fields", return_value={}),
+        patch.object(hybrid._fmp, "fetch_quote", return_value={}),
+        _patch_analyst(hybrid),
+    ):
         result = hybrid.fetch_single("AAPL", source="hybrid")
     assert result["SUE"] is not None
     assert result["EpsRevision30d"] is not None
 
 
 def test_fmp_branch_also_injects(hybrid: HybridDataFetcher) -> None:
-    with patch.object(hybrid._fmp, "extract_scoring_fields", return_value={"Revenue": 4e8}), \
-         patch.object(hybrid._fmp, "fetch_quote", return_value={"Price": 100.0, "MarketCap": 1e9}), \
-         _patch_analyst(hybrid):
+    with (
+        patch.object(hybrid._fmp, "extract_scoring_fields", return_value={"Revenue": 4e8}),
+        patch.object(hybrid._fmp, "fetch_quote", return_value={"Price": 100.0, "MarketCap": 1e9}),
+        _patch_analyst(hybrid),
+    ):
         result = hybrid.fetch_single("AAPL", source="fmp")
     assert result["SUE"] is not None
     assert result["EarningsSurprise"] == 5.0
@@ -111,11 +135,13 @@ def test_fmp_branch_also_injects(hybrid: HybridDataFetcher) -> None:
 
 def test_injection_swallows_failures(hybrid: HybridDataFetcher) -> None:
     """If any of the 4 analyst fetchers fail, the scoring row stays valid."""
-    with patch.object(hybrid._yf, "fetch_full_row", return_value=_yf_row()), \
-         patch.object(hybrid._yf, "fetch_earnings_history", side_effect=RuntimeError("boom")), \
-         patch.object(hybrid._yf, "fetch_eps_trend", side_effect=RuntimeError("boom")), \
-         patch.object(hybrid._yf, "fetch_eps_revisions", side_effect=RuntimeError("boom")), \
-         patch.object(hybrid._yf, "fetch_growth_estimates", side_effect=RuntimeError("boom")):
+    with (
+        patch.object(hybrid._yf, "fetch_full_row", return_value=_yf_row()),
+        patch.object(hybrid._yf, "fetch_earnings_history", side_effect=RuntimeError("boom")),
+        patch.object(hybrid._yf, "fetch_eps_trend", side_effect=RuntimeError("boom")),
+        patch.object(hybrid._yf, "fetch_eps_revisions", side_effect=RuntimeError("boom")),
+        patch.object(hybrid._yf, "fetch_growth_estimates", side_effect=RuntimeError("boom")),
+    ):
         result = hybrid.fetch_single("AAPL", source="yfinance")
     # SUE/EpsRevision30d remain NaN; row still valid
     assert result["field_sources"]["SUE"] == "missing"
@@ -131,12 +157,14 @@ def test_fetch_analyst_ratings_returns_full_shape(hybrid: HybridDataFetcher) -> 
     upgrades = [
         {"date": "2025-04-01", "firm": "GS", "to_grade": "Buy", "from_grade": "Hold", "action": "up"},
     ]
-    with patch.object(hybrid._yf, "fetch_analyst_targets", return_value={"target_mean": 220.0, "num_analysts": 42}), \
-         patch.object(hybrid._yf, "fetch_recommendations_summary", return_value=rec), \
-         patch.object(hybrid._yf, "fetch_upgrades_downgrades", return_value=upgrades), \
-         patch.object(hybrid._yf, "fetch_growth_estimates", return_value=_GROWTH), \
-         patch.object(hybrid._yf, "fetch_earnings_history", return_value=_HISTORY), \
-         patch.object(hybrid._yf, "fetch_eps_revisions", return_value=_REVISIONS):
+    with (
+        patch.object(hybrid._yf, "fetch_analyst_targets", return_value={"target_mean": 220.0, "num_analysts": 42}),
+        patch.object(hybrid._yf, "fetch_recommendations_summary", return_value=rec),
+        patch.object(hybrid._yf, "fetch_upgrades_downgrades", return_value=upgrades),
+        patch.object(hybrid._yf, "fetch_growth_estimates", return_value=_GROWTH),
+        patch.object(hybrid._yf, "fetch_earnings_history", return_value=_HISTORY),
+        patch.object(hybrid._yf, "fetch_eps_revisions", return_value=_REVISIONS),
+    ):
         out = hybrid.fetch_analyst_ratings("AAPL", source="yfinance")
 
     assert out is not None

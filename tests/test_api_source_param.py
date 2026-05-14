@@ -1,4 +1,5 @@
 """HTTP-level tests for the ?source= query parameter on every relevant route."""
+
 from __future__ import annotations
 
 from typing import Any
@@ -34,7 +35,8 @@ def client() -> TestClient:
 
 
 def test_company_detail_accepts_source(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     called: dict[str, Any] = {}
 
@@ -72,7 +74,8 @@ def test_company_detail_rejects_unknown_source(client: TestClient) -> None:
 
 
 def test_company_metrics_accepts_source(
-    client: TestClient, monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     monkeypatch.setattr(
         DataFetcher,
@@ -126,8 +129,12 @@ def test_price_history_endpoint(client: TestClient, monkeypatch: pytest.MonkeyPa
         "candles": [{"date": "2025-01-02", "open": 100, "high": 101, "low": 99, "close": 100.5, "volume": 1e6}],
         "benchmark_candles": [],
         "metrics": {
-            "total_return": 0.1, "cagr": 0.1, "annualized_vol": 0.18,
-            "max_drawdown": -0.1, "beta": None, "sharpe": 0.5,
+            "total_return": 0.1,
+            "cagr": 0.1,
+            "annualized_vol": 0.18,
+            "max_drawdown": -0.1,
+            "beta": None,
+            "sharpe": 0.5,
         },
         "moving_averages": {"ma_50": [None], "ma_200": [None]},
     }
@@ -175,8 +182,12 @@ def test_price_history_accepts_known_benchmark(client: TestClient, monkeypatch: 
             "candles": [],
             "benchmark_candles": [],
             "metrics": {
-                "total_return": None, "cagr": None, "annualized_vol": None,
-                "max_drawdown": None, "beta": None, "sharpe": None,
+                "total_return": None,
+                "cagr": None,
+                "annualized_vol": None,
+                "max_drawdown": None,
+                "beta": None,
+                "sharpe": None,
             },
             "moving_averages": {"ma_50": [], "ma_200": []},
         },

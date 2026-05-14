@@ -26,6 +26,7 @@ Signals
 This module has zero I/O. It operates on yfinance-derived dicts/lists
 already in memory.
 """
+
 from __future__ import annotations
 
 import math

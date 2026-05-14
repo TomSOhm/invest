@@ -203,9 +203,7 @@ class DataFetcher:
         source: str = "hybrid",
     ) -> dict[str, Any]:
         """Delegate to HybridDataFetcher.fetch_single()."""
-        return self._hybrid.fetch_single(
-            ticker_symbol, cache_only=cache_only, source=source
-        )
+        return self._hybrid.fetch_single(ticker_symbol, cache_only=cache_only, source=source)
 
     def fetch_batch(
         self,

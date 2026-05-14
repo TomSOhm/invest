@@ -724,10 +724,14 @@ class YFinanceDataFetcher:
         if cached is not None:
             return cached
         out = {
-            "up_last_7d": 0, "down_last_7d": 0,
-            "up_last_30d": 0, "down_last_30d": 0,
-            "up_last_60d": 0, "down_last_60d": 0,
-            "up_last_90d": 0, "down_last_90d": 0,
+            "up_last_7d": 0,
+            "down_last_7d": 0,
+            "up_last_30d": 0,
+            "down_last_30d": 0,
+            "up_last_60d": 0,
+            "down_last_60d": 0,
+            "up_last_90d": 0,
+            "down_last_90d": 0,
         }
         try:
             df = yf.Ticker(ticker).eps_revisions

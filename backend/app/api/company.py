@@ -113,5 +113,7 @@ async def get_company_price_history(
             detail=f"Invalid benchmark '{benchmark}'. Allowed: {sorted(_VALID_BENCHMARKS)}",
         )
     return svc.get_price_history(
-        _validate_ticker(ticker), period=period, benchmark=benchmark,
+        _validate_ticker(ticker),
+        period=period,
+        benchmark=benchmark,
     )

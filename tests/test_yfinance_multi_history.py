@@ -1,4 +1,5 @@
 """Tests for YFinanceDataFetcher.fetch_multi_price_history."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -21,10 +22,16 @@ def _fake_multi_download() -> pd.DataFrame:
     idx = pd.date_range("2024-01-02", periods=5, freq="B")
     cols = pd.MultiIndex.from_tuples(
         [
-            ("AAPL", "Open"), ("AAPL", "High"), ("AAPL", "Low"),
-            ("AAPL", "Close"), ("AAPL", "Volume"),
-            ("^GSPC", "Open"), ("^GSPC", "High"), ("^GSPC", "Low"),
-            ("^GSPC", "Close"), ("^GSPC", "Volume"),
+            ("AAPL", "Open"),
+            ("AAPL", "High"),
+            ("AAPL", "Low"),
+            ("AAPL", "Close"),
+            ("AAPL", "Volume"),
+            ("^GSPC", "Open"),
+            ("^GSPC", "High"),
+            ("^GSPC", "Low"),
+            ("^GSPC", "Close"),
+            ("^GSPC", "Volume"),
         ]
     )
     data = np.tile(np.array([100, 101, 99, 100.5, 1_000_000.0]), (5, 2))

@@ -1,4 +1,5 @@
 """Tests for source-routing in HybridDataFetcher."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -88,9 +89,11 @@ _YF_ROW: dict[str, Any] = {
 
 
 def test_yfinance_only_source_skips_fmp(hybrid: HybridDataFetcher) -> None:
-    with patch.object(hybrid._yf, "fetch_full_row", return_value=_YF_ROW.copy()) as yf_mock, \
-         patch.object(hybrid._fmp, "extract_scoring_fields") as fmp_mock, \
-         patch.object(hybrid._fmp, "fetch_quote") as fmp_quote_mock:
+    with (
+        patch.object(hybrid._yf, "fetch_full_row", return_value=_YF_ROW.copy()) as yf_mock,
+        patch.object(hybrid._fmp, "extract_scoring_fields") as fmp_mock,
+        patch.object(hybrid._fmp, "fetch_quote") as fmp_quote_mock,
+    ):
         result = hybrid.fetch_single("AAPL", source="yfinance")
 
     yf_mock.assert_called_once()
@@ -139,9 +142,11 @@ def _fmp_scoring_row() -> dict[str, Any]:
 
 
 def test_fmp_only_source_skips_yfinance(hybrid: HybridDataFetcher) -> None:
-    with patch.object(hybrid._fmp, "extract_scoring_fields", return_value=_fmp_scoring_row()), \
-         patch.object(hybrid._fmp, "fetch_quote", return_value={"Price": 100.0, "MarketCap": 1e9, "Shares": 1e7}), \
-         patch.object(hybrid._yf, "fetch_full_row") as yf_mock:
+    with (
+        patch.object(hybrid._fmp, "extract_scoring_fields", return_value=_fmp_scoring_row()),
+        patch.object(hybrid._fmp, "fetch_quote", return_value={"Price": 100.0, "MarketCap": 1e9, "Shares": 1e7}),
+        patch.object(hybrid._yf, "fetch_full_row") as yf_mock,
+    ):
         result = hybrid.fetch_single("AAPL", source="fmp")
 
     yf_mock.assert_not_called()
@@ -155,9 +160,14 @@ def test_fmp_only_source_skips_yfinance(hybrid: HybridDataFetcher) -> None:
 def test_fmp_only_falls_back_to_yfinance_on_quota_exceeded(
     hybrid: HybridDataFetcher,
 ) -> None:
-    with patch.object(
-        hybrid._fmp, "extract_scoring_fields", side_effect=FMPQuotaExceeded("daily cap"),
-    ), patch.object(hybrid._yf, "fetch_full_row", return_value=_YF_ROW.copy()) as yf_mock:
+    with (
+        patch.object(
+            hybrid._fmp,
+            "extract_scoring_fields",
+            side_effect=FMPQuotaExceeded("daily cap"),
+        ),
+        patch.object(hybrid._yf, "fetch_full_row", return_value=_YF_ROW.copy()) as yf_mock,
+    ):
         result = hybrid.fetch_single("AAPL", source="fmp")
 
     yf_mock.assert_called_once()
@@ -168,9 +178,14 @@ def test_fmp_only_falls_back_to_yfinance_on_quota_exceeded(
 
 
 def test_fmp_only_falls_back_on_http_error(hybrid: HybridDataFetcher) -> None:
-    with patch.object(
-        hybrid._fmp, "extract_scoring_fields", side_effect=FMPHTTPError(403, "forbidden"),
-    ), patch.object(hybrid._yf, "fetch_full_row", return_value=_YF_ROW.copy()) as yf_mock:
+    with (
+        patch.object(
+            hybrid._fmp,
+            "extract_scoring_fields",
+            side_effect=FMPHTTPError(403, "forbidden"),
+        ),
+        patch.object(hybrid._yf, "fetch_full_row", return_value=_YF_ROW.copy()) as yf_mock,
+    ):
         result = hybrid.fetch_single("AAPL", source="fmp")
 
     yf_mock.assert_called_once()
@@ -198,8 +213,10 @@ def test_fmp_only_uses_fmp_cache_key(
     hybrid: HybridDataFetcher,
     tmp_cache: CacheService,
 ) -> None:
-    with patch.object(hybrid._fmp, "extract_scoring_fields", return_value=_fmp_scoring_row()), \
-         patch.object(hybrid._fmp, "fetch_quote", return_value={"Price": 100.0}):
+    with (
+        patch.object(hybrid._fmp, "extract_scoring_fields", return_value=_fmp_scoring_row()),
+        patch.object(hybrid._fmp, "fetch_quote", return_value={"Price": 100.0}),
+    ):
         hybrid.fetch_single("AAPL", source="fmp")
     assert tmp_cache.get("fmp:AAPL") is not None
     assert tmp_cache.get("hybrid:AAPL") is None
@@ -223,10 +240,14 @@ def test_fetch_batch_passes_source_through(hybrid: HybridDataFetcher) -> None:
 def test_fetch_analyst_ratings_yfinance_only_skips_fmp(
     hybrid: HybridDataFetcher,
 ) -> None:
-    with patch.object(hybrid._fmp, "fetch_analyst_targets") as fmp_mock, \
-         patch.object(
-             hybrid._yf, "fetch_analyst_targets", return_value={"target_mean": 150.0},
-         ) as yf_mock:
+    with (
+        patch.object(hybrid._fmp, "fetch_analyst_targets") as fmp_mock,
+        patch.object(
+            hybrid._yf,
+            "fetch_analyst_targets",
+            return_value={"target_mean": 150.0},
+        ) as yf_mock,
+    ):
         result = hybrid.fetch_analyst_ratings("AAPL", source="yfinance")
     fmp_mock.assert_not_called()
     yf_mock.assert_called_once()
@@ -236,11 +257,18 @@ def test_fetch_analyst_ratings_yfinance_only_skips_fmp(
 def test_fetch_analyst_ratings_fmp_falls_back_on_quota(
     hybrid: HybridDataFetcher,
 ) -> None:
-    with patch.object(
-        hybrid._fmp, "fetch_analyst_targets", side_effect=FMPQuotaExceeded("cap"),
-    ), patch.object(
-        hybrid._yf, "fetch_analyst_targets", return_value={"target_mean": 120.0},
-    ) as yf_mock:
+    with (
+        patch.object(
+            hybrid._fmp,
+            "fetch_analyst_targets",
+            side_effect=FMPQuotaExceeded("cap"),
+        ),
+        patch.object(
+            hybrid._yf,
+            "fetch_analyst_targets",
+            return_value={"target_mean": 120.0},
+        ) as yf_mock,
+    ):
         result = hybrid.fetch_analyst_ratings("AAPL", source="fmp")
     yf_mock.assert_called_once()
     assert result["target_mean"] == 120.0

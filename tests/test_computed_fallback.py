@@ -1,4 +1,5 @@
 """Tests for the computed-fallback layer."""
+
 from __future__ import annotations
 
 import math
@@ -48,7 +49,10 @@ def test_revenue_growth_recomputed_from_prior_year() -> None:
 
 def test_roic_recomputed_from_ebit_equity_debt_cash() -> None:
     row = {
-        "EBIT": 100.0, "TotalEquity": 400.0, "TotalDebt": 100.0, "Cash": 50.0,
+        "EBIT": 100.0,
+        "TotalEquity": 400.0,
+        "TotalDebt": 100.0,
+        "Cash": 50.0,
         "ROIC": float("nan"),
     }
     sources = {"ROIC": "missing"}
@@ -60,8 +64,11 @@ def test_roic_recomputed_from_ebit_equity_debt_cash() -> None:
 def test_fcf_margin_after_fcf_recompute() -> None:
     """FCFMargin should compute when FCF is recomputed in the same pass."""
     row = {
-        "OperatingCashflow": 200.0, "CapEx": 60.0, "FCF": float("nan"),
-        "Revenue": 1000.0, "FCFMargin": float("nan"),
+        "OperatingCashflow": 200.0,
+        "CapEx": 60.0,
+        "FCF": float("nan"),
+        "Revenue": 1000.0,
+        "FCFMargin": float("nan"),
     }
     sources = {"FCF": "missing", "FCFMargin": "missing"}
     apply_computed_fallback(row, sources)
