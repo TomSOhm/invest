@@ -157,6 +157,14 @@ class CompanyService:
         detail = self.get_detail(ticker, source=source)
         return detail["metrics"]
 
+    def get_calendar(self, ticker: str, source: str = "hybrid") -> dict[str, Any]:
+        """Forward events + dividend history (sub-project 3, display-only).
+
+        Pure passthrough — no scoring side effects.  Yfinance is the only
+        backing source; ``source`` is honored for cache-key isolation only.
+        """
+        return self._fetcher.fetch_calendar(ticker, source=source)
+
     def get_horizon(
         self,
         ticker: str,

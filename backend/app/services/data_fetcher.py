@@ -221,6 +221,14 @@ class DataFetcher:
         """Delegate to HybridDataFetcher.fetch_analyst_ratings()."""
         return self._hybrid.fetch_analyst_ratings(ticker_symbol, source=source)
 
+    def fetch_calendar(
+        self,
+        ticker_symbol: str,
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
+        """Delegate to HybridDataFetcher.fetch_calendar()."""
+        return self._hybrid.fetch_calendar(ticker_symbol, source=source)
+
     # ------------------------------------------------------------------
     # Legacy static method kept for callers that used DataFetcher._country_to_code
     # ------------------------------------------------------------------

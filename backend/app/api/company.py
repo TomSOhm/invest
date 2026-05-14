@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from backend.app.dependencies import get_chart_service, get_company_service
 from backend.app.models.chart import PriceHistoryResponse
-from backend.app.models.company import CompanyDetail, CompanyMetrics
+from backend.app.models.company import CompanyCalendar, CompanyDetail, CompanyMetrics
 from backend.app.services.chart_service import ChartService
 from backend.app.services.company_service import CompanyService
 from backend.app.services.market_data.types import SOURCES
@@ -117,3 +117,19 @@ async def get_company_price_history(
         period=period,
         benchmark=benchmark,
     )
+
+
+@router.get("/{ticker}/calendar", response_model=CompanyCalendar)
+async def get_company_calendar(
+    ticker: str,
+    source: str = Query("hybrid", description="Data source: hybrid|yfinance|fmp"),
+    svc: CompanyService = Depends(get_company_service),
+) -> dict[str, Any]:
+    """Forward-looking earnings + dividend events and recent dividend history.
+
+    yfinance is the only backing source for sub-project 3; ``source`` is
+    honored for cache-key isolation only (returns identical data regardless
+    of source).
+    """
+    _validate_source(source)
+    return svc.get_calendar(_validate_ticker(ticker), source=source)
