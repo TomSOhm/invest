@@ -1,7 +1,7 @@
 """Probe None / empty-DataFrame behavior on tickers unlikely to have full analyst coverage."""
 
-import yfinance as yf
 import pandas as pd
+import yfinance as yf
 
 for sym in ["ZZZZZ", "MC.PA", "VOW3.DE"]:
     print(f"\n########## {sym} ##########")

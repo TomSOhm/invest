@@ -12,15 +12,12 @@ from __future__ import annotations
 
 import math
 
-import pytest
-
 from src.analysis.analyst_signals import (
     compute_eps_revision_pct_from_trend,
     compute_sue_from_history,
     earnings_surprise_latest,
     parse_recommendations_summary,
 )
-
 
 # ---------------------------------------------------------------------------
 # compute_sue_from_history
