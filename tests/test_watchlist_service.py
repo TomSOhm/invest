@@ -263,7 +263,9 @@ class TestAddItem:
         result = svc.add_item(req)
 
         # Must call fetch_single exactly once for NVDA with cache_only=False
-        fetcher.fetch_single.assert_called_once_with("NVDA", cache_only=False)
+        fetcher.fetch_single.assert_called_once_with(
+            "NVDA", cache_only=False, source="hybrid",
+        )
         assert result == stored_item
 
     def test_add_item_returns_stored_row_even_if_fetch_fails(self) -> None:
@@ -328,4 +330,4 @@ class TestRefresh:
         svc = WatchlistService(store=store, fetcher=fetcher, scorer=scorer)
         svc.refresh()
 
-        fetcher.fetch_analyst_ratings.assert_called_once_with("AAPL")
+        fetcher.fetch_analyst_ratings.assert_called_once_with("AAPL", source="hybrid")

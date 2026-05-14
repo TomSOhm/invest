@@ -85,8 +85,13 @@ def refresh(
     scorer: ScoringService,
     *,
     use_yfinance_holdings: bool = True,
+    source: str = "hybrid",
 ) -> dict[str, Any]:
     """Load universe, fetch live data, score, cache, persist.
+
+    ``source`` selects the data backend for ``fetcher.fetch_batch`` so the user
+    can drive a universe refresh from yfinance-only or fmp-only instead of the
+    default hybrid path.
 
     Returns a summary dict matching ``ScreenerRefreshResponse``.
     """
@@ -97,8 +102,8 @@ def refresh(
         if not tickers:
             raise RuntimeError("Universe loader returned no tickers — check data/universes/universe_pea_static.csv")
 
-        logger.info(f"Screener refresh: fetching {len(tickers)} tickers")
-        df = fetcher.fetch_batch(tickers)
+        logger.info(f"Screener refresh: fetching {len(tickers)} tickers (source={source})")
+        df = fetcher.fetch_batch(tickers, source=source)
 
         # Track tickers that came back fully empty (every scoring field NaN
         # or missing). Treat them as "failed" so the user has visibility.

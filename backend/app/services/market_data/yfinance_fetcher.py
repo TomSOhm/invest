@@ -55,6 +55,17 @@ def _is_finite_number(val: Any) -> bool:
     return np.isfinite(f)
 
 
+def _safe_float(val: Any) -> float | None:
+    """Coerce a value to ``float`` or ``None`` for non-finite/non-numeric inputs."""
+    try:
+        f = float(val)
+    except (TypeError, ValueError):
+        return None
+    if np.isnan(f) or np.isinf(f):
+        return None
+    return f
+
+
 def _latest_from_statement(
     statement: pd.DataFrame | None,
     candidate_keys: Sequence[str],
@@ -577,6 +588,87 @@ class YFinanceDataFetcher:
             logger.warning(f"yfinance fetch_price_history failed for {ticker}: {exc}")
             return pd.DataFrame()
 
+    def fetch_multi_price_history(
+        self,
+        tickers: list[str],
+        period: str = "5y",
+    ) -> dict[str, pd.DataFrame]:
+        """Bulk OHLCV download for multiple tickers (one HTTP round-trip).
+
+        Wraps ``yfinance.download(tickers, period=period, group_by="ticker",
+        auto_adjust=True, progress=False)`` and splits the resulting
+        MultiIndex DataFrame into one frame per ticker.
+
+        Cached as parquet (not JSON) because the JSON cache cannot
+        round-trip a DatetimeIndex reliably for large OHLCV payloads.
+        24h TTL via mtime check.
+        """
+        import time as _time
+
+        import yfinance as yf
+
+        if not tickers:
+            return {}
+
+        # Hash-based cache key — collision-safe (no ambiguity between
+        # ["AAPL_BAD"] vs ["AAPL","BAD"]) and path-traversal-safe (the
+        # hex digest contains only [0-9a-f]).
+        import hashlib
+
+        cache_dir = self._cache._cache_dir / "multi_history"
+        cache_dir.mkdir(parents=True, exist_ok=True)
+        digest_input = "|".join(sorted(tickers)) + f"|{period}"
+        digest = hashlib.sha256(digest_input.encode("utf-8")).hexdigest()[:16]
+        parquet_path = cache_dir / f"{digest}.parquet"
+        # Defence-in-depth path-traversal guard
+        if not str(parquet_path.resolve()).startswith(str(cache_dir.resolve())):
+            raise ValueError("Cache path escaped expected directory")
+
+        if parquet_path.exists():
+            age = _time.time() - parquet_path.stat().st_mtime
+            if age < 86400:
+                try:
+                    df_cached = pd.read_parquet(parquet_path)
+                    if isinstance(df_cached.columns, pd.MultiIndex):
+                        return {
+                            tk: df_cached[tk].dropna(how="all")
+                            for tk in tickers
+                            if tk in df_cached.columns.get_level_values(0)
+                        }
+                    return {tickers[0]: df_cached}
+                except Exception as exc:
+                    logger.debug(f"multi_history parquet read failed: {exc}")
+
+        try:
+            raw = yf.download(
+                tickers=" ".join(tickers),
+                period=period,
+                group_by="ticker",
+                auto_adjust=True,
+                progress=False,
+                threads=True,
+            )
+        except Exception as exc:
+            logger.warning(f"yfinance.download failed for {tickers}: {exc}")
+            return {}
+
+        out: dict[str, pd.DataFrame] = {}
+        if isinstance(raw.columns, pd.MultiIndex):
+            for tk in tickers:
+                if tk in raw.columns.get_level_values(0):
+                    sub = raw[tk].dropna(how="all")
+                    if not sub.empty:
+                        out[tk] = sub
+        else:
+            if not raw.empty:
+                out[tickers[0]] = raw
+
+        try:
+            raw.to_parquet(parquet_path)
+        except Exception as exc:
+            logger.debug(f"multi_history parquet write failed: {exc}")
+        return out
+
     def fetch_eps_estimates(self, ticker: str) -> pd.DataFrame | None:
         """Fetch analyst EPS estimates from yfinance earnings_estimate."""
         try:
@@ -590,12 +682,197 @@ class YFinanceDataFetcher:
             logger.debug(f"yfinance fetch_eps_estimates failed for {ticker}: {exc}")
             return None
 
-    def fetch_eps_revisions(self, ticker: str) -> pd.DataFrame | None:
-        """yfinance does not provide EPS revision history.
+    # ------------------------------------------------------------------
+    # yfinance.analysis surface (sub-project 2: analyst enrichment)
+    # ------------------------------------------------------------------
 
-        Raises ``NotImplementedError`` so the hybrid composer falls through to FMP.
+    def fetch_recommendations_summary(self, ticker: str) -> dict[str, int]:
+        """Return latest analyst rating counts (strong_buy/buy/hold/sell/strong_sell)."""
+        cache_key = f"yf:rec_summary:{ticker}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        out = {"strong_buy": 0, "buy": 0, "hold": 0, "sell": 0, "strong_sell": 0}
+        try:
+            df = yf.Ticker(ticker).recommendations_summary
+            if df is None or df.empty:
+                return out
+            row = df.iloc[0]
+            mapping = {
+                "strongBuy": "strong_buy",
+                "buy": "buy",
+                "hold": "hold",
+                "sell": "sell",
+                "strongSell": "strong_sell",
+            }
+            for src, dst in mapping.items():
+                if src in row.index and pd.notna(row[src]):
+                    out[dst] = int(row[src])
+        except Exception as exc:
+            logger.debug(f"yfinance fetch_recommendations_summary failed for {ticker}: {exc}")
+        self._cache.set(cache_key, out, ttl_seconds=21600)
+        return out
+
+    def fetch_eps_revisions(self, ticker: str) -> dict[str, int]:
+        """Return revision counts up/down for 7d / 30d / 60d / 90d windows.
+
+        Casing trap: yfinance uses ``upLast7days`` (lowercase) but ``downLast7Days``
+        (capital D) for the 7-day column. Copy column names verbatim.
         """
-        raise NotImplementedError("yfinance does not provide EPS revision history")
+        cache_key = f"yf:eps_revisions:{ticker}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        out = {
+            "up_last_7d": 0, "down_last_7d": 0,
+            "up_last_30d": 0, "down_last_30d": 0,
+            "up_last_60d": 0, "down_last_60d": 0,
+            "up_last_90d": 0, "down_last_90d": 0,
+        }
+        try:
+            df = yf.Ticker(ticker).eps_revisions
+            if df is None or df.empty:
+                return out
+            row = df.iloc[0]
+            mapping = {
+                "upLast7days": "up_last_7d",
+                "downLast7Days": "down_last_7d",  # casing trap
+                "upLast30days": "up_last_30d",
+                "downLast30days": "down_last_30d",
+                "upLast60days": "up_last_60d",
+                "downLast60days": "down_last_60d",
+                "upLast90days": "up_last_90d",
+                "downLast90days": "down_last_90d",
+            }
+            for src, dst in mapping.items():
+                if src in row.index and pd.notna(row[src]):
+                    out[dst] = int(row[src])
+        except Exception as exc:
+            logger.debug(f"yfinance fetch_eps_revisions failed for {ticker}: {exc}")
+        self._cache.set(cache_key, out, ttl_seconds=21600)
+        return out
+
+    def fetch_eps_trend(self, ticker: str) -> list[dict[str, Any]]:
+        """Return the rolling EPS-estimate trend (current / 7d ago / 30d / 60d / 90d)."""
+        cache_key = f"yf:eps_trend:{ticker}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        out: list[dict[str, Any]] = []
+        try:
+            df = yf.Ticker(ticker).eps_trend
+            if df is None or df.empty:
+                return out
+            for label, row in df.iterrows():
+                out.append(
+                    {
+                        "period": str(label),
+                        "current": _safe_float(row.get("current")),
+                        "n_minus_7d": _safe_float(row.get("7daysAgo")),
+                        "n_minus_30d": _safe_float(row.get("30daysAgo")),
+                        "n_minus_60d": _safe_float(row.get("60daysAgo")),
+                        "n_minus_90d": _safe_float(row.get("90daysAgo")),
+                    }
+                )
+        except Exception as exc:
+            logger.debug(f"yfinance fetch_eps_trend failed for {ticker}: {exc}")
+        self._cache.set(cache_key, out, ttl_seconds=21600)
+        return out
+
+    def fetch_earnings_history(self, ticker: str, limit: int = 4) -> list[dict[str, Any]]:
+        """Return last `limit` quarters of actual vs estimate vs surprise %.
+
+        Empty for most non-US tickers — caller must degrade gracefully.
+        ``limit`` is clamped to ``[1, 8]`` to prevent unbounded cache growth.
+        """
+        limit = max(1, min(int(limit), 8))
+        cache_key = f"yf:earnings_history:{ticker}:{limit}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        out: list[dict[str, Any]] = []
+        try:
+            df = yf.Ticker(ticker).earnings_history
+            if df is None or df.empty:
+                return out
+            # Most-recent first (yfinance returns descending by quarter date)
+            for idx, row in df.head(limit).iterrows():
+                date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx)
+                out.append(
+                    {
+                        "date": date_str,
+                        "eps_actual": _safe_float(row.get("epsActual")),
+                        "eps_estimate": _safe_float(row.get("epsEstimate")),
+                        "eps_difference": _safe_float(row.get("epsDifference")),
+                        "surprise_pct": _safe_float(row.get("surprisePercent")),
+                    }
+                )
+        except Exception as exc:
+            logger.debug(f"yfinance fetch_earnings_history failed for {ticker}: {exc}")
+        self._cache.set(cache_key, out, ttl_seconds=21600)
+        return out
+
+    def fetch_growth_estimates(self, ticker: str) -> dict[str, float | None]:
+        """Return FY (+1y) / long-term growth estimates."""
+        cache_key = f"yf:growth_estimates:{ticker}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        out: dict[str, float | None] = {"fy_growth": None, "five_year_growth": None}
+        try:
+            df = yf.Ticker(ticker).growth_estimates
+            if df is None or df.empty:
+                return out
+            for idx, row in df.iterrows():
+                key = str(idx).lower()
+                val = _safe_float(row.get("stockTrend"))
+                if key in ("+1y", "1y", "next_year") and out["fy_growth"] is None:
+                    out["fy_growth"] = val
+                elif key in ("ltg", "+5y", "5y", "five_year") and out["five_year_growth"] is None:
+                    out["five_year_growth"] = val
+        except Exception as exc:
+            logger.debug(f"yfinance fetch_growth_estimates failed for {ticker}: {exc}")
+        self._cache.set(cache_key, out, ttl_seconds=21600)
+        return out
+
+    def fetch_upgrades_downgrades(
+        self,
+        ticker: str,
+        limit: int = 50,
+    ) -> list[dict[str, Any]]:
+        """Return the most recent `limit` analyst upgrades/downgrades.
+
+        ``limit`` is clamped to ``[1, 50]`` (Phase 0 security review cap) to
+        prevent unbounded cache growth + memory blow-up. Caller can slice further.
+        """
+        limit = max(1, min(int(limit), 50))
+        cache_key = f"yf:upgrades_downgrades:{ticker}:{limit}"
+        cached = self._cache.get(cache_key)
+        if cached is not None:
+            return cached
+        out: list[dict[str, Any]] = []
+        try:
+            df = yf.Ticker(ticker).upgrades_downgrades
+            if df is None or df.empty:
+                return out
+            # Sort by date descending if the index is a DatetimeIndex
+            if isinstance(df.index, pd.DatetimeIndex):
+                df = df.sort_index(ascending=False)
+            for idx, row in df.head(limit).iterrows():
+                date_str = idx.strftime("%Y-%m-%d") if hasattr(idx, "strftime") else str(idx)
+                out.append(
+                    {
+                        "date": date_str,
+                        "firm": str(row.get("Firm", "")),
+                        "to_grade": str(row.get("ToGrade", "")),
+                        "from_grade": str(row.get("FromGrade", "")),
+                        "action": str(row.get("Action", "")),
+                    }
+                )
+        except Exception as exc:
+            logger.debug(f"yfinance fetch_upgrades_downgrades failed for {ticker}: {exc}")
+        self._cache.set(cache_key, out, ttl_seconds=21600)
+        return out
 
     def fetch_analyst_targets(self, ticker: str) -> dict[str, Any] | None:
         """Fetch consensus analyst price targets from yfinance info."""

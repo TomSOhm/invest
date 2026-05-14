@@ -3,6 +3,7 @@
 import { useState, useCallback } from "react";
 import { api, refreshScreenerUniverse } from "@/lib/api";
 import type {
+  DataSource,
   Horizon,
   ScreenerRefreshResponse,
   ScreenerRequest,
@@ -31,12 +32,17 @@ export function useScreener() {
   }, []);
 
   const runPreset = useCallback(
-    async (name: string, peaOnly = false, limit = 50) => {
+    async (
+      name: string,
+      peaOnly = false,
+      limit = 50,
+      source: DataSource = "hybrid"
+    ) => {
       setLoading(true);
       setError(null);
       try {
         const res = await api.post<ScreenerResponse>(
-          `/api/screener/preset/${name}`,
+          `/api/screener/preset/${name}?source=${source}`,
           { pea_only: peaOnly, top_n: limit }
         );
         setResults(res);
@@ -51,14 +57,18 @@ export function useScreener() {
   );
 
   const scoreTickers = useCallback(
-    async (tickers: string[], horizon: Horizon = "long_term") => {
+    async (
+      tickers: string[],
+      horizon: Horizon = "long_term",
+      source: DataSource = "hybrid"
+    ) => {
       setLoading(true);
       setError(null);
       try {
-        const res = await api.post<ScreenerResponse>("/api/screener/tickers", {
-          tickers,
-          horizon,
-        });
+        const res = await api.post<ScreenerResponse>(
+          `/api/screener/tickers?source=${source}`,
+          { tickers, horizon }
+        );
         setResults(res);
         if (res.last_refreshed) setLastRefreshed(res.last_refreshed);
       } catch (e) {
@@ -70,20 +80,25 @@ export function useScreener() {
     []
   );
 
-  const refresh = useCallback(async (): Promise<ScreenerRefreshResponse | null> => {
-    setRefreshing(true);
-    setError(null);
-    try {
-      const res = await refreshScreenerUniverse();
-      setLastRefreshed(res.last_refreshed);
-      return res;
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Refresh failed");
-      return null;
-    } finally {
-      setRefreshing(false);
-    }
-  }, []);
+  const refresh = useCallback(
+    async (
+      source: DataSource = "hybrid"
+    ): Promise<ScreenerRefreshResponse | null> => {
+      setRefreshing(true);
+      setError(null);
+      try {
+        const res = await refreshScreenerUniverse(source);
+        setLastRefreshed(res.last_refreshed);
+        return res;
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Refresh failed");
+        return null;
+      } finally {
+        setRefreshing(false);
+      }
+    },
+    []
+  );
 
   return {
     results,

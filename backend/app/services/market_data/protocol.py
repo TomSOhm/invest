@@ -28,12 +28,13 @@ class FetchedField:
         The actual data value. May be ``float('nan')`` when the source knows
         the field exists but has no data for this ticker.
     source:
-        One of ``"fmp"``, ``"yfinance"``, or ``"missing"`` (both sources
-        returned nothing useful).
+        One of ``"fmp"``, ``"yfinance"``, ``"computed"``, or ``"missing"``
+        (both sources returned nothing useful, and no fallback derivation
+        was possible).
     """
 
     value: Any = float("nan")
-    source: str = "missing"  # "fmp" | "yfinance" | "missing"
+    source: str = "missing"  # "fmp" | "yfinance" | "computed" | "missing"
 
 
 @runtime_checkable

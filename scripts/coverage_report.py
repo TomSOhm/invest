@@ -89,16 +89,17 @@ def run_coverage(tickers: list[str], bust_cache: bool = False) -> None:
             all_results.append({"Ticker": ticker, "field_sources": {}, "data_completeness": 0.0})
 
     # Print per-ticker completeness summary
-    print(f"\n{'Ticker':<12} {'Completeness':>13} {'FMP fields':>11} {'yfinance fields':>16} {'missing':>8}")
-    print("-" * 65)
+    print(f"\n{'Ticker':<12} {'Completeness':>13} {'FMP fields':>11} {'yfinance fields':>16} {'computed':>10} {'missing':>8}")
+    print("-" * 75)
     for row in all_results:
         ticker = row.get("Ticker", "?")
         dc = row.get("data_completeness", 0.0)
         sources = row.get("field_sources", {})
         n_fmp = sum(1 for s in sources.values() if s == "fmp")
         n_yf = sum(1 for s in sources.values() if s == "yfinance")
+        n_comp = sum(1 for s in sources.values() if s == "computed")
         n_miss = sum(1 for s in sources.values() if s == "missing")
-        print(f"{ticker:<12} {dc:>12.1%} {n_fmp:>11} {n_yf:>16} {n_miss:>8}")
+        print(f"{ticker:<12} {dc:>12.1%} {n_fmp:>11} {n_yf:>16} {n_comp:>10} {n_miss:>8}")
 
     # Build per-field source breakdown table
     print(f"\n\n{'Field':<22}", end="")
@@ -118,6 +119,8 @@ def run_coverage(tickers: list[str], bust_cache: bool = False) -> None:
                 indicator = "F"
             elif src == "yfinance":
                 indicator = "Y"
+            elif src == "computed":
+                indicator = "C"
             elif src == "missing":
                 indicator = "-"
             else:
@@ -131,7 +134,7 @@ def run_coverage(tickers: list[str], bust_cache: bool = False) -> None:
         print()
 
     # Legend
-    print("\nLegend: F=FMP, Y=yfinance, -=missing")
+    print("\nLegend: F=FMP, Y=yfinance, C=computed, -=missing")
 
     # Dump to coverage_matrix.md
     _update_coverage_matrix(tickers, all_results, display_cols)
@@ -160,6 +163,8 @@ def _update_coverage_matrix(
                 indicator = "FMP"
             elif src == "yfinance":
                 indicator = "yf"
+            elif src == "computed":
+                indicator = "comp"
             else:
                 indicator = "-"
             cells.append(indicator)

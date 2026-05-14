@@ -47,46 +47,45 @@ class PortfolioService:
         self._fetcher = fetcher
         self._scorer = scorer
 
-    def get_portfolio(self, horizon: str = "long_term") -> dict[str, Any]:
+    def get_portfolio(
+        self,
+        horizon: str = "long_term",
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
         """
         Load all positions, enrich with cached data, scoring, and P&L.
 
-        This method is cache-only: it never fires live FMP or yfinance calls.
-        Positions without a cache entry return degraded rows (NaN scoring
-        fields, None price/market_value).  Per-ticker try/except ensures one
-        bad ticker never 500s the whole list.
-
-        Parameters
-        ----------
-        horizon : str
-            "long_term" | "medium_term" | "short_term". Determines which
-            signal column drives signal_distribution in the summary.
-
-        Returns a dict matching PortfolioResponse schema.
+        Cache-only: never fires live FMP/yfinance calls. ``source`` is honored
+        on the per-source cache key (``{source}:{ticker}``).
         """
-        return self._build_enriched_response(horizon=horizon, cache_only=True)
+        return self._build_enriched_response(
+            horizon=horizon, cache_only=True, source=source,
+        )
 
-    def refresh(self, horizon: str = "long_term") -> dict[str, Any]:
+    def refresh(
+        self,
+        horizon: str = "long_term",
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
         """
         Force-refresh: invalidate cache for all stored tickers and re-fetch live.
-
-        Parameters
-        ----------
-        horizon : str
-            Passed through to the summary computation.
-
-        Returns the freshly enriched portfolio.
         """
         positions = self._store.get_positions()
         tickers = {p["ticker"] for p in positions}
         for ticker in tickers:
-            self._fetcher._cache.invalidate(f"hybrid:{ticker}")
-            # Also invalidate the legacy key pattern used elsewhere
+            for prefix in ("hybrid", "yfinance", "fmp"):
+                self._fetcher._cache.invalidate(f"{prefix}:{ticker}")
             self._fetcher._cache.invalidate(f"ticker_{ticker}")
-        return self._build_enriched_response(horizon=horizon, cache_only=False)
+        return self._build_enriched_response(
+            horizon=horizon, cache_only=False, source=source,
+        )
 
-    def add_position(self, req: AddPositionRequest) -> dict[str, Any]:
-        """Add a position to the portfolio store and trigger a live fetch for it."""
+    def add_position(
+        self,
+        req: AddPositionRequest,
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
+        """Add a position and trigger a live fetch via ``source``."""
         stored = self._store.add_position(
             ticker=req.ticker,
             quantity=req.quantity,
@@ -96,11 +95,8 @@ class PortfolioService:
             notes=req.notes,
         )
 
-        # Trigger a live fetch for the new ticker so scoring fields populate
-        # immediately. Wrap in try/except -- if FMP/yf both fail the stored
-        # row is returned with NaN scoring fields.
         try:
-            self._fetcher.fetch_single(req.ticker, cache_only=False)
+            self._fetcher.fetch_single(req.ticker, cache_only=False, source=source)
         except Exception as exc:
             logger.warning(
                 f"Live fetch failed for newly added position {req.ticker}: {exc}. "
@@ -109,8 +105,13 @@ class PortfolioService:
 
         return stored
 
-    def update_position(self, position_id: str, req: UpdatePositionRequest) -> dict[str, Any] | None:
-        """Update a position in the store and refresh live data for that ticker."""
+    def update_position(
+        self,
+        position_id: str,
+        req: UpdatePositionRequest,
+        source: str = "hybrid",
+    ) -> dict[str, Any] | None:
+        """Update a position and refresh live data via ``source``."""
         updates = req.model_dump(exclude_none=True)
         updated = self._store.update_position(position_id, updates)
 
@@ -118,10 +119,10 @@ class PortfolioService:
             ticker = updated.get("ticker")
             if ticker:
                 try:
-                    # Invalidate and re-fetch for the affected ticker only
-                    self._fetcher._cache.invalidate(f"hybrid:{ticker}")
+                    for prefix in ("hybrid", "yfinance", "fmp"):
+                        self._fetcher._cache.invalidate(f"{prefix}:{ticker}")
                     self._fetcher._cache.invalidate(f"ticker_{ticker}")
-                    self._fetcher.fetch_single(ticker, cache_only=False)
+                    self._fetcher.fetch_single(ticker, cache_only=False, source=source)
                 except Exception as exc:
                     logger.warning(f"Live fetch failed for updated position {ticker}: {exc}.")
 
@@ -135,7 +136,12 @@ class PortfolioService:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _build_enriched_response(self, horizon: str = "long_term", cache_only: bool = True) -> dict[str, Any]:
+    def _build_enriched_response(
+        self,
+        horizon: str = "long_term",
+        cache_only: bool = True,
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
         """
         Build the full enriched portfolio response.
 
@@ -146,6 +152,8 @@ class PortfolioService:
         cache_only:
             When True, only serve cached data (no live FMP/yfinance calls).
             When False, force-live (all tickers re-fetched).
+        source:
+            "hybrid" | "yfinance" | "fmp". Selects the data backend.
         """
         raw_positions = self._store.get_positions()
         if not raw_positions:
@@ -164,7 +172,9 @@ class PortfolioService:
         live_data: dict[str, dict[str, Any]] = {}
         for ticker in tickers:
             try:
-                live_data[ticker] = self._fetcher.fetch_single(ticker, cache_only=cache_only)
+                live_data[ticker] = self._fetcher.fetch_single(
+                    ticker, cache_only=cache_only, source=source,
+                )
             except Exception as exc:
                 logger.warning(f"fetch_single failed for portfolio ticker {ticker}: {exc}. Using empty row.")
                 live_data[ticker] = {}
@@ -187,7 +197,9 @@ class PortfolioService:
         if not cache_only:
             for ticker in tickers:
                 try:
-                    analyst_data[ticker] = self._fetcher.fetch_analyst_ratings(ticker)
+                    analyst_data[ticker] = self._fetcher.fetch_analyst_ratings(
+                        ticker, source=source,
+                    )
                 except Exception as exc:
                     logger.warning(f"fetch_analyst_ratings failed for {ticker}: {exc}")
                     analyst_data[ticker] = None

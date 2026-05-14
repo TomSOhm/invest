@@ -1,7 +1,7 @@
 # Data Sources — FMP + yfinance Hybrid
 
-**Status:** Active (v2 data layer; M2 milestone).
-**Last updated:** 2026-05-08.
+**Status:** Active (v2 data layer; M2 milestone + user-selectable source).
+**Last updated:** 2026-05-14.
 **Companion docs:** [`METHODOLOGY.md`](METHODOLOGY.md), [`PROJECT_BRIEF.md`](PROJECT_BRIEF.md), [`adr/0002-fmp-yfinance-hybrid.md`](adr/0002-fmp-yfinance-hybrid.md), [`backend/app/services/market_data/coverage_matrix.md`](../backend/app/services/market_data/coverage_matrix.md) (live coverage).
 
 ---
@@ -259,6 +259,129 @@ If `FMP_TOKEN` is unset OR `fmp.enabled: false` in settings.yaml, the engine run
 3. Store backup of keys in a password manager.
 4. Rotate keys if exposed (gitleaks / trufflehog should catch accidental commits but they're not in CI yet — manual review for now).
 5. Use free tiers wisely — the 24h cache is the difference between sustainable use and burning a week of quota in a single batch.
+
+---
+
+## 9.4. Computed-fallback tier
+
+Beyond FMP and yfinance, scoring fields can now have a **third provenance**
+called `computed`. The `apply_computed_fallback` function in
+`backend/app/services/market_data/computed_fallback.py` runs at the end of
+every `HybridDataFetcher` branch and recomputes seven fields from raw inputs
+already in the row when both upstream sources returned NaN:
+
+| Field | Formula |
+|-------|---------|
+| `FCF` | `OperatingCashflow - abs(CapEx)` |
+| `InterestCoverage` | `EBIT / abs(InterestExpense)` |
+| `RevenueGrowth` | `Revenue / Revenue_PriorYear - 1` |
+| `ROIC` | `EBIT * 0.75 / (TotalEquity + TotalDebt - Cash)` |
+| `CurrentRatio` | `CurrentAssets / CurrentLiabilities` |
+| `DebtEquity` | `TotalDebt / TotalEquity` |
+| `FCFMargin` | `FCF / Revenue` (after FCF recomputed) |
+
+A field is only set to "computed" when its current `field_sources` value is
+`"missing"` — legitimate `fmp` / `yfinance` provenance is never overwritten.
+The `data_completeness` ratio rises accordingly. The coverage matrix
+(`scripts/coverage_report.py`) shows recovered fields as `C:value`.
+
+## 9.4b. yfinance.analysis surface (sub-project 2)
+
+Sub-project 2 wires yfinance's analyst endpoints in to light up dormant scoring
+fields and a richer analyst panel.
+
+Six new methods on `YFinanceDataFetcher` (cache TTL 6h each):
+
+| Method | yfinance source | Returns |
+|--------|-----------------|---------|
+| `fetch_recommendations_summary(ticker)` | `tk.recommendations_summary` | `{strong_buy, buy, hold, sell, strong_sell}` counts |
+| `fetch_eps_revisions(ticker)` | `tk.eps_revisions` | `{up_last_{7,30,60,90}d, down_last_{7,30,60,90}d}` (note casing trap: `downLast7Days` capital D, others lowercase) |
+| `fetch_eps_trend(ticker)` | `tk.eps_trend` | List of `{period, current, n_minus_{7,30,60,90}d}` rows |
+| `fetch_earnings_history(ticker, limit=4)` | `tk.earnings_history` | Last N quarters: `{date, eps_actual, eps_estimate, eps_difference, surprise_pct}`. Clamped to ≤8. |
+| `fetch_growth_estimates(ticker)` | `tk.growth_estimates` | `{fy_growth, five_year_growth}` |
+| `fetch_upgrades_downgrades(ticker, limit=50)` | `tk.upgrades_downgrades` | List of `{date, firm, from_grade, to_grade, action}`. Clamped to ≤50. |
+
+These feed `HybridDataFetcher._inject_analyst_signals` (called at the tail of
+all 4 fetch branches), which computes:
+
+- **SUE** (`src/analysis/analyst_signals.py:compute_sue_from_history`) — Bernard-Thomas 1989 convention: surprises = `eps_actual - eps_estimate` over the last 8 quarters, σ excludes the current quarter, sample stdev (`ddof=1`). Requires ≥6 valid quarters; returns `None` otherwise. Empty for most non-US tickers.
+- **EpsRevision30d / EpsRevision90d** — `(current - n_days_ago) / abs(n_days_ago)` from `eps_trend`. `abs()` preserves sign on negative prior estimates.
+- **EarningsSurprise** — latest quarter's `surprisePercent` (display-only).
+- **GrowthEstimateFY** — `stockTrend` for the `+1y` row (display-only).
+- **EpsRevisionsUp30d / EpsRevisionsDown30d** — raw counts (display-only).
+
+The scoring engine (`scoring_service.py`) already reads `EPS_Rev_30d` / `EPS_Rev_90d` / `SUE` — these now flow through and feed the Momentum score.
+
+The `fetch_analyst_ratings` return shape grew six new optional fields exposed on `AnalystRatings`: `num_analysts`, `recent_changes`, `revisions_history`, `growth_estimate_fy`, `growth_estimate_5y`, `earnings_history`. Frontend `AnalystTargetsPanel` + `MomentumPanel` consume them.
+
+**Source routing:** all 6 new methods are yfinance-only (FMP analyst endpoints are not wired). Existing FMP-first hybrid path for price *targets* (`target_low/mean/high/median`) is preserved.
+
+## 9.5. Company chart endpoint
+
+`GET /api/company/{ticker}/price-history?period=&benchmark=`
+
+Returns date-indexed OHLCV for the ticker + optional benchmark + six derived
+metrics + 50d/200d MA series. Frontend mounts the response on
+`/company/[ticker]` between the header card and horizon score cards.
+
+- **Backend:** `backend/app/services/chart_service.py` orchestrates;
+  `backend/app/services/market_data/yfinance_fetcher.py:fetch_multi_price_history`
+  bulk-downloads via `yfinance.download(group_by="ticker")` in a single
+  HTTP call, then caches as parquet (not JSON — preserves DatetimeIndex)
+  under `data/cache/multi_history/{sha256-of-tickers-period}.parquet`.
+- **Period allow-list:** `1M`, `3M`, `6M`, `1Y`, `5Y`, `MAX` — server-side
+  validated.
+- **Benchmark allow-list:** `^GSPC`, `^FCHI`, `^FTSE`, `^GDAXI`, `^STOXX`,
+  `^IXIC` — server-side validated.
+- **Ticker validation:** `^[A-Z0-9.^_-]{1,12}$`.
+- **Metrics:** total_return, CAGR (calendar days / 365.25), annualized_vol
+  (log returns × √252), max_drawdown, beta vs benchmark (60-obs minimum),
+  Sharpe (rf=4% annual).
+- **Source-agnostic:** no `?source=` query param — prices are universally
+  identical across yfinance/FMP, so the source selector does not apply.
+
+## 9.6. User-selectable source (frontend `SourceSelector`)
+
+Starting with the source-selector feature, the UI exposes a segmented
+`SourceSelector` control on every data-driven page (company detail, screener,
+portfolio, watchlist). Three options:
+
+| Choice    | Behavior                                                              |
+|-----------|-----------------------------------------------------------------------|
+| Hybrid    | Default. FMP-first, yfinance fallback per field (best coverage).      |
+| Yahoo     | yfinance only. No FMP quota cost. Best for EU / global tickers.       |
+| FMP       | FMP only. Best US fundamentals. Falls back to yfinance when FMP is disabled or quota is hit. |
+
+The choice persists in `localStorage` under the key `invest:data_source` and
+syncs across tabs via the `storage` event.
+
+**Backend wiring.** Every relevant FastAPI route accepts a `?source=` query
+param validated against `backend.app.services.market_data.types.SOURCES`:
+
+- `GET /api/company/{ticker}?source=…`
+- `GET /api/company/{ticker}/metrics?source=…`
+- `GET /api/company/{ticker}/horizons/{horizon}?source=…`
+- `GET /api/portfolio/?source=…`, `POST /api/portfolio/refresh?source=…`,
+  `POST /api/portfolio/positions?source=…`
+- `GET /api/watchlist/?source=…`, `POST /api/watchlist/?source=…`,
+  `POST /api/watchlist/refresh?source=…`
+- `POST /api/screener/refresh?source=…`, `POST /api/screener/preset/{name}?source=…`,
+  `POST /api/screener/tickers?source=…`
+
+Unknown source values raise HTTP 422.
+
+**Explicit FMP fallback.** When the user picks `source=fmp` but FMP is either
+disabled in settings (`fmp.enabled: false`) or has hit its daily quota,
+`HybridDataFetcher._fetch_fmp_only` builds a yfinance-sourced row and marks
+it with `effective_source="yfinance"` plus a human-readable
+`source_fallback_message`. The frontend visibly switches the active button
+back to "Yahoo" and shows a one-line amber banner explaining the fallback.
+
+**Cache partitioning.** Cache keys include the source so a switch never
+returns cross-source stale data: `hybrid:{ticker}`, `yfinance:{ticker}`,
+`fmp:{ticker}`. The CompanyService bypasses the screener-universe cache when
+`source != "hybrid"` so the user-chosen backend actually drives the response
+even for tickers in the scored universe.
 
 ---
 

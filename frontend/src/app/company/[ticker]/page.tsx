@@ -1,9 +1,16 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, TrendingUp, TrendingDown } from "lucide-react";
 import { useCompany } from "@/hooks/useCompany";
+import { useCompanyPriceHistory } from "@/hooks/useCompanyPriceHistory";
+import PriceChart from "@/components/ui/PriceChart";
+import ChartMetricsPanel from "@/components/ui/ChartMetricsPanel";
+import PeriodSelector from "@/components/ui/PeriodSelector";
+import BenchmarkSelector from "@/components/ui/BenchmarkSelector";
+import { BENCHMARK_OPTIONS } from "@/lib/benchmarks";
+import type { ChartPeriod } from "@/lib/types";
 import {
   formatCurrency,
   formatNumber,
@@ -21,6 +28,9 @@ import EarningsQualityPanel from "@/components/ui/EarningsQualityPanel";
 import MomentumPanel from "@/components/ui/MomentumPanel";
 import { ScoreBar } from "@/components/ui/ScoreGauge";
 import MetricInfo from "@/components/ui/MetricInfo";
+import SourceSelector from "@/components/ui/SourceSelector";
+import AnalystTargetsPanel from "@/components/ui/AnalystTargetsPanel";
+import { useDataSource } from "@/hooks/useDataSource";
 import type { AnalystRatings, RiskSignals, SubScores } from "@/lib/types";
 import clsx from "clsx";
 
@@ -52,56 +62,6 @@ function MetricRow({
       >
         {value}
       </span>
-    </div>
-  );
-}
-
-// Analyst bar: buy/hold/sell distribution
-function AnalystBar({
-  strongBuy,
-  buy,
-  hold,
-  sell,
-  strongSell,
-}: {
-  strongBuy: number;
-  buy: number;
-  hold: number;
-  sell: number;
-  strongSell: number;
-}) {
-  const total = strongBuy + buy + hold + sell + strongSell;
-  if (total === 0) return <p className="text-sm text-slate-400">No analyst data</p>;
-
-  const pct = (n: number) => `${((n / total) * 100).toFixed(0)}%`;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex h-4 rounded-full overflow-hidden gap-px">
-        {strongBuy > 0 && (
-          <div className="bg-emerald-600" style={{ width: pct(strongBuy) }} title={`Strong Buy: ${strongBuy}`} />
-        )}
-        {buy > 0 && (
-          <div className="bg-emerald-400" style={{ width: pct(buy) }} title={`Buy: ${buy}`} />
-        )}
-        {hold > 0 && (
-          <div className="bg-amber-400" style={{ width: pct(hold) }} title={`Hold: ${hold}`} />
-        )}
-        {sell > 0 && (
-          <div className="bg-red-400" style={{ width: pct(sell) }} title={`Sell: ${sell}`} />
-        )}
-        {strongSell > 0 && (
-          <div className="bg-red-600" style={{ width: pct(strongSell) }} title={`Strong Sell: ${strongSell}`} />
-        )}
-      </div>
-      <div className="flex gap-4 text-xs text-slate-500">
-        {strongBuy > 0 && <span className="text-emerald-600 dark:text-emerald-400">SB: {strongBuy}</span>}
-        {buy > 0 && <span className="text-emerald-500">B: {buy}</span>}
-        {hold > 0 && <span className="text-amber-500">H: {hold}</span>}
-        {sell > 0 && <span className="text-red-400">S: {sell}</span>}
-        {strongSell > 0 && <span className="text-red-600">SS: {strongSell}</span>}
-        <span className="ml-auto">Total: {total}</span>
-      </div>
     </div>
   );
 }
@@ -212,51 +172,34 @@ function SubScoresPanel({ subScores }: { subScores: SubScores }) {
 }
 
 // Analyst targets panel
-function AnalystTargetsPanel({ analyst }: { analyst: AnalystRatings; currentPrice: number }) {
-  return (
-    <Card title="Analyst Consensus">
-      <div className="space-y-3">
-        <AnalystBar
-          strongBuy={analyst.strong_buy}
-          buy={analyst.buy}
-          hold={analyst.hold}
-          sell={analyst.sell}
-          strongSell={analyst.strong_sell}
-        />
-        <div className="grid grid-cols-3 gap-3 text-center">
-          <div>
-            <div className="text-xs text-slate-400">Low</div>
-            <div className="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300">
-              {formatCurrency(analyst.target_low)}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-400">Mean</div>
-            <div className="font-mono text-sm font-bold text-slate-900 dark:text-slate-100">
-              {formatCurrency(analyst.target_mean)}
-            </div>
-          </div>
-          <div>
-            <div className="text-xs text-slate-400">High</div>
-            <div className="font-mono text-sm font-semibold text-slate-700 dark:text-slate-300">
-              {formatCurrency(analyst.target_high)}
-            </div>
-          </div>
-        </div>
-      </div>
-    </Card>
-  );
-}
-
 export default function CompanyPage() {
   const params = useParams();
   const router = useRouter();
   const ticker = (params.ticker as string)?.toUpperCase();
   const { data, loading, error, fetch } = useCompany();
+  const { source, setSource } = useDataSource();
+
+  const [period, setPeriod] = useState<ChartPeriod>("1Y");
+  const [benchmark, setBenchmark] = useState<string | null>(null);
+  const { data: priceData, loading: priceLoading } = useCompanyPriceHistory(
+    ticker,
+    period,
+    benchmark,
+  );
+  const benchmarkLabel =
+    BENCHMARK_OPTIONS.find((o) => o.ticker === benchmark)?.label ?? null;
 
   useEffect(() => {
-    if (ticker) fetch(ticker);
-  }, [ticker, fetch]);
+    if (ticker) fetch(ticker, source);
+  }, [ticker, fetch, source]);
+
+  // When backend fell back (user picked fmp but got yfinance), reflect it.
+  useEffect(() => {
+    if (data?.effective_source && data.effective_source !== source) {
+      setSource(data.effective_source);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [data?.effective_source]);
 
   if (loading) {
     return (
@@ -302,13 +245,23 @@ export default function CompanyPage() {
 
   return (
     <div className="max-w-screen-xl mx-auto px-4 py-6 space-y-5">
-      {/* Back */}
-      <button
-        onClick={() => router.back()}
-        className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
-      >
-        <ArrowLeft size={15} /> Back
-      </button>
+      {/* Back + source selector */}
+      <div className="flex items-center justify-between gap-3">
+        <button
+          onClick={() => router.back()}
+          className="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 transition-colors"
+        >
+          <ArrowLeft size={15} /> Back
+        </button>
+        <SourceSelector value={source} onChange={setSource} />
+      </div>
+
+      {/* Source fallback banner */}
+      {data.source_fallback_message && (
+        <div className="rounded-md border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 px-4 py-2 text-xs text-amber-800 dark:text-amber-200">
+          {data.source_fallback_message}
+        </div>
+      )}
 
       {/* Score-source warning when this ticker isn't in the screener universe */}
       {data.score_source === "single_row_fallback" && (
@@ -382,6 +335,46 @@ export default function CompanyPage() {
         </div>
       </div>
 
+      {/* Price chart section */}
+      <section className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-sm font-semibold text-slate-700 dark:text-slate-300">
+            Price history
+          </h2>
+          <div className="flex flex-wrap items-center gap-2">
+            <BenchmarkSelector value={benchmark} onChange={setBenchmark} />
+            <PeriodSelector value={period} onChange={setPeriod} />
+          </div>
+        </div>
+
+        {priceLoading && (
+          <div className="flex items-center justify-center py-12">
+            <Spinner size={24} />
+          </div>
+        )}
+
+        {!priceLoading && priceData && priceData.candles.length > 0 && (
+          <>
+            <PriceChart
+              candles={priceData.candles}
+              benchmarkCandles={priceData.benchmark_candles}
+              movingAverages={priceData.moving_averages}
+              benchmarkLabel={benchmark ? benchmarkLabel : null}
+            />
+            <ChartMetricsPanel
+              metrics={priceData.metrics}
+              benchmarkLabel={benchmark ? benchmarkLabel : null}
+            />
+          </>
+        )}
+
+        {!priceLoading && priceData && priceData.candles.length === 0 && (
+          <div className="text-sm text-slate-400 py-6 text-center">
+            No price history available for {ticker}.
+          </div>
+        )}
+      </section>
+
       {/* Three Horizon Score Cards */}
       <div className="grid md:grid-cols-3 gap-4">
         <HorizonScoreCard horizon="long_term" scoring={horizons.long_term} />
@@ -395,7 +388,7 @@ export default function CompanyPage() {
       {/* Earnings Quality + Momentum */}
       <div className="grid md:grid-cols-2 gap-4">
         <EarningsQualityPanel quality={quality} />
-        <MomentumPanel momentum={momentum} />
+        <MomentumPanel momentum={momentum} analyst={analyst_ratings} />
       </div>
 
       {/* Risk + Analyst */}
@@ -467,7 +460,10 @@ export default function CompanyPage() {
 
       {/* Footer */}
       <div className="text-xs text-slate-400 pb-4">
-        Data source: {data.data_source} · Last updated: {formatDate(last_updated)}
+        Data source: {data.effective_source}
+        {data.effective_source !== data.data_source &&
+          ` (fallback from ${data.data_source})`}
+        {" · "}Last updated: {formatDate(last_updated)}
       </div>
     </div>
   );

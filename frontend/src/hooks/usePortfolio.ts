@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { api } from "@/lib/api";
 import type {
+  DataSource,
   Horizon,
   PortfolioResponse,
   PortfolioSummary,
@@ -75,29 +76,32 @@ function recomputeWeights(positions: PortfolioPosition[]): PortfolioPosition[] {
   }));
 }
 
-export function usePortfolio(initialHorizon: Horizon = "long_term") {
+export function usePortfolio(
+  initialHorizon: Horizon = "long_term",
+  source: DataSource = "hybrid",
+) {
   const [data, setData] = useState<PortfolioResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [horizon, setHorizon] = useState<Horizon>(initialHorizon);
 
-  // Stable fetch — empty deps so useEffect mount only fires once.
-  // Caller can pass an explicit horizon to override the closure default
-  // (used by `refresh()` which always uses the current horizon).
-  const fetch = useCallback(async (h?: Horizon) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await api.get<PortfolioResponse>(
-        `/api/portfolio/?horizon=${h ?? "long_term"}`
-      );
-      setData(res);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load portfolio");
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const fetch = useCallback(
+    async (h?: Horizon, src?: DataSource) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await api.get<PortfolioResponse>(
+          `/api/portfolio/?horizon=${h ?? "long_term"}&source=${src ?? source}`,
+        );
+        setData(res);
+      } catch (e) {
+        setError(e instanceof Error ? e.message : "Failed to load portfolio");
+      } finally {
+        setLoading(false);
+      }
+    },
+    [source],
+  );
 
   // Horizon switch is now purely client-side: the response already carries
   // all three score columns per position. We just remember which one to
@@ -112,7 +116,7 @@ export function usePortfolio(initialHorizon: Horizon = "long_term") {
     async (req: AddPositionRequest): Promise<PortfolioPosition | null> => {
       try {
         const pos = await api.post<PortfolioPosition>(
-          "/api/portfolio/positions",
+          `/api/portfolio/positions?source=${source}`,
           req
         );
         setData((prev) => {
@@ -130,7 +134,7 @@ export function usePortfolio(initialHorizon: Horizon = "long_term") {
         return null;
       }
     },
-    []
+    [source]
   );
 
   const updatePosition = useCallback(
@@ -140,7 +144,7 @@ export function usePortfolio(initialHorizon: Horizon = "long_term") {
     ): Promise<PortfolioPosition | null> => {
       try {
         const pos = await api.put<PortfolioPosition>(
-          `/api/portfolio/positions/${id}`,
+          `/api/portfolio/positions/${id}?source=${source}`,
           req
         );
         setData((prev) => {
@@ -160,7 +164,7 @@ export function usePortfolio(initialHorizon: Horizon = "long_term") {
         return null;
       }
     },
-    []
+    [source]
   );
 
   const removePosition = useCallback(async (id: string): Promise<boolean> => {
@@ -191,7 +195,7 @@ export function usePortfolio(initialHorizon: Horizon = "long_term") {
     setError(null);
     try {
       const res = await api.post<PortfolioResponse>(
-        `/api/portfolio/refresh?horizon=${horizon}`
+        `/api/portfolio/refresh?horizon=${horizon}&source=${source}`
       );
       setData(res);
     } catch (e) {
@@ -199,11 +203,11 @@ export function usePortfolio(initialHorizon: Horizon = "long_term") {
     } finally {
       setLoading(false);
     }
-  }, [horizon]);
+  }, [horizon, source]);
 
-  // Mount-once fetch. Empty deps on purpose — horizon flip does not refetch.
+  // Mount-once fetch + refetch when source changes.
   // eslint-disable-next-line react-hooks/exhaustive-deps, react-hooks/set-state-in-effect
-  useEffect(() => { fetch(initialHorizon); }, []);
+  useEffect(() => { fetch(initialHorizon, source); }, [source]);
 
   return {
     data,

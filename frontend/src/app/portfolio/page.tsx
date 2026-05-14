@@ -31,6 +31,8 @@ import Spinner from "@/components/ui/Spinner";
 import Card from "@/components/ui/Card";
 import { ScoreBar } from "@/components/ui/ScoreGauge";
 import HorizonSelector from "@/components/ui/HorizonSelector";
+import SourceSelector from "@/components/ui/SourceSelector";
+import { useDataSource } from "@/hooks/useDataSource";
 import MetricInfo from "@/components/ui/MetricInfo";
 import clsx from "clsx";
 
@@ -540,6 +542,7 @@ function SortIcon({
 // ---------------------------------------------------------------------------
 
 export default function PortfolioPage() {
+  const { source, setSource } = useDataSource();
   const {
     data,
     loading,
@@ -550,7 +553,7 @@ export default function PortfolioPage() {
     removePosition,
     updatePosition,
     refresh,
-  } = usePortfolio("long_term");
+  } = usePortfolio("long_term", source);
 
   const [showAdd, setShowAdd] = useState(false);
   const [editingPosition, setEditingPosition] =
@@ -614,6 +617,7 @@ export default function PortfolioPage() {
           Portfolio
         </h1>
         <div className="flex flex-wrap items-center gap-2">
+          <SourceSelector value={source} onChange={setSource} />
           <HorizonSelector value={horizon} onChange={changeHorizon} />
           <button
             onClick={() => refresh()}

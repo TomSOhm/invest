@@ -28,31 +28,27 @@ class CompanyService:
         self._fetcher = fetcher
         self._scorer = scorer
 
-    def get_detail(self, ticker: str) -> dict[str, Any]:
+    def get_detail(self, ticker: str, source: str = "hybrid") -> dict[str, Any]:
         """
         Full company detail: metrics + three-horizon scoring + DCF + quality
         + risk + momentum blocks + analyst ratings + PEA status.
 
-        Reads from the screener cache when the ticker is in the universe so
-        scores match the screener exactly (same peer set, same sector
-        percentiles). Falls back to a live single-row fetch + scoring
-        otherwise — note that single-row scoring degenerates the
-        sector-relative percentile path (no peers) so the resulting scores
-        are approximate; the response carries ``score_source`` so the UI
-        can warn the user.
+        ``source`` selects which backend feeds the live fetch. When ``source``
+        is anything other than ``"hybrid"`` the screener-universe cache is
+        bypassed so the user-chosen backend actually drives the data.
         """
-        cached_row = screener_cache.lookup(ticker)
+        cached_row = screener_cache.lookup(ticker) if source == "hybrid" else None
         if cached_row is not None:
             data = cached_row
             scoring = self._scorer.extract_scoring_from_row(pd.Series(cached_row))
             score_source = "universe"
         else:
-            data = self._fetcher.fetch_single(ticker)
+            data = self._fetcher.fetch_single(ticker, source=source)
             series = pd.Series(data)
             scoring = self._scorer.score_single(series)
             score_source = "single_row_fallback"
 
-        analyst = self._fetcher.fetch_analyst_ratings(ticker)
+        analyst = self._fetcher.fetch_analyst_ratings(ticker, source=source)
 
         current_price = self._num(data.get("Price"))
         high_52 = self._num(data.get("FiftyTwoWeekHigh"))
@@ -149,17 +145,24 @@ class CompanyService:
             "metrics": metrics,
             "analyst_ratings": analyst,
             "data_completeness": scoring.get("data_completeness", 0.0),
-            "data_source": "yfinance",
+            "data_source": source,
+            "effective_source": data.get("effective_source", source),
+            "source_fallback_message": data.get("source_fallback_message"),
             "last_updated": datetime.now(UTC).isoformat(),
             "score_source": score_source,
         }
 
-    def get_metrics(self, ticker: str) -> dict[str, Any]:
+    def get_metrics(self, ticker: str, source: str = "hybrid") -> dict[str, Any]:
         """Return only the raw metrics portion of company detail."""
-        detail = self.get_detail(ticker)
+        detail = self.get_detail(ticker, source=source)
         return detail["metrics"]
 
-    def get_horizon(self, ticker: str, horizon: str) -> dict[str, Any]:
+    def get_horizon(
+        self,
+        ticker: str,
+        horizon: str,
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
         """
         Return the selected horizon's scoring block plus DCF valuation.
 
@@ -168,8 +171,10 @@ class CompanyService:
         ticker : str
         horizon : str
             "long_term" | "medium_term" | "short_term"
+        source : str
+            "hybrid" | "yfinance" | "fmp"
         """
-        detail = self.get_detail(ticker)
+        detail = self.get_detail(ticker, source=source)
         horizons_block = detail.get("horizons", {})
         horizon_data = horizons_block.get(horizon, {})
         return {

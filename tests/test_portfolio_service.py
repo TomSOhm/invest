@@ -243,7 +243,7 @@ class TestAddPosition:
         req = AddPositionRequest(ticker="NVDA", quantity=5.0, buy_price=800.0, account_type="cto")
         result = svc.add_position(req)
 
-        fetcher.fetch_single.assert_called_once_with("NVDA", cache_only=False)
+        fetcher.fetch_single.assert_called_once_with("NVDA", cache_only=False, source="hybrid")
         assert result == stored_pos
 
     def test_add_position_returns_stored_pos_even_if_fetch_fails(self) -> None:
@@ -304,7 +304,7 @@ class TestRefresh:
         svc = PortfolioService(store=store, fetcher=fetcher, scorer=scorer)
         svc.refresh()
 
-        fetcher.fetch_analyst_ratings.assert_called_once_with("AAPL")
+        fetcher.fetch_analyst_ratings.assert_called_once_with("AAPL", source="hybrid")
 
     def test_refresh_passes_horizon_to_summary(self) -> None:
         positions = [_make_position("AAPL")]

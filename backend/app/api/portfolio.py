@@ -19,6 +19,7 @@ from backend.app.models.portfolio import (
     PortfolioResponse,
     UpdatePositionRequest,
 )
+from backend.app.services.market_data.types import SOURCES
 from backend.app.services.portfolio_service import PortfolioService
 
 router = APIRouter(tags=["portfolio"])
@@ -26,43 +27,43 @@ router = APIRouter(tags=["portfolio"])
 _VALID_HORIZONS = {"long_term", "medium_term", "short_term"}
 
 
-@router.get("/", response_model=PortfolioResponse)
-async def get_portfolio(
-    horizon: str = Query(
-        "long_term",
-        description="Horizon for signal_distribution in summary: long_term | medium_term | short_term",
-    ),
-    svc: PortfolioService = Depends(get_portfolio_service),
-) -> dict[str, Any]:
-    """Return the full portfolio with cached data, three-horizon scoring, and P&L.
+def _validate_source(source: str) -> None:
+    if source not in SOURCES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid source '{source}'. Must be one of: {list(SOURCES)}",
+        )
 
-    This endpoint is cache-only: no live FMP/yfinance calls are made.
-    Positions without a cache entry return degraded rows (NaN scoring fields,
-    None price/market_value).  Use POST /refresh to trigger a live re-fetch.
 
-    All three horizon scores (score_lt, score_mt, score_st) are present on
-    every position. The ``horizon`` param only affects which signal column is
-    used for the summary's signal_distribution bucket.
-    """
+def _validate_horizon(horizon: str) -> None:
     if horizon not in _VALID_HORIZONS:
         raise HTTPException(
             status_code=422,
             detail=f"Invalid horizon '{horizon}'. Must be one of: {sorted(_VALID_HORIZONS)}",
         )
-    return svc.get_portfolio(horizon=horizon)
+
+
+@router.get("/", response_model=PortfolioResponse)
+async def get_portfolio(
+    horizon: str = Query("long_term"),
+    source: str = Query("hybrid"),
+    svc: PortfolioService = Depends(get_portfolio_service),
+) -> dict[str, Any]:
+    """Cache-only portfolio read with three-horizon scoring and P&L."""
+    _validate_horizon(horizon)
+    _validate_source(source)
+    return svc.get_portfolio(horizon=horizon, source=source)
 
 
 @router.post("/positions")
 async def add_position(
     req: AddPositionRequest,
+    source: str = Query("hybrid"),
     svc: PortfolioService = Depends(get_portfolio_service),
 ) -> dict[str, Any]:
-    """Add a new position to the portfolio.
-
-    Triggers a live fetch for the new ticker only. Returns 200 even if both
-    FMP and yfinance fail (degraded row).
-    """
-    position = svc.add_position(req)
+    """Add a position; triggers a live fetch for the new ticker via ``source``."""
+    _validate_source(source)
+    position = svc.add_position(req, source=source)
     return {"success": True, "position": position}
 
 
@@ -70,13 +71,12 @@ async def add_position(
 async def update_position(
     position_id: str,
     req: UpdatePositionRequest,
+    source: str = Query("hybrid"),
     svc: PortfolioService = Depends(get_portfolio_service),
 ) -> dict[str, Any]:
-    """Update an existing position.
-
-    If the ticker is unchanged, re-fetches live data for that ticker only.
-    """
-    result = svc.update_position(position_id, req)
+    """Update an existing position; refresh live data for that ticker via source."""
+    _validate_source(source)
+    result = svc.update_position(position_id, req, source=source)
     if result is None:
         raise HTTPException(status_code=404, detail=f"Position {position_id} not found")
     return {"success": True, "position": result}
@@ -96,17 +96,11 @@ async def remove_position(
 
 @router.post("/refresh", response_model=PortfolioResponse)
 async def refresh_portfolio(
-    horizon: str = Query("long_term", description="Horizon for summary signal_distribution"),
+    horizon: str = Query("long_term"),
+    source: str = Query("hybrid"),
     svc: PortfolioService = Depends(get_portfolio_service),
 ) -> dict[str, Any]:
-    """Force-refresh all live data for the portfolio.
-
-    Invalidates the cache for every stored ticker and re-fetches live data
-    from FMP (with yfinance fallback). Analyst ratings are included.
-    """
-    if horizon not in _VALID_HORIZONS:
-        raise HTTPException(
-            status_code=422,
-            detail=f"Invalid horizon '{horizon}'. Must be one of: {sorted(_VALID_HORIZONS)}",
-        )
-    return svc.refresh(horizon=horizon)
+    """Force-refresh all live data for the portfolio."""
+    _validate_horizon(horizon)
+    _validate_source(source)
+    return svc.refresh(horizon=horizon, source=source)

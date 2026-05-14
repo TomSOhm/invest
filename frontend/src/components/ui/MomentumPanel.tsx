@@ -1,13 +1,14 @@
 "use client";
 
 import clsx from "clsx";
-import { TrendingUp, TrendingDown, CheckCircle, XCircle, Minus } from "lucide-react";
-import type { MomentumSignals } from "@/lib/types";
-import { formatPercent, formatNumber } from "@/lib/formatters";
+import { CheckCircle, Minus, XCircle } from "lucide-react";
+import type { AnalystRatings, MomentumSignals } from "@/lib/types";
+import { formatPercent } from "@/lib/formatters";
 import MetricInfo from "./MetricInfo";
 
 interface MomentumPanelProps {
   momentum: MomentumSignals;
+  analyst?: AnalystRatings | null;
 }
 
 /**
@@ -17,7 +18,7 @@ interface MomentumPanelProps {
  * Usage:
  *   <MomentumPanel momentum={data.momentum} />
  */
-export default function MomentumPanel({ momentum }: MomentumPanelProps) {
+export default function MomentumPanel({ momentum, analyst }: MomentumPanelProps) {
   const {
     momentum_12_1,
     rs_3m,
@@ -120,6 +121,112 @@ export default function MomentumPanel({ momentum }: MomentumPanelProps) {
           )}
         </div>
       )}
+
+      {/* Sub-project 2: yfinance.analysis enrichment */}
+      {analyst?.revisions_history && (
+        <RevisionsHistogram rows={analyst.revisions_history} />
+      )}
+      {analyst?.earnings_history && analyst.earnings_history.length > 0 && (
+        <EarningsHistoryTable rows={analyst.earnings_history} />
+      )}
+    </div>
+  );
+}
+
+function RevisionsHistogram({
+  rows,
+}: {
+  rows: NonNullable<AnalystRatings["revisions_history"]>;
+}) {
+  const maxCount = Math.max(...rows.map((r) => r.up + r.down), 1);
+  return (
+    <div
+      role="region"
+      aria-label="Estimate revisions by time window"
+      className="space-y-1.5 pt-2 border-t border-slate-100 dark:border-slate-800"
+    >
+      <div className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        Estimate Revisions
+      </div>
+      {rows.map((r) => {
+        const upPct = (r.up / maxCount) * 100;
+        const downPct = (r.down / maxCount) * 100;
+        return (
+          <div key={r.period} className="flex items-center gap-2 text-xs">
+            <span className="w-8 text-slate-500 text-right">{r.period}</span>
+            <div className="flex-1 h-3 flex items-center gap-px" aria-hidden>
+              <div
+                className="bg-emerald-500 h-2 rounded-l-sm"
+                style={{ width: `${upPct}%` }}
+                title={`${r.up} up`}
+              />
+              <div
+                className="bg-red-500 h-2 rounded-r-sm"
+                style={{ width: `${downPct}%` }}
+                title={`${r.down} down`}
+              />
+            </div>
+            <span className="w-14 text-right font-mono text-slate-500">
+              {r.up}↑ {r.down}↓
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function EarningsHistoryTable({
+  rows,
+}: {
+  rows: NonNullable<AnalystRatings["earnings_history"]>;
+}) {
+  return (
+    <div className="space-y-1 pt-2 border-t border-slate-100 dark:border-slate-800">
+      <div className="text-[10px] uppercase tracking-wide text-slate-400 dark:text-slate-500">
+        Earnings History
+      </div>
+      <div className="overflow-x-auto">
+      <table className="w-full text-xs">
+        <thead className="text-slate-400 dark:text-slate-500">
+          <tr>
+            <th scope="col" className="text-left font-normal">Date</th>
+            <th scope="col" className="text-right font-normal">Actual</th>
+            <th scope="col" className="text-right font-normal">Est.</th>
+            <th scope="col" className="text-right font-normal">Surprise</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.slice(0, 4).map((r) => {
+            const surprise = r.surprise_pct;
+            const surpriseClass =
+              surprise == null
+                ? "text-slate-400"
+                : surprise > 0
+                ? "text-emerald-600 dark:text-emerald-400"
+                : surprise < 0
+                ? "text-red-500 dark:text-red-400"
+                : "text-slate-500";
+            return (
+              <tr key={r.date} className="font-mono">
+                <td className="py-0.5 text-slate-500">{r.date}</td>
+                <td className="py-0.5 text-right text-slate-800 dark:text-slate-200">
+                  {r.eps_actual == null ? "—" : r.eps_actual.toFixed(2)}
+                </td>
+                <td className="py-0.5 text-right text-slate-600 dark:text-slate-400">
+                  {r.eps_estimate == null ? "—" : r.eps_estimate.toFixed(2)}
+                </td>
+                <td className={clsx("py-0.5 text-right", surpriseClass)}>
+                  {surprise == null
+                    ? "—"
+                    : `${surprise > 0 ? "+" : ""}${surprise.toFixed(1)}%`}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
+      </div>
     </div>
   );
 }

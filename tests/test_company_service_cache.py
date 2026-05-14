@@ -267,5 +267,53 @@ def test_cache_miss_falls_back_to_single_row() -> None:
     result = svc.get_detail("AAPL")
 
     assert result["score_source"] == "single_row_fallback"
-    fetcher.fetch_single.assert_called_once_with("AAPL")
+    fetcher.fetch_single.assert_called_once_with("AAPL", source="hybrid")
     scorer.score_single.assert_called_once()
+
+
+def test_company_service_threads_source_and_bypasses_universe_cache(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """When source != 'hybrid', skip the screener cache and force a live fetch
+    so the user-chosen backend actually feeds the response."""
+    fetcher = MagicMock()
+    fetcher.fetch_single.return_value = {
+        "Ticker": "AAPL",
+        "Name": "Apple",
+        "Sector": "Tech",
+        "Country": "US",
+        "Price": 150.0,
+        "MarketCap": 3e12,
+        "PEA": False,
+        "PEA_PME": False,
+        "effective_source": "yfinance",
+        "source_fallback_message": "FMP daily quota exhausted; using yfinance for this fetch.",
+    }
+    fetcher.fetch_analyst_ratings.return_value = None
+
+    scorer = MagicMock()
+    scorer.score_single.return_value = {
+        "horizons": {},
+        "dcf": {},
+        "risk": {},
+        "momentum": {},
+        "valuation_score": 50.0,
+        "health_score": 50.0,
+        "profitability_score": 50.0,
+        "growth_score": 50.0,
+        "shareholder_score": 50.0,
+        "risk_score": 50.0,
+    }
+
+    # Even if the screener cache *would* have a row, source='fmp' must bypass it.
+    monkeypatch.setattr(screener_cache, "lookup", lambda t: {"Price": 999.0})
+
+    svc = CompanyService(fetcher=fetcher, scorer=scorer)
+    result = svc.get_detail("AAPL", source="fmp")
+
+    fetcher.fetch_single.assert_called_with("AAPL", source="fmp")
+    fetcher.fetch_analyst_ratings.assert_called_with("AAPL", source="fmp")
+    assert result["data_source"] == "fmp"
+    assert result["effective_source"] == "yfinance"
+    assert "FMP" in result["source_fallback_message"]
+    assert result["score_source"] == "single_row_fallback"

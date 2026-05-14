@@ -26,6 +26,34 @@ from backend.app.models.horizons import (
 # ---------------------------------------------------------------------------
 
 
+class AnalystChange(BaseModel):
+    """One row of upgrades_downgrades history."""
+
+    date: str
+    firm: str = ""
+    from_grade: str = ""
+    to_grade: str = ""
+    action: str = ""
+
+
+class EpsRevisionRow(BaseModel):
+    """One row of revision counts for a time window."""
+
+    period: str  # "7d" | "30d" | "60d" | "90d"
+    up: int = 0
+    down: int = 0
+
+
+class EarningsHistoryRow(BaseModel):
+    """One quarterly earnings actual vs estimate row."""
+
+    date: str
+    eps_actual: float | None = None
+    eps_estimate: float | None = None
+    eps_difference: float | None = None
+    surprise_pct: float | None = None
+
+
 class AnalystRatings(BaseModel):
     """Analyst consensus ratings and price targets."""
 
@@ -38,6 +66,14 @@ class AnalystRatings(BaseModel):
     target_mean: float | None = None
     target_high: float | None = None
     target_median: float | None = None
+
+    # Sub-project 2 (yfinance.analysis enrichment) — all optional, backward-compatible
+    num_analysts: int | None = None
+    recent_changes: list[AnalystChange] | None = None
+    revisions_history: list[EpsRevisionRow] | None = None
+    growth_estimate_fy: float | None = None
+    growth_estimate_5y: float | None = None
+    earnings_history: list[EarningsHistoryRow] | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -144,7 +180,21 @@ class CompanyDetail(BaseModel):
     analyst_ratings: AnalystRatings | None = None
     data_completeness: float = Field(0.0, description="Fraction of scoring inputs present 0-1")
 
-    data_source: str = "yfinance"
+    data_source: str = "hybrid"
+    effective_source: str = Field(
+        "hybrid",
+        description=(
+            "Source that actually supplied the data. Equals data_source unless "
+            "a fallback fired (e.g. user picked 'fmp' but quota was exhausted)."
+        ),
+    )
+    source_fallback_message: str | None = Field(
+        None,
+        description=(
+            "Set when the user-requested source was unavailable and the backend "
+            "fell back to another one. Frontend should surface this to the user."
+        ),
+    )
     last_updated: str = ""
 
     score_source: Literal["universe", "single_row_fallback"] = Field(

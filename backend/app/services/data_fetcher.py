@@ -121,6 +121,14 @@ SCORING_COLUMNS = [
     "InterestExpense",
     # M5 placeholder; M6 fills with real WACC.
     "WACC",
+    # Sub-project 2: yfinance.analysis enrichment — Momentum-feeding signals
+    "EpsRevision30d",
+    "EpsRevision90d",
+    "SUE",
+    "EarningsSurprise",
+    "GrowthEstimateFY",
+    "EpsRevisionsUp30d",
+    "EpsRevisionsDown30d",
 ]
 
 # Extra fields we fetch beyond what the scoring engine needs
@@ -132,6 +140,12 @@ EXTRA_FIELDS = [
     "ShortPctFloat",
     "FiftyTwoWeekHigh",
     "FiftyTwoWeekLow",
+    # Sub-project 2 — analyst rating counts (display-only via AnalystRatings)
+    "RecommendationsBuy",
+    "RecommendationsHold",
+    "RecommendationsSell",
+    "RecommendationsStrongBuy",
+    "RecommendationsStrongSell",
 ]
 
 
@@ -182,17 +196,32 @@ class DataFetcher:
     # Delegate to hybrid
     # ------------------------------------------------------------------
 
-    def fetch_single(self, ticker_symbol: str, cache_only: bool = False) -> dict[str, Any]:
+    def fetch_single(
+        self,
+        ticker_symbol: str,
+        cache_only: bool = False,
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
         """Delegate to HybridDataFetcher.fetch_single()."""
-        return self._hybrid.fetch_single(ticker_symbol, cache_only=cache_only)
+        return self._hybrid.fetch_single(
+            ticker_symbol, cache_only=cache_only, source=source
+        )
 
-    def fetch_batch(self, tickers: list[str]) -> pd.DataFrame:
+    def fetch_batch(
+        self,
+        tickers: list[str],
+        source: str = "hybrid",
+    ) -> pd.DataFrame:
         """Delegate to HybridDataFetcher.fetch_batch()."""
-        return self._hybrid.fetch_batch(tickers)
+        return self._hybrid.fetch_batch(tickers, source=source)
 
-    def fetch_analyst_ratings(self, ticker_symbol: str) -> dict[str, Any] | None:
+    def fetch_analyst_ratings(
+        self,
+        ticker_symbol: str,
+        source: str = "hybrid",
+    ) -> dict[str, Any] | None:
         """Delegate to HybridDataFetcher.fetch_analyst_ratings()."""
-        return self._hybrid.fetch_analyst_ratings(ticker_symbol)
+        return self._hybrid.fetch_analyst_ratings(ticker_symbol, source=source)
 
     # ------------------------------------------------------------------
     # Legacy static method kept for callers that used DataFetcher._country_to_code

@@ -41,41 +41,30 @@ class WatchlistService:
         self._fetcher = fetcher
         self._scorer = scorer
 
-    def get_watchlist(self) -> dict[str, Any]:
-        """
-        Load watchlist, enrich with cached data and three-horizon scoring.
+    def get_watchlist(self, source: str = "hybrid") -> dict[str, Any]:
+        """Cache-only enriched watchlist read; honors per-source cache keys."""
+        return self._build_enriched_response(cache_only=True, source=source)
 
-        This method is cache-only: it never fires live FMP or yfinance calls.
-        Tickers without a cache entry return degraded rows (NaN scoring fields).
-        Per-ticker try/except ensures one bad ticker never 500s the whole list.
-
-        Returns a dict matching WatchlistResponse schema.
-        """
-        return self._build_enriched_response(cache_only=True)
-
-    def refresh(self) -> dict[str, Any]:
-        """
-        Force-refresh: invalidate cache for all stored tickers and re-fetch live.
-
-        Returns the freshly enriched watchlist.
-        """
+    def refresh(self, source: str = "hybrid") -> dict[str, Any]:
+        """Force-refresh: invalidate all source caches for stored tickers."""
         items = self._store.get_items()
         for item in items:
             ticker = item["ticker"]
-            self._fetcher._cache.invalidate(f"hybrid:{ticker}")
-            # Also invalidate the legacy key pattern used elsewhere
+            for prefix in ("hybrid", "yfinance", "fmp"):
+                self._fetcher._cache.invalidate(f"{prefix}:{ticker}")
             self._fetcher._cache.invalidate(f"ticker_{ticker}")
-        return self._build_enriched_response(cache_only=False)
+        return self._build_enriched_response(cache_only=False, source=source)
 
-    def add_item(self, req: AddWatchlistRequest) -> dict[str, Any]:
-        """Add a ticker to the watchlist with a live fetch for that ticker only."""
+    def add_item(
+        self,
+        req: AddWatchlistRequest,
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
+        """Add a ticker with a live fetch via ``source``."""
         stored = self._store.add_item(ticker=req.ticker, notes=req.notes)
 
-        # Trigger a live fetch for the new ticker so its scoring fields are
-        # populated immediately. Wrap in try/except -- if both FMP and yf fail
-        # the stored row is returned with NaN scoring fields.
         try:
-            self._fetcher.fetch_single(req.ticker, cache_only=False)
+            self._fetcher.fetch_single(req.ticker, cache_only=False, source=source)
         except Exception as exc:
             logger.warning(
                 f"Live fetch failed for newly added ticker {req.ticker}: {exc}. "
@@ -92,16 +81,12 @@ class WatchlistService:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _build_enriched_response(self, cache_only: bool) -> dict[str, Any]:
-        """
-        Build the full enriched watchlist response.
-
-        Parameters
-        ----------
-        cache_only:
-            When True, only serve cached data (no live FMP/yfinance calls).
-            When False, force-live (all tickers re-fetched).
-        """
+    def _build_enriched_response(
+        self,
+        cache_only: bool,
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
+        """Build the full enriched watchlist response."""
         raw_items = self._store.get_items()
         if not raw_items:
             return {
@@ -117,7 +102,9 @@ class WatchlistService:
         live_data: dict[str, dict[str, Any]] = {}
         for ticker in tickers:
             try:
-                live_data[ticker] = self._fetcher.fetch_single(ticker, cache_only=cache_only)
+                live_data[ticker] = self._fetcher.fetch_single(
+                    ticker, cache_only=cache_only, source=source,
+                )
             except Exception as exc:
                 logger.warning(f"fetch_single failed for watchlist ticker {ticker}: {exc}. Using empty row.")
                 live_data[ticker] = {}
@@ -140,7 +127,9 @@ class WatchlistService:
         if not cache_only:
             for ticker in tickers:
                 try:
-                    analyst_data[ticker] = self._fetcher.fetch_analyst_ratings(ticker)
+                    analyst_data[ticker] = self._fetcher.fetch_analyst_ratings(
+                        ticker, source=source,
+                    )
                 except Exception as exc:
                     logger.warning(f"fetch_analyst_ratings failed for {ticker}: {exc}")
                     analyst_data[ticker] = None

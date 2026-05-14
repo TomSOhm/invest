@@ -7,6 +7,55 @@ export type Horizon = "long_term" | "medium_term" | "short_term";
 export type Signal = "Strong Buy" | "Buy" | "Hold" | "Sell" | "Strong Sell" | "Insufficient Data";
 
 // ---------------------------------------------------------------------------
+// Data source (which backend the user wants to feed live fetches)
+// ---------------------------------------------------------------------------
+
+export type DataSource = "hybrid" | "yfinance" | "fmp";
+
+export const DATA_SOURCES: DataSource[] = ["hybrid", "yfinance", "fmp"];
+
+// ---------------------------------------------------------------------------
+// Chart types (price history endpoint)
+// ---------------------------------------------------------------------------
+
+export type ChartPeriod = "1M" | "3M" | "6M" | "1Y" | "5Y" | "MAX";
+
+export const CHART_PERIODS: ChartPeriod[] = ["1M", "3M", "6M", "1Y", "5Y", "MAX"];
+
+export interface Candle {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+}
+
+export interface ChartMetrics {
+  total_return: number | null;
+  cagr: number | null;
+  annualized_vol: number | null;
+  max_drawdown: number | null;
+  beta: number | null;
+  sharpe: number | null;
+}
+
+export interface MovingAverages {
+  ma_50: (number | null)[];
+  ma_200: (number | null)[];
+}
+
+export interface PriceHistoryResponse {
+  ticker: string;
+  period: ChartPeriod;
+  benchmark: string | null;
+  candles: Candle[];
+  benchmark_candles: Candle[];
+  metrics: ChartMetrics;
+  moving_averages: MovingAverages;
+}
+
+// ---------------------------------------------------------------------------
 // Horizon scoring block (mirrors backend HorizonScoring)
 // ---------------------------------------------------------------------------
 
@@ -82,6 +131,7 @@ export interface MomentumSignals {
   sue_z_score?: number | null;
   sentiment_30d?: number | null;
   sentiment_trend?: number | null;
+  eps_estimate_trend?: EpsEstimateTrendRow[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +151,37 @@ export interface SubScores {
 // Analyst ratings
 // ---------------------------------------------------------------------------
 
+export interface AnalystChange {
+  date: string;
+  firm: string;
+  from_grade: string;
+  to_grade: string;
+  action: string;
+}
+
+export interface EpsRevisionRow {
+  period: string; // "7d" | "30d" | "60d" | "90d"
+  up: number;
+  down: number;
+}
+
+export interface EarningsHistoryRow {
+  date: string;
+  eps_actual: number | null;
+  eps_estimate: number | null;
+  eps_difference?: number | null;
+  surprise_pct: number | null;
+}
+
+export interface EpsEstimateTrendRow {
+  period: string;
+  current: number | null;
+  n_minus_7d: number | null;
+  n_minus_30d: number | null;
+  n_minus_60d: number | null;
+  n_minus_90d: number | null;
+}
+
 export interface AnalystRatings {
   buy: number;
   hold: number;
@@ -111,6 +192,13 @@ export interface AnalystRatings {
   target_mean: number | null;
   target_high: number | null;
   target_median: number | null;
+  // Sub-project 2 — yfinance.analysis enrichment (all optional)
+  num_analysts?: number | null;
+  recent_changes?: AnalystChange[] | null;
+  revisions_history?: EpsRevisionRow[] | null;
+  growth_estimate_fy?: number | null;
+  growth_estimate_5y?: number | null;
+  earnings_history?: EarningsHistoryRow[] | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,7 +270,9 @@ export interface CompanyDetail {
   metrics: CompanyMetrics;
   analyst_ratings?: AnalystRatings | null;
   data_completeness: number;
-  data_source: string;
+  data_source: DataSource;
+  effective_source: DataSource;
+  source_fallback_message?: string | null;
   last_updated: string;
   score_source: "universe" | "single_row_fallback";
 }

@@ -20,6 +20,8 @@ import Modal from "@/components/ui/Modal";
 import Spinner from "@/components/ui/Spinner";
 import { ScoreBar } from "@/components/ui/ScoreGauge";
 import HorizonSelector from "@/components/ui/HorizonSelector";
+import SourceSelector from "@/components/ui/SourceSelector";
+import { useDataSource } from "@/hooks/useDataSource";
 import CTOWarningBanner from "@/components/ui/CTOWarningBanner";
 import MetricInfo from "@/components/ui/MetricInfo";
 import { api } from "@/lib/api";
@@ -212,7 +214,8 @@ function AddToPortfolioModal({
 // ---------------------------------------------------------------------------
 
 export default function WatchlistPage() {
-  const { data, loading, error, addItem, removeItem, refresh } = useWatchlist();
+  const { source, setSource } = useDataSource();
+  const { data, loading, error, addItem, removeItem, refresh } = useWatchlist(source);
   const [horizon, setHorizon] = useState<Horizon>("long_term");
   const [tickerInput, setTickerInput] = useState("");
   const [notesInput, setNotesInput] = useState("");
@@ -250,6 +253,7 @@ export default function WatchlistPage() {
           Watchlist
         </h1>
         <div className="flex flex-wrap items-center gap-2">
+          <SourceSelector value={source} onChange={setSource} />
           <HorizonSelector value={horizon} onChange={setHorizon} />
           <button
             onClick={() => refresh()}

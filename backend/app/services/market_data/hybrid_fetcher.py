@@ -27,6 +27,7 @@ from loguru import logger
 
 from backend.app.config import settings
 from backend.app.services.cache_service import CacheService
+from backend.app.services.market_data.computed_fallback import apply_computed_fallback
 from backend.app.services.market_data.fmp_fetcher import (
     FMPDataFetcher,
     FMPHTTPError,
@@ -129,58 +130,52 @@ class HybridDataFetcher:
     # Public API (matches legacy DataFetcher surface)
     # ------------------------------------------------------------------
 
-    def fetch_single(self, ticker: str, cache_only: bool = False) -> dict[str, Any]:
-        """Fetch a complete scoring row for *ticker*.
+    def fetch_single(
+        self,
+        ticker: str,
+        cache_only: bool = False,
+        source: str = "hybrid",
+    ) -> dict[str, Any]:
+        """Fetch a complete scoring row for *ticker* from the requested source.
 
-        Parameters
-        ----------
-        ticker:
-            The ticker symbol to fetch.
-        cache_only:
-            When True and the cache is empty: return a base row of NaN with
-            ``field_sources`` all set to ``"missing"`` and
-            ``data_completeness=0.0``. No FMP or yfinance calls are made.
-            When True and cached: return the cached row unchanged.
-            When False (default): existing live-fetch path.
-
-        Returns a dict with keys matching ``SCORING_COLUMNS + EXTRA_FIELDS``
-        plus:
-        - ``"field_sources"``: Dict[str, str] mapping each field name to the
-          source that provided it (``"fmp"``, ``"yfinance"``, or ``"missing"``).
-        - ``"data_completeness"``: fraction of SCORING_COLUMNS that are finite.
-        - ``"Ticker"``: the ticker symbol.
-
-        Strategy (cache_only=False):
-        1. Check the hybrid-level cache (``hybrid:{ticker}``).
-        2. Get the yfinance full row as the base (proven by M1).
-        3. Overlay FMP fundamental fields where FMP can supply them and they
-           are finite.
-        4. Fill any remaining NaN from the FMP quote endpoint.
-        5. Derive computed fields (ROIC, PFCF, InterestCoverage, etc.) using
-           the best available inputs.
-        6. Record provenance in ``field_sources``.
+        ``source`` is one of ``"hybrid"`` (default — current behavior),
+        ``"yfinance"`` (yfinance only, FMP skipped), or ``"fmp"`` (FMP only,
+        with explicit fallback to yfinance when FMP is unavailable; the
+        returned dict carries ``effective_source`` and
+        ``source_fallback_message`` so the caller can tell the user).
         """
-        # Lazy import to avoid circular dependency at module load time
-        from backend.app.services.data_fetcher import EXTRA_FIELDS, SCORING_COLUMNS
+        from backend.app.services.market_data.types import is_valid_source
 
-        cache_key = f"hybrid:{ticker}"
+        if not is_valid_source(source):
+            raise ValueError(
+                f"Unknown source {source!r}; expected one of hybrid/yfinance/fmp"
+            )
+
+        cache_key = f"{source}:{ticker}"
         cached = self._cache.get(cache_key)
         if cached is not None:
-            logger.debug(f"Hybrid cache hit for {ticker}")
+            logger.debug(f"{source} cache hit for {ticker}")
             return cached
 
-        # cache_only=True with a cache miss: return a degraded NaN row immediately
-        # without firing any FMP or yfinance calls.
+        if source == "yfinance":
+            return self._fetch_yfinance_only(ticker, cache_key, cache_only)
+        if source == "fmp":
+            return self._fetch_fmp_only(ticker, cache_key, cache_only)
+
+        return self._fetch_hybrid(ticker, cache_key, cache_only)
+
+    def _fetch_hybrid(
+        self,
+        ticker: str,
+        cache_key: str,
+        cache_only: bool,
+    ) -> dict[str, Any]:
+        """Original hybrid (FMP-first + yfinance fallback) flow."""
+        from backend.app.services.data_fetcher import EXTRA_FIELDS, SCORING_COLUMNS
+
         if cache_only:
             logger.debug(f"cache_only=True, cache miss for {ticker}: returning NaN row")
-            nan_row: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
-            nan_row["Ticker"] = ticker
-            nan_row["field_sources"] = {col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS}
-            nan_row["data_completeness"] = 0.0
-            # Set boolean fields to safe defaults
-            nan_row["PEA"] = False
-            nan_row["PEA_PME"] = False
-            return nan_row
+            return self._nan_row(ticker, "hybrid", None)
 
         logger.info(f"HybridDataFetcher: assembling row for {ticker}")
 
@@ -295,14 +290,258 @@ class HybridDataFetcher:
             result.setdefault("PEA_PME", False)
 
         # ------------------------------------------------------------------
-        # Step 6: data_completeness
+        # Step 6: data_completeness + source bookkeeping
         # ------------------------------------------------------------------
-        # We exclude:
-        #   - identification fields (Name, Sector, ...): never numeric
-        #   - all M5-added fields: keep the M2 denominator stable so the
-        #     `data_completeness` ratio stays comparable across milestones.
-        #     M7 will redefine completeness with the new categories included.
-        _COMPLETENESS_EXCLUDE = {
+        self._inject_analyst_signals(ticker, result, field_sources)
+        apply_computed_fallback(result, field_sources)
+        result["data_completeness"] = self._completeness(result)
+        result["field_sources"] = field_sources
+        result["effective_source"] = "hybrid"
+        result["source_fallback_message"] = None
+
+        # Cache 4 hours
+        self._cache.set(cache_key, result, ttl_seconds=14400)
+        return result
+
+    # ------------------------------------------------------------------
+    # Source-specific branches
+    # ------------------------------------------------------------------
+
+    def _fetch_yfinance_only(
+        self,
+        ticker: str,
+        cache_key: str,
+        cache_only: bool,
+    ) -> dict[str, Any]:
+        """yfinance-only flow. FMP is never consulted."""
+        from backend.app.services.data_fetcher import EXTRA_FIELDS, SCORING_COLUMNS
+
+        if cache_only:
+            return self._nan_row(ticker, "yfinance", None)
+
+        logger.info(f"yfinance-only: assembling row for {ticker}")
+        yf_row: dict[str, Any] = {}
+        try:
+            yf_row = self._yf.fetch_full_row(ticker)
+        except Exception as exc:
+            logger.warning(f"yfinance fetch_full_row failed for {ticker}: {exc}")
+
+        result: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
+        result["Ticker"] = ticker
+        field_sources: dict[str, str] = {
+            col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS
+        }
+
+        for k, v in yf_row.items():
+            if k in result:
+                result[k] = v
+                if k in SCORING_COLUMNS or k in EXTRA_FIELDS:
+                    field_sources[k] = "yfinance" if self._is_valid(v) else "missing"
+
+        for id_field in ("Name", "Sector", "Industry", "Country", "Exchange", "PEA", "PEA_PME"):
+            if id_field in yf_row:
+                result[id_field] = yf_row[id_field]
+
+        country = result.get("Country", "")
+        if isinstance(country, str) and country:
+            result["PEA"] = country.upper() in self._pea_countries
+            mktcap = result.get("MarketCap", 0) or 0
+            result["PEA_PME"] = result["PEA"] and (0 < mktcap < 2_000_000_000)
+        else:
+            result.setdefault("PEA", False)
+            result.setdefault("PEA_PME", False)
+
+        self._inject_analyst_signals(ticker, result, field_sources)
+        apply_computed_fallback(result, field_sources)
+        result["data_completeness"] = self._completeness(result)
+        result["field_sources"] = field_sources
+        result["effective_source"] = "yfinance"
+        result["source_fallback_message"] = None
+        self._cache.set(cache_key, result, ttl_seconds=14400)
+        return result
+
+    def _fetch_fmp_only(
+        self,
+        ticker: str,
+        cache_key: str,
+        cache_only: bool,
+    ) -> dict[str, Any]:
+        """fmp-only flow with explicit yfinance fallback on FMP unavailability.
+
+        On ``FMPQuotaExceeded``, ``FMPHTTPError``, or when FMP is disabled in
+        settings, returns a yfinance-sourced row with
+        ``effective_source="yfinance"`` plus a ``source_fallback_message``
+        explaining what happened.
+        """
+        from backend.app.services.data_fetcher import EXTRA_FIELDS, SCORING_COLUMNS
+
+        if cache_only:
+            return self._nan_row(ticker, "fmp", None)
+
+        if not getattr(self._fmp, "_enabled", True):
+            logger.info(f"FMP disabled, falling back to yfinance for {ticker}")
+            return self._fallback_to_yfinance(
+                ticker,
+                cache_key,
+                msg="FMP source is disabled in settings; using yfinance.",
+            )
+
+        logger.info(f"fmp-only: assembling row for {ticker}")
+        try:
+            fmp_fields = self._fmp.extract_scoring_fields(ticker)
+            fmp_quote = self._fmp.fetch_quote(ticker)
+        except FMPQuotaExceeded as exc:
+            logger.info(
+                f"FMP quota exceeded for {ticker}: {exc}; falling back to yfinance"
+            )
+            return self._fallback_to_yfinance(
+                ticker,
+                cache_key,
+                msg="FMP daily quota exhausted; using yfinance for this fetch.",
+            )
+        except FMPHTTPError as exc:
+            logger.warning(
+                f"FMP HTTP error for {ticker}: {exc}; falling back to yfinance"
+            )
+            return self._fallback_to_yfinance(
+                ticker,
+                cache_key,
+                msg=f"FMP returned an error ({exc}); using yfinance.",
+            )
+
+        result: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
+        result["Ticker"] = ticker
+        field_sources: dict[str, str] = {
+            col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS
+        }
+
+        for scoring_col in _FMP_SUPPLIED_FIELDS:
+            val = fmp_fields.get(scoring_col, np.nan)
+            if self._is_valid(val):
+                result[scoring_col] = float(val)
+                field_sources[scoring_col] = "fmp"
+
+        for hist_col in _FMP_SUPPLIED_HISTORY_FIELDS:
+            seq = fmp_fields.get(hist_col)
+            if isinstance(seq, list) and len(seq) >= 1:
+                result[hist_col] = list(seq)
+                field_sources[hist_col] = "fmp"
+
+        # FMP raw InterestExpense → derive InterestCoverage when EBIT available.
+        ie_fmp = fmp_fields.get("InterestExpense_FMP", np.nan)
+        if self._is_valid(ie_fmp) and self._is_valid(result.get("EBIT")):
+            ie = abs(float(ie_fmp))
+            if ie > 0:
+                result["InterestCoverage"] = float(result["EBIT"]) / ie
+                field_sources["InterestCoverage"] = "fmp"
+
+        for fmp_key in (
+            "Price",
+            "MarketCap",
+            "EV",
+            "Shares",
+            "Beta",
+            "AvgVolume",
+            "FiftyTwoWeekHigh",
+            "FiftyTwoWeekLow",
+            "PE",
+        ):
+            val = fmp_quote.get(fmp_key)
+            if self._is_valid(val):
+                result[fmp_key] = float(val)
+                field_sources[fmp_key] = "fmp"
+
+        self._recompute_derived(result, field_sources)
+
+        country = result.get("Country", "")
+        if isinstance(country, str) and country:
+            result["PEA"] = country.upper() in self._pea_countries
+            mktcap = result.get("MarketCap", 0) or 0
+            result["PEA_PME"] = result["PEA"] and (0 < mktcap < 2_000_000_000)
+        else:
+            result.setdefault("PEA", False)
+            result.setdefault("PEA_PME", False)
+
+        self._inject_analyst_signals(ticker, result, field_sources)
+        apply_computed_fallback(result, field_sources)
+        result["data_completeness"] = self._completeness(result)
+        result["field_sources"] = field_sources
+        result["effective_source"] = "fmp"
+        result["source_fallback_message"] = None
+        self._cache.set(cache_key, result, ttl_seconds=14400)
+        return result
+
+    def _fallback_to_yfinance(
+        self,
+        ticker: str,
+        cache_key: str,
+        msg: str,
+    ) -> dict[str, Any]:
+        """Build a yfinance-sourced row and mark it as the FMP fallback."""
+        from backend.app.services.data_fetcher import EXTRA_FIELDS, SCORING_COLUMNS
+
+        yf_row: dict[str, Any] = {}
+        try:
+            yf_row = self._yf.fetch_full_row(ticker)
+        except Exception as exc:
+            logger.warning(f"yfinance fallback failed for {ticker}: {exc}")
+
+        result: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
+        result["Ticker"] = ticker
+        field_sources: dict[str, str] = {
+            col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS
+        }
+        for k, v in yf_row.items():
+            if k in result:
+                result[k] = v
+                if k in SCORING_COLUMNS or k in EXTRA_FIELDS:
+                    field_sources[k] = "yfinance" if self._is_valid(v) else "missing"
+        for id_field in ("Name", "Sector", "Industry", "Country", "Exchange", "PEA", "PEA_PME"):
+            if id_field in yf_row:
+                result[id_field] = yf_row[id_field]
+
+        country = result.get("Country", "")
+        if isinstance(country, str) and country:
+            result["PEA"] = country.upper() in self._pea_countries
+            mktcap = result.get("MarketCap", 0) or 0
+            result["PEA_PME"] = result["PEA"] and (0 < mktcap < 2_000_000_000)
+        else:
+            result.setdefault("PEA", False)
+            result.setdefault("PEA_PME", False)
+
+        self._inject_analyst_signals(ticker, result, field_sources)
+        apply_computed_fallback(result, field_sources)
+        result["data_completeness"] = self._completeness(result)
+        result["field_sources"] = field_sources
+        result["effective_source"] = "yfinance"
+        result["source_fallback_message"] = msg
+        self._cache.set(cache_key, result, ttl_seconds=14400)
+        return result
+
+    def _nan_row(
+        self,
+        ticker: str,
+        effective: str,
+        fallback_msg: str | None,
+    ) -> dict[str, Any]:
+        """Build an all-NaN row with consistent provenance bookkeeping."""
+        from backend.app.services.data_fetcher import EXTRA_FIELDS, SCORING_COLUMNS
+
+        row: dict[str, Any] = {col: np.nan for col in SCORING_COLUMNS + EXTRA_FIELDS}
+        row["Ticker"] = ticker
+        row["field_sources"] = {
+            col: "missing" for col in SCORING_COLUMNS + EXTRA_FIELDS
+        }
+        row["data_completeness"] = 0.0
+        row["PEA"] = False
+        row["PEA_PME"] = False
+        row["effective_source"] = effective
+        row["source_fallback_message"] = fallback_msg
+        return row
+
+    @staticmethod
+    def _completeness_excluded_fields() -> set[str]:
+        return {
             "Name",
             "Sector",
             "Industry",
@@ -335,23 +574,100 @@ class HybridDataFetcher:
             "COGS",
             "InterestExpense",
             "WACC",
+            # Sub-project 2 — display-only analyst counts/values that default
+            # to 0 even when "no data" and would falsely inflate completeness.
+            # SUE / EpsRevision30d / EpsRevision90d remain in the denominator
+            # since they are real Momentum-feeding scoring signals.
+            "EarningsSurprise",
+            "GrowthEstimateFY",
+            "EpsRevisionsUp30d",
+            "EpsRevisionsDown30d",
         }
-        numeric_cols = [c for c in SCORING_COLUMNS if c not in _COMPLETENESS_EXCLUDE]
+
+    def _inject_analyst_signals(
+        self,
+        ticker: str,
+        result: dict[str, Any],
+        sources: dict[str, str],
+    ) -> None:
+        """Pull yfinance.analysis data and populate the dormant scoring fields.
+
+        Always uses yfinance (FMP analyst data is not wired in sub-project 2).
+        Per-method failures are swallowed; the row stays valid.
+
+        Formulas locked in by Phase 0 financial review:
+        - SUE: surprises[0] / stdev(surprises[1:], ddof=1) — current quarter
+          excluded from σ (Bernard-Thomas 1989); requires ≥ 6 quarters.
+        - EpsRevision30d/90d: (current - past) / abs(past) with abs() to
+          preserve sign on negative prior estimates.
+        - EarningsSurprise: latest quarter's surprisePercent from yfinance.
+        - GrowthEstimateFY: stockTrend for +1y row from tk.growth_estimates.
+        """
+        from src.analysis.analyst_signals import (
+            compute_eps_revision_pct_from_trend,
+            compute_sue_from_history,
+            earnings_surprise_latest,
+        )
+
+        try:
+            history = self._yf.fetch_earnings_history(ticker, limit=8)
+        except Exception:
+            history = []
+        try:
+            trend = self._yf.fetch_eps_trend(ticker)
+        except Exception:
+            trend = []
+        try:
+            rev_counts = self._yf.fetch_eps_revisions(ticker)
+        except Exception:
+            rev_counts = {}
+        try:
+            growth = self._yf.fetch_growth_estimates(ticker)
+        except Exception:
+            growth = {}
+
+        def _set(field: str, value: Any) -> None:
+            import math as _math
+
+            if value is None:
+                return
+            try:
+                fv = float(value)
+            except (TypeError, ValueError):
+                return
+            if _math.isnan(fv) or _math.isinf(fv):
+                return
+            result[field] = fv
+            sources[field] = "yfinance"
+
+        _set("SUE", compute_sue_from_history(history))
+        _set("EpsRevision30d", compute_eps_revision_pct_from_trend(trend, days=30))
+        _set("EpsRevision90d", compute_eps_revision_pct_from_trend(trend, days=90))
+        _set("EarningsSurprise", earnings_surprise_latest(history))
+        _set("GrowthEstimateFY", growth.get("fy_growth"))
+        _set("EpsRevisionsUp30d", rev_counts.get("up_last_30d"))
+        _set("EpsRevisionsDown30d", rev_counts.get("down_last_30d"))
+
+    def _completeness(self, result: dict[str, Any]) -> float:
+        """Fraction of numeric SCORING_COLUMNS that are finite in *result*."""
+        from backend.app.services.data_fetcher import SCORING_COLUMNS
+
+        excluded = self._completeness_excluded_fields()
+        numeric_cols = [c for c in SCORING_COLUMNS if c not in excluded]
         n_present = sum(1 for c in numeric_cols if self._is_valid(result.get(c)))
-        result["data_completeness"] = n_present / len(numeric_cols) if numeric_cols else 0.0
-        result["field_sources"] = field_sources
+        return n_present / len(numeric_cols) if numeric_cols else 0.0
 
-        # Cache 4 hours
-        self._cache.set(cache_key, result, ttl_seconds=14400)
-        return result
-
-    def fetch_batch(self, tickers: list[str]) -> pd.DataFrame:
-        """Fetch multiple tickers and return a DataFrame indexed by Ticker."""
+    def fetch_batch(
+        self,
+        tickers: list[str],
+        source: str = "hybrid",
+    ) -> pd.DataFrame:
+        """Fetch multiple tickers from the requested source."""
         from backend.app.services.data_fetcher import SCORING_COLUMNS
 
         rows: list[dict[str, Any]] = []
         for i, ticker in enumerate(tickers):
-            data = self.fetch_single(ticker)
+            data = self.fetch_single(ticker, source=source)
             data["Ticker"] = ticker
             rows.append(data)
             if i < len(tickers) - 1:
@@ -364,33 +680,94 @@ class HybridDataFetcher:
         df.set_index("Ticker", inplace=True)
         return df
 
-    def fetch_analyst_ratings(self, ticker: str) -> dict[str, Any] | None:
-        """Fetch analyst ratings -- FMP first, yfinance fallback."""
-        # Try FMP consensus targets first
-        fmp_targets: dict[str, Any] | None = None
+    def fetch_analyst_ratings(
+        self,
+        ticker: str,
+        source: str = "hybrid",
+    ) -> dict[str, Any] | None:
+        """Return the enriched analyst payload (sub-project 2 shape).
+
+        Targets follow the source-routing contract (FMP-first for hybrid/fmp,
+        yfinance for yfinance). Rating counts, upgrades, growth estimates, and
+        earnings history are always yfinance-only (FMP analyst data not wired).
+
+        Returned dict shape matches ``AnalystRatings`` Pydantic model:
+        - buy/hold/sell/strong_buy/strong_sell  (int counts)
+        - target_low/mean/high/median           (float | None)
+        - num_analysts                          (int | None)
+        - recent_changes                        (list of upgrade/downgrade dicts)
+        - revisions_history                     (list of {period,up,down})
+        - growth_estimate_fy / growth_estimate_5y (float | None)
+        - earnings_history                      (list of EarningsHistoryRow dicts)
+        """
+        from backend.app.services.market_data.types import is_valid_source
+
+        if not is_valid_source(source):
+            raise ValueError(f"Unknown source {source!r}")
+
+        # 1. Targets — preserves existing FMP-first/yfinance fallback contract
+        targets: dict[str, Any] = {}
+        if source != "yfinance":
+            try:
+                fmp_targets = self._fmp.fetch_analyst_targets(ticker)
+                if fmp_targets:
+                    targets = fmp_targets
+            except (FMPQuotaExceeded, FMPHTTPError):
+                pass
+            except Exception as exc:
+                logger.debug(f"FMP fetch_analyst_targets failed for {ticker}: {exc}")
+        if not targets:
+            try:
+                targets = self._yf.fetch_analyst_targets(ticker) or {}
+            except Exception:
+                targets = {}
+
+        # 2. yfinance.analysis enrichment — always sourced from yfinance
         try:
-            fmp_targets = self._fmp.fetch_analyst_targets(ticker)
-        except (FMPQuotaExceeded, FMPHTTPError):
-            pass
-        except Exception as exc:
-            logger.debug(f"FMP fetch_analyst_targets failed for {ticker}: {exc}")
+            rec = self._yf.fetch_recommendations_summary(ticker)
+        except Exception:
+            rec = {"strong_buy": 0, "buy": 0, "hold": 0, "sell": 0, "strong_sell": 0}
+        try:
+            upgrades = self._yf.fetch_upgrades_downgrades(ticker, limit=50)[:3]
+        except Exception:
+            upgrades = []
+        try:
+            growth = self._yf.fetch_growth_estimates(ticker)
+        except Exception:
+            growth = {}
+        try:
+            history = self._yf.fetch_earnings_history(ticker, limit=8)
+        except Exception:
+            history = []
+        try:
+            rev_counts = self._yf.fetch_eps_revisions(ticker)
+        except Exception:
+            rev_counts = {}
 
-        if fmp_targets:
-            # Map to the legacy analyst ratings format
-            return {
-                "buy": 0,
-                "hold": 0,
-                "sell": 0,
-                "strong_buy": 0,
-                "strong_sell": 0,
-                "target_low": fmp_targets.get("target_low"),
-                "target_mean": fmp_targets.get("target_mean"),
-                "target_high": fmp_targets.get("target_high"),
-                "target_median": fmp_targets.get("target_median"),
-            }
+        revisions_history = [
+            {"period": "7d", "up": rev_counts.get("up_last_7d", 0), "down": rev_counts.get("down_last_7d", 0)},
+            {"period": "30d", "up": rev_counts.get("up_last_30d", 0), "down": rev_counts.get("down_last_30d", 0)},
+            {"period": "60d", "up": rev_counts.get("up_last_60d", 0), "down": rev_counts.get("down_last_60d", 0)},
+            {"period": "90d", "up": rev_counts.get("up_last_90d", 0), "down": rev_counts.get("down_last_90d", 0)},
+        ]
 
-        # Fallback: yfinance
-        return self._yf.fetch_analyst_targets(ticker)
+        return {
+            "buy": rec.get("buy", 0),
+            "hold": rec.get("hold", 0),
+            "sell": rec.get("sell", 0),
+            "strong_buy": rec.get("strong_buy", 0),
+            "strong_sell": rec.get("strong_sell", 0),
+            "target_low": targets.get("target_low"),
+            "target_mean": targets.get("target_mean"),
+            "target_high": targets.get("target_high"),
+            "target_median": targets.get("target_median"),
+            "num_analysts": targets.get("num_analysts"),
+            "recent_changes": upgrades,
+            "revisions_history": revisions_history,
+            "growth_estimate_fy": growth.get("fy_growth"),
+            "growth_estimate_5y": growth.get("five_year_growth"),
+            "earnings_history": history,
+        }
 
     # ------------------------------------------------------------------
     # Internal helpers

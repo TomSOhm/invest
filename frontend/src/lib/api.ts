@@ -1,8 +1,11 @@
 import type {
+  ChartPeriod,
   CompanyDetail,
+  DataSource,
   Horizon,
   PortfolioResponse,
   PresetMeta,
+  PriceHistoryResponse,
   ScreenerRefreshResponse,
   ScreenerResponse,
 } from "./types";
@@ -85,28 +88,52 @@ export async function fetchScreenerPresets(): Promise<PresetMeta[]> {
 export async function fetchHorizonScreening(
   preset: string,
   peaOnly = false,
-  limit = 50
+  limit = 50,
+  source: DataSource = "hybrid"
 ): Promise<ScreenerResponse> {
-  return api.post<ScreenerResponse>(`/api/screener/preset/${preset}`, {
-    pea_only: peaOnly,
-    limit,
-  });
+  return api.post<ScreenerResponse>(
+    `/api/screener/preset/${preset}?source=${source}`,
+    { pea_only: peaOnly, top_n: limit }
+  );
 }
 
 export async function fetchCompanyDetail(
-  ticker: string
+  ticker: string,
+  source: DataSource = "hybrid"
 ): Promise<CompanyDetail> {
-  return api.get<CompanyDetail>(`/api/company/${ticker.toUpperCase()}`);
+  return api.get<CompanyDetail>(
+    `/api/company/${ticker.toUpperCase()}?source=${source}`
+  );
 }
 
 export async function fetchPortfolio(
-  horizon: Horizon = "long_term"
+  horizon: Horizon = "long_term",
+  source: DataSource = "hybrid"
 ): Promise<PortfolioResponse> {
-  return api.get<PortfolioResponse>(`/api/portfolio/?horizon=${horizon}`);
+  return api.get<PortfolioResponse>(
+    `/api/portfolio/?horizon=${horizon}&source=${source}`
+  );
 }
 
-export async function refreshScreenerUniverse(): Promise<ScreenerRefreshResponse> {
-  return api.post<ScreenerRefreshResponse>("/api/screener/refresh");
+export async function refreshScreenerUniverse(
+  source: DataSource = "hybrid"
+): Promise<ScreenerRefreshResponse> {
+  return api.post<ScreenerRefreshResponse>(
+    `/api/screener/refresh?source=${source}`
+  );
+}
+
+export async function fetchPriceHistory(
+  ticker: string,
+  period: ChartPeriod = "1Y",
+  benchmark: string | null = null
+): Promise<PriceHistoryResponse> {
+  const benchParam = benchmark
+    ? `&benchmark=${encodeURIComponent(benchmark)}`
+    : "";
+  return api.get<PriceHistoryResponse>(
+    `/api/company/${ticker.toUpperCase()}/price-history?period=${period}${benchParam}`
+  );
 }
 
 export { ApiError };

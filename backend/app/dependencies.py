@@ -41,6 +41,19 @@ def _get_data_fetcher() -> DataFetcher:
 
 
 @lru_cache(maxsize=1)
+def _get_chart_service():
+    from backend.app.services.chart_service import ChartService
+    from backend.app.services.market_data.yfinance_fetcher import YFinanceDataFetcher
+
+    yf = YFinanceDataFetcher(cache=_get_cache_service())
+    return ChartService(yf_fetcher=yf)
+
+
+def get_chart_service():
+    return _get_chart_service()
+
+
+@lru_cache(maxsize=1)
 def _get_scoring_service() -> ScoringService:
     return ScoringService()
 

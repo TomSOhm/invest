@@ -99,6 +99,17 @@ class RiskSignals(BaseModel):
 # ---------------------------------------------------------------------------
 
 
+class EpsEstimateTrendRow(BaseModel):
+    """One row of the EPS-estimate trend table (sub-project 2)."""
+
+    period: str
+    current: float | None = None
+    n_minus_7d: float | None = None
+    n_minus_30d: float | None = None
+    n_minus_60d: float | None = None
+    n_minus_90d: float | None = None
+
+
 class MomentumSignals(BaseModel):
     """Price momentum and analyst revision signals (M9)."""
 
@@ -113,6 +124,11 @@ class MomentumSignals(BaseModel):
     sue_z_score: float | None = Field(None, description="Standardised Unexpected Earnings z-score")
     sentiment_30d: float | None = Field(None, description="News sentiment score over 30 days (-1..+1)")
     sentiment_trend: float | None = Field(None, description="Trend in sentiment (positive = improving)")
+    # Sub-project 2: optional EPS-estimate trend table for the new revisions UI.
+    eps_estimate_trend: list[EpsEstimateTrendRow] | None = Field(
+        None,
+        description="Rolling EPS-estimate trend rows (current / 7d / 30d / 60d / 90d ago).",
+    )
 
 
 # ---------------------------------------------------------------------------

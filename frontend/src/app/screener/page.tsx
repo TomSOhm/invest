@@ -11,8 +11,10 @@ import PeaBadge from "@/components/ui/PeaBadge";
 import Spinner from "@/components/ui/Spinner";
 import { ScoreBar } from "@/components/ui/ScoreGauge";
 import HorizonSelector from "@/components/ui/HorizonSelector";
+import SourceSelector from "@/components/ui/SourceSelector";
 import CTOWarningBanner from "@/components/ui/CTOWarningBanner";
 import MetricInfo from "@/components/ui/MetricInfo";
+import { useDataSource } from "@/hooks/useDataSource";
 import { fetchScreenerPresets } from "@/lib/api";
 import clsx from "clsx";
 
@@ -152,6 +154,7 @@ export default function ScreenerPage() {
   const [customTickers, setCustomTickers] = useState("");
   const [activePreset, setActivePreset] = useState<string | null>(null);
   const [presets, setPresets] = useState<PresetMeta[]>(FALLBACK_PRESETS);
+  const { source, setSource } = useDataSource();
 
   useEffect(() => {
     fetchScreenerPresets()
@@ -189,7 +192,7 @@ export default function ScreenerPage() {
 
   function handlePreset(name: string) {
     setActivePreset(name);
-    runPreset(name, peaOnly, 50);
+    runPreset(name, peaOnly, 50, source);
   }
 
   function handleScoreTickers() {
@@ -198,13 +201,13 @@ export default function ScreenerPage() {
       .map((t) => t.trim().toUpperCase())
       .filter(Boolean);
     if (tickers.length === 0) return;
-    scoreTickers(tickers, horizon);
+    scoreTickers(tickers, horizon, source);
   }
 
   async function handleRefresh() {
-    const summary = await refresh();
+    const summary = await refresh(source);
     if (summary && activePreset) {
-      runPreset(activePreset, peaOnly, 50);
+      runPreset(activePreset, peaOnly, 50, source);
     }
   }
 
@@ -240,7 +243,7 @@ export default function ScreenerPage() {
             Universe refreshed {formatRelativeTime(lastRefreshed)}
           </span>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={handleRefresh}
             disabled={refreshing}
@@ -250,6 +253,7 @@ export default function ScreenerPage() {
             {refreshing ? <Spinner size={13} /> : <RefreshCw size={13} />}
             {refreshing ? "Refreshing universe…" : "Refresh"}
           </button>
+          <SourceSelector value={source} onChange={setSource} />
           <HorizonSelector value={horizon} onChange={setHorizon} />
         </div>
       </div>

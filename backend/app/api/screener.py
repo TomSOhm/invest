@@ -16,7 +16,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from backend.app.dependencies import (
@@ -31,10 +31,19 @@ from backend.app.models.screener import (
 )
 from backend.app.services import screener_cache
 from backend.app.services.data_fetcher import DataFetcher
+from backend.app.services.market_data.types import SOURCES
 from backend.app.services.scoring_service import ScoringService
 from backend.app.services.screener_service import ScreenerService
 
 router = APIRouter(tags=["screener"])
+
+
+def _validate_source(source: str) -> None:
+    if source not in SOURCES:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Invalid source '{source}'. Must be one of: {list(SOURCES)}",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -354,16 +363,14 @@ async def run_preset(
 
 @router.post("/refresh", response_model=ScreenerRefreshResponse)
 async def refresh_universe(
+    source: str = Query("hybrid", description="Data source for the refresh"),
     fetcher: DataFetcher = Depends(_get_fetcher),
     scorer: ScoringService = Depends(_get_scorer),
 ) -> dict[str, Any]:
-    """Pull live data for the full PEA universe, score it, persist to cache.
-
-    Synchronous: blocks the request until all tickers are fetched and
-    scored. With ~120 tickers this typically takes 20-40 seconds.
-    """
+    """Pull live data for the full PEA universe, score it, persist to cache."""
+    _validate_source(source)
     try:
-        return screener_cache.refresh(fetcher, scorer)
+        return screener_cache.refresh(fetcher, scorer, source=source)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
@@ -371,11 +378,13 @@ async def refresh_universe(
 @router.post("/tickers", response_model=ScreenerResponse)
 async def score_ticker_list(
     req: TickerListRequest,
+    source: str = Query("hybrid"),
     fetcher: DataFetcher = Depends(_get_fetcher),
     scorer: ScoringService = Depends(_get_scorer),
 ) -> dict[str, Any]:
-    """Fetch and score a custom list of tickers (live data from yfinance)."""
-    df = fetcher.fetch_batch(req.tickers)
+    """Fetch and score a custom list of tickers (live data)."""
+    _validate_source(source)
+    df = fetcher.fetch_batch(req.tickers, source=source)
     if df.empty:
         return {
             "results": [],
