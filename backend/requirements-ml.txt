@@ -6,5 +6,5 @@
 # These are NOT pulled by the main backend install.  Without them every
 # sentiment_score / sentiment_signals_df call returns NaN and the rest of
 # the engine continues to work unchanged.
-transformers>=4.40,<5.0
-torch>=2.0,<3.0
+torch>=2.12.0,<3.0
+transformers>=5.8.1,<6.0
