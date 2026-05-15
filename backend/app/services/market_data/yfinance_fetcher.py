@@ -1097,12 +1097,8 @@ class YFinanceDataFetcher:
             info = yf.Ticker(ticker).info or {}
             out["dividend_yield"] = _safe_float(info.get("dividendYield"))
             out["dividend_rate"] = _safe_float(info.get("dividendRate"))
-            out["trailing_annual_dividend_rate"] = _safe_float(
-                info.get("trailingAnnualDividendRate")
-            )
-            out["trailing_annual_dividend_yield"] = _safe_float(
-                info.get("trailingAnnualDividendYield")
-            )
+            out["trailing_annual_dividend_rate"] = _safe_float(info.get("trailingAnnualDividendRate"))
+            out["trailing_annual_dividend_yield"] = _safe_float(info.get("trailingAnnualDividendYield"))
         except Exception as exc:
             logger.debug(f"yfinance fetch_info_yields failed for {ticker}: {exc}")
         self._cache.set(cache_key, out, ttl_seconds=21600)
