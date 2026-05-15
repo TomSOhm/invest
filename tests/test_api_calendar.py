@@ -14,7 +14,6 @@ from fastapi.testclient import TestClient
 from backend.app.main import app
 from backend.app.services.data_fetcher import DataFetcher
 
-
 _STUB_CALENDAR = {
     "next_earnings_date": "2026-07-30",
     "next_earnings_eps_estimate": 2.10,

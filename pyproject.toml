@@ -5,6 +5,9 @@ description = "Quantitative fundamental analysis platform for PEA-eligible and g
 requires-python = ">=3.13"
 readme = "README.md"
 license = { text = "Apache-2.0" }
+dependencies = [
+    "transformers>=5.8.1",
+]
 
 [tool.pytest.ini_options]
 minversion = "8.0"
