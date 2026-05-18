@@ -684,9 +684,7 @@ class HybridDataFetcher:
                     time.sleep(self._delay)
         else:
             with ThreadPoolExecutor(max_workers=max_workers) as pool:
-                future_to_ticker = {
-                    pool.submit(self.fetch_single, t, source=source): t for t in tickers
-                }
+                future_to_ticker = {pool.submit(self.fetch_single, t, source=source): t for t in tickers}
                 for future in as_completed(future_to_ticker):
                     ticker = future_to_ticker[future]
                     try:

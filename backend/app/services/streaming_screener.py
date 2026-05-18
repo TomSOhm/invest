@@ -48,7 +48,7 @@ def refresh_stream(
     source: str = "hybrid",
     use_yfinance_holdings: bool = True,
     max_workers: int | None = None,
-) -> Generator[str, None, None]:
+) -> Generator[str]:
     """Run a universe refresh, emitting SSE events as tickers complete.
 
     Yields formatted SSE strings. The caller (FastAPI endpoint) wraps the

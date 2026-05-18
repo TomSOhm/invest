@@ -17,7 +17,6 @@ import pytest
 
 from backend.app.services import screener_cache, streaming_screener
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -210,9 +209,7 @@ def test_commits_scored_to_cache_on_success() -> None:
     fetcher = MagicMock()
     scorer = MagicMock()
 
-    def fake_fetch_batch(
-        tks, source="hybrid", *, max_workers=1, on_ticker_complete=None
-    ):
+    def fake_fetch_batch(tks, source="hybrid", *, max_workers=1, on_ticker_complete=None):
         for t in tks:
             on_ticker_complete(t, {"Ticker": t, "Price": 9.0})
         return _scored_df(tks)
