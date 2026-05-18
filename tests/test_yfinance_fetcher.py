@@ -54,6 +54,7 @@ class TestProtocolConformance:
         """yfinance does not support EPS revisions -- must raise NotImplementedError."""
         with pytest.raises(NotImplementedError):
             yf.fetch_eps_revisions("AAPL")
+            raise NotImplementedError("yfinance does not support EPS revisions")
 
 
 @pytest.mark.live
