@@ -135,12 +135,13 @@ export default function ScreenerPage() {
     results,
     loading,
     refreshing,
+    refreshProgress,
     error,
     lastRefreshed,
     runScreen,
     runPreset,
     scoreTickers,
-    refresh,
+    refreshStream,
   } = useScreener();
   const [horizon, setHorizon] = useState<Horizon>("long_term");
   const [filters, setFilters] = useState<CustomFilters>(DEFAULT_FILTERS);
@@ -185,6 +186,12 @@ export default function ScreenerPage() {
   }
 
   function handlePreset(name: string) {
+    // Toggle: clicking the active preset deselects and clears the results
+    // panel so the user can return to the empty / "configure filters" state.
+    if (activePreset === name) {
+      setActivePreset(null);
+      return;
+    }
     setActivePreset(name);
     runPreset(name, peaOnly, 50, source);
   }
@@ -199,11 +206,16 @@ export default function ScreenerPage() {
   }
 
   async function handleRefresh() {
-    const summary = await refresh(source);
+    const summary = await refreshStream(source);
     if (summary && activePreset) {
       runPreset(activePreset, peaOnly, 50, source);
     }
   }
+
+  const refreshPct =
+    refreshProgress && refreshProgress.total > 0
+      ? Math.round((refreshProgress.done / refreshProgress.total) * 100)
+      : 0;
 
   function formatRelativeTime(iso: string | null): string {
     if (!iso) return "never";
@@ -242,10 +254,14 @@ export default function ScreenerPage() {
             onClick={handleRefresh}
             disabled={refreshing}
             className="inline-flex items-center gap-2 px-3 py-1.5 text-sm rounded-md border border-slate-300 dark:border-slate-600 hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-60 transition-colors"
-            title="Pull live data for the full PEA universe (~30s)"
+            title="Pull live data for the full PEA universe in parallel (~30-45s)"
           >
             {refreshing ? <Spinner size={13} /> : <RefreshCw size={13} />}
-            {refreshing ? "Refreshing universe…" : "Refresh"}
+            {refreshing
+              ? refreshProgress && refreshProgress.total > 0
+                ? `Refreshing ${refreshProgress.done}/${refreshProgress.total}…`
+                : "Refreshing universe…"
+              : "Refresh"}
           </button>
           <SourceSelector value={source} onChange={setSource} />
           <HorizonSelector value={horizon} onChange={setHorizon} />
@@ -378,6 +394,29 @@ export default function ScreenerPage() {
           {error && (
             <div className="p-3 rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-sm text-red-600 dark:text-red-400">
               {error}
+            </div>
+          )}
+
+          {/* Streaming refresh progress */}
+          {refreshing && refreshProgress && refreshProgress.total > 0 && (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-slate-700 dark:text-slate-300 font-medium">
+                  Refreshing universe ({refreshProgress.done}/{refreshProgress.total})
+                </span>
+                <span className="font-mono text-emerald-600 dark:text-emerald-400">
+                  {refreshPct}%
+                </span>
+              </div>
+              <div className="w-full h-2 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-emerald-500 transition-all duration-200"
+                  style={{ width: `${refreshPct}%` }}
+                />
+              </div>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Parallel yfinance fetch — see README &quot;Known Limitations&quot; for details.
+              </p>
             </div>
           )}
 

@@ -1,7 +1,11 @@
 "use client";
 
-import { useState, useCallback } from "react";
-import { api, refreshScreenerUniverse } from "@/lib/api";
+import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  api,
+  openScreenerRefreshStream,
+  refreshScreenerUniverse,
+} from "@/lib/api";
 import type {
   DataSource,
   Horizon,
@@ -10,12 +14,29 @@ import type {
   ScreenerResponse,
 } from "@/lib/types";
 
+export interface RefreshProgress {
+  done: number;
+  total: number;
+}
+
 export function useScreener() {
   const [results, setResults] = useState<ScreenerResponse | null>(null);
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [refreshProgress, setRefreshProgress] =
+    useState<RefreshProgress | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [lastRefreshed, setLastRefreshed] = useState<string | null>(null);
+  const streamRef = useRef<EventSource | null>(null);
+
+  // Abort any in-flight stream on unmount so a navigation doesn't leave a
+  // dangling HTTP connection.
+  useEffect(() => {
+    return () => {
+      streamRef.current?.close();
+      streamRef.current = null;
+    };
+  }, []);
 
   const runScreen = useCallback(async (req: ScreenerRequest) => {
     setLoading(true);
@@ -100,15 +121,59 @@ export function useScreener() {
     []
   );
 
+  // Streaming refresh: emits progress events while parallel fetch runs. Falls
+  // back to the POST endpoint when EventSource is unavailable (test env, some
+  // older runtimes).
+  const refreshStream = useCallback(
+    (source: DataSource = "hybrid"): Promise<ScreenerRefreshResponse | null> => {
+      if (typeof window === "undefined" || typeof EventSource === "undefined") {
+        return refresh(source);
+      }
+
+      // Close any prior stream before opening a new one.
+      streamRef.current?.close();
+      streamRef.current = null;
+
+      setRefreshing(true);
+      setError(null);
+      setRefreshProgress({ done: 0, total: 0 });
+
+      return new Promise<ScreenerRefreshResponse | null>((resolve) => {
+        const es = openScreenerRefreshStream(source, {
+          onStart: ({ total }) => setRefreshProgress({ done: 0, total }),
+          onTicker: ({ progress }) => setRefreshProgress(progress),
+          onDone: (summary) => {
+            setLastRefreshed(summary.last_refreshed);
+            setRefreshing(false);
+            setRefreshProgress(null);
+            streamRef.current = null;
+            resolve(summary);
+          },
+          onError: ({ reason }) => {
+            setError(reason || "Stream refresh failed");
+            setRefreshing(false);
+            setRefreshProgress(null);
+            streamRef.current = null;
+            resolve(null);
+          },
+        });
+        streamRef.current = es;
+      });
+    },
+    [refresh]
+  );
+
   return {
     results,
     loading,
     refreshing,
+    refreshProgress,
     error,
     lastRefreshed,
     runScreen,
     runPreset,
     scoreTickers,
     refresh,
+    refreshStream,
   };
 }

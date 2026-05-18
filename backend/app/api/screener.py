@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
 
 from backend.app.dependencies import (
@@ -34,6 +35,7 @@ from backend.app.services.data_fetcher import DataFetcher
 from backend.app.services.market_data.types import SOURCES
 from backend.app.services.scoring_service import ScoringService
 from backend.app.services.screener_service import ScreenerService
+from backend.app.services.streaming_screener import refresh_stream
 
 router = APIRouter(tags=["screener"])
 
@@ -373,6 +375,29 @@ async def refresh_universe(
         return screener_cache.refresh(fetcher, scorer, source=source)
     except RuntimeError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/refresh/stream")
+async def refresh_universe_stream(
+    source: str = Query("hybrid", description="Data source for the refresh"),
+    fetcher: DataFetcher = Depends(_get_fetcher),
+    scorer: ScoringService = Depends(_get_scorer),
+) -> StreamingResponse:
+    """SSE variant of POST /refresh.
+
+    Streams per-ticker progress (``event: ticker``) while the parallel fetch
+    runs, then a final ``event: done`` carrying the same payload as the POST
+    endpoint. Frontend consumes via ``EventSource``.
+    """
+    _validate_source(source)
+    return StreamingResponse(
+        refresh_stream(fetcher, scorer, source=source),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 @router.post("/tickers", response_model=ScreenerResponse)

@@ -196,6 +196,13 @@ class AppConfig:
     def screener_exclude_sectors(self) -> list[str]:
         return self._raw["screener"].get("exclude_sectors", [])
 
+    @property
+    def screener_streaming_max_workers(self) -> int:
+        """Parallel workers used by the SSE refresh stream. Default 8."""
+        sc = self._raw.get("screener", {}) or {}
+        streaming = sc.get("streaming", {}) or {}
+        return int(streaming.get("max_workers", 8))
+
     # -- fmp --
     @property
     def fmp_enabled(self) -> bool:

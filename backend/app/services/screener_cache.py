@@ -133,6 +133,20 @@ def refresh(
         }
 
 
+def set_scored(df: pd.DataFrame, last_refreshed: datetime, failed: list[str]) -> None:
+    """Replace the in-memory scored cache and persist it to disk.
+
+    Used by the streaming refresh pipeline to commit the final scored
+    DataFrame once parallel fetching + scoring completes. Mirrors what
+    ``refresh()`` does at the end of its run, minus the duration summary.
+    """
+    with _lock:
+        _state.scored_df = df
+        _state.last_refreshed = last_refreshed
+        _state.tickers_failed = list(failed)
+        _disk_persist(df, last_refreshed, list(failed))
+
+
 def get_scored() -> pd.DataFrame:
     """Return the cached scored DataFrame.
 

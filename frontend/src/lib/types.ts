@@ -362,6 +362,25 @@ export interface ScreenerRefreshResponse {
   universe_size: number;
 }
 
+// SSE event payloads emitted by GET /api/screener/refresh/stream
+export interface ScreenerStreamStartEvent {
+  total: number;
+  source: DataSource;
+  max_workers: number;
+}
+
+export interface ScreenerStreamTickerEvent {
+  ticker: string;
+  progress: { done: number; total: number };
+  ok: boolean;
+}
+
+export interface ScreenerStreamErrorEvent {
+  reason: string;
+}
+
+export type ScreenerStreamDoneEvent = ScreenerRefreshResponse;
+
 // Preset metadata returned by GET /api/screener/presets
 export interface PresetMeta {
   name: string;

@@ -115,6 +115,10 @@ screener:
     - "Tobacco"
     - "Gambling"
     # Add ESG exclusions as needed
+  streaming:
+    # Parallel workers for the streaming universe refresh (SSE).
+    # Yahoo may rate-limit if pushed too high; 8 is empirically stable.
+    max_workers: 8
 
 # ── Reporting ──
 reporting:

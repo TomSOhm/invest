@@ -257,6 +257,40 @@ Contributions are welcome! Please read the [Contributing Guide](CONTRIBUTING.md)
 
 This project is licensed under the Apache License 2.0 — see the [LICENSE](LICENSE) file for details.
 
+## Known Limitations
+
+These are documented constraints of the current architecture. Track or contribute
+fixes via [GitHub Issues](https://github.com/TomSOhm/invest/issues).
+
+- **No true batch fundamentals API for yfinance.** `yf.Tickers` and similar
+  helpers look like batch APIs but issue one HTTP call per ticker internally;
+  `yf.download` is genuinely batched but only covers price history, not
+  fundamentals (income statement, balance sheet, cash flow, info). Mitigation
+  in v2: parallel fetch via `ThreadPoolExecutor` (configurable
+  `screener.streaming.max_workers`, default 8) and SSE progress streaming
+  through `GET /api/screener/refresh/stream`.
+
+- **Screener refresh fan-out.** The PEA universe is ~127 tickers and each
+  ticker requires ~5 yfinance endpoints (info, financials, balance, cashflow,
+  history) → ~600 HTTP calls per cold refresh. Atténuations en place: 4h–24h
+  on-disk per-field cache (`data/cache/`), parquet snapshot of the scored
+  universe (`screener_scored.parquet`), 8 parallel workers, and SSE so the UI
+  shows a live progress bar instead of a frozen spinner.
+
+- **Yahoo rate-limiting.** Pushing `max_workers` above ~16 reliably triggers
+  HTTP 429 responses and short IP bans. The default (8) is empirically stable;
+  raise it cautiously and only if your IP is dedicated.
+
+- **Sector-relative scores recomputed in one batch.** Composite scores depend
+  on sector-median percentile ranks, which require the full scored universe.
+  The stream therefore only emits *progress* events during the fetch — final
+  scored rows arrive in the terminal `done` event, not per-ticker.
+
+- **Possible future improvements** (tracked in the issue tracker): adopt a
+  true batch-fundamentals source (Polygon, Financial Modeling Prep's `/v3/profile`
+  multi-symbol endpoint, Alpha Vantage premium); pre-warm the parquet cache
+  via a nightly cron so the UI is instant for users.
+
 ## Disclaimer
 
 This software is provided for **educational and informational purposes only**. It does not constitute financial advice, investment recommendations, or an offer to buy or sell securities. Past performance does not guarantee future results. Always conduct your own research and consult a qualified financial advisor before making investment decisions. The authors assume no liability for any financial losses incurred through the use of this software.

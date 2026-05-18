@@ -19,6 +19,8 @@ delegate without changing ``dependencies.py``.
 from __future__ import annotations
 
 import time
+from collections.abc import Callable
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 
 import numpy as np
@@ -647,17 +649,58 @@ class HybridDataFetcher:
         self,
         tickers: list[str],
         source: str = "hybrid",
+        *,
+        max_workers: int = 1,
+        on_ticker_complete: Callable[[str, dict[str, Any]], None] | None = None,
     ) -> pd.DataFrame:
-        """Fetch multiple tickers from the requested source."""
+        """Fetch multiple tickers from the requested source.
+
+        ``max_workers`` > 1 enables ``ThreadPoolExecutor`` parallelism (used by
+        the SSE refresh stream). ``max_workers=1`` keeps the legacy sequential
+        path with ``request_delay_seconds`` between calls — preserves existing
+        caller behavior. ``on_ticker_complete(ticker, row)`` is invoked once
+        per completed ticker (sequential or parallel) so a streaming consumer
+        can push progress events.
+        """
         from backend.app.services.data_fetcher import SCORING_COLUMNS
 
         rows: list[dict[str, Any]] = []
-        for i, ticker in enumerate(tickers):
-            data = self.fetch_single(ticker, source=source)
-            data["Ticker"] = ticker
-            rows.append(data)
-            if i < len(tickers) - 1:
-                time.sleep(self._delay)
+
+        if max_workers <= 1:
+            for i, ticker in enumerate(tickers):
+                try:
+                    data = self.fetch_single(ticker, source=source)
+                except Exception as exc:
+                    logger.warning(f"fetch_single({ticker}) raised: {exc}")
+                    data = {}
+                data["Ticker"] = ticker
+                rows.append(data)
+                if on_ticker_complete is not None:
+                    try:
+                        on_ticker_complete(ticker, data)
+                    except Exception as exc:
+                        logger.debug(f"on_ticker_complete callback raised for {ticker}: {exc}")
+                if i < len(tickers) - 1:
+                    time.sleep(self._delay)
+        else:
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                future_to_ticker = {
+                    pool.submit(self.fetch_single, t, source=source): t for t in tickers
+                }
+                for future in as_completed(future_to_ticker):
+                    ticker = future_to_ticker[future]
+                    try:
+                        data = future.result()
+                    except Exception as exc:
+                        logger.warning(f"fetch_single({ticker}) raised in worker: {exc}")
+                        data = {}
+                    data["Ticker"] = ticker
+                    rows.append(data)
+                    if on_ticker_complete is not None:
+                        try:
+                            on_ticker_complete(ticker, data)
+                        except Exception as exc:
+                            logger.debug(f"on_ticker_complete callback raised for {ticker}: {exc}")
 
         if not rows:
             return pd.DataFrame(columns=["Ticker"] + SCORING_COLUMNS)

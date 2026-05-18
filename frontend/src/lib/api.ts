@@ -9,6 +9,10 @@ import type {
   PriceHistoryResponse,
   ScreenerRefreshResponse,
   ScreenerResponse,
+  ScreenerStreamDoneEvent,
+  ScreenerStreamErrorEvent,
+  ScreenerStreamStartEvent,
+  ScreenerStreamTickerEvent,
 } from "./types";
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -122,6 +126,57 @@ export async function refreshScreenerUniverse(
   return api.post<ScreenerRefreshResponse>(
     `/api/screener/refresh?source=${source}`
   );
+}
+
+export interface ScreenerStreamHandlers {
+  onStart?: (e: ScreenerStreamStartEvent) => void;
+  onTicker?: (e: ScreenerStreamTickerEvent) => void;
+  onDone?: (e: ScreenerStreamDoneEvent) => void;
+  onError?: (e: ScreenerStreamErrorEvent) => void;
+}
+
+/**
+ * Open an EventSource on GET /api/screener/refresh/stream and dispatch each
+ * named SSE event to the matching handler. The returned EventSource is
+ * closed automatically on `done` / `error` events; callers should also call
+ * `.close()` on unmount to abort an in-flight stream.
+ */
+export function openScreenerRefreshStream(
+  source: DataSource,
+  handlers: ScreenerStreamHandlers
+): EventSource {
+  const es = new EventSource(
+    `${BASE_URL}/api/screener/refresh/stream?source=${source}`
+  );
+
+  es.addEventListener("start", (ev) => {
+    handlers.onStart?.(JSON.parse((ev as MessageEvent).data));
+  });
+  es.addEventListener("ticker", (ev) => {
+    handlers.onTicker?.(JSON.parse((ev as MessageEvent).data));
+  });
+  es.addEventListener("done", (ev) => {
+    handlers.onDone?.(JSON.parse((ev as MessageEvent).data));
+    es.close();
+  });
+  // Server emits a named "error" event with a JSON payload on fatal errors.
+  // EventSource also fires its built-in "error" listener on socket failures;
+  // distinguish by presence of MessageEvent.data.
+  es.addEventListener("error", (ev) => {
+    const data = (ev as MessageEvent).data;
+    if (typeof data === "string" && data.length > 0) {
+      try {
+        handlers.onError?.(JSON.parse(data));
+      } catch {
+        handlers.onError?.({ reason: data });
+      }
+      es.close();
+    } else if (es.readyState === EventSource.CLOSED) {
+      handlers.onError?.({ reason: "connection closed" });
+    }
+  });
+
+  return es;
 }
 
 export async function fetchPriceHistory(

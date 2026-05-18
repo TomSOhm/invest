@@ -448,3 +448,82 @@ class TestDataCompleteness:
         assert result_with_fmp["data_completeness"] > result_no_fmp["data_completeness"], (
             "FMP overlay should improve data_completeness"
         )
+
+
+# ---------------------------------------------------------------------------
+# Parallel fetch_batch (streaming refresh)
+# ---------------------------------------------------------------------------
+
+
+def test_fetch_batch_parallel_returns_all_tickers(hybrid: HybridDataFetcher) -> None:
+    """max_workers>1 fetches all tickers concurrently and the result preserves
+    each ticker's row regardless of completion order."""
+    tickers = ["AAPL", "MSFT", "GOOG", "TSLA", "NVDA"]
+
+    def fake_fetch(ticker: str, source: str = "hybrid") -> dict[str, Any]:
+        return {"Ticker": ticker, "Price": 100.0 + len(ticker)}
+
+    with patch.object(hybrid, "fetch_single", side_effect=fake_fetch):
+        df = hybrid.fetch_batch(tickers, max_workers=4)
+
+    assert len(df) == len(tickers)
+    assert set(df.index.astype(str)) == set(tickers)
+    # Sanity: Price was carried through for every row
+    assert df["Price"].notna().all()
+
+
+def test_fetch_batch_parallel_invokes_on_ticker_callback(hybrid: HybridDataFetcher) -> None:
+    """The on_ticker_complete callback fires once per ticker in parallel mode."""
+    tickers = ["A", "B", "C", "D"]
+    seen: list[str] = []
+    lock = __import__("threading").Lock()
+
+    def fake_fetch(ticker: str, source: str = "hybrid") -> dict[str, Any]:
+        return {"Ticker": ticker, "Price": 1.0}
+
+    def cb(ticker: str, _row: dict[str, Any]) -> None:
+        with lock:
+            seen.append(ticker)
+
+    with patch.object(hybrid, "fetch_single", side_effect=fake_fetch):
+        hybrid.fetch_batch(tickers, max_workers=3, on_ticker_complete=cb)
+
+    assert sorted(seen) == sorted(tickers)
+
+
+def test_fetch_batch_sequential_default_unchanged(hybrid: HybridDataFetcher) -> None:
+    """Default max_workers=1 keeps the legacy sequential path (no regression
+    for existing callers like screener_cache.refresh())."""
+    tickers = ["X", "Y"]
+    call_order: list[str] = []
+
+    def fake_fetch(ticker: str, source: str = "hybrid") -> dict[str, Any]:
+        call_order.append(ticker)
+        return {"Ticker": ticker, "Price": 50.0}
+
+    with patch.object(hybrid, "fetch_single", side_effect=fake_fetch):
+        # Drop the legacy inter-ticker sleep so the test isn't slow
+        hybrid._delay = 0
+        df = hybrid.fetch_batch(tickers)
+
+    assert call_order == tickers  # deterministic order in sequential mode
+    assert list(df.index.astype(str)) == tickers
+
+
+def test_fetch_batch_parallel_continues_on_per_ticker_error(
+    hybrid: HybridDataFetcher,
+) -> None:
+    """A failure on one ticker must not abort the rest of the batch."""
+    tickers = ["GOOD1", "BAD", "GOOD2"]
+
+    def fake_fetch(ticker: str, source: str = "hybrid") -> dict[str, Any]:
+        if ticker == "BAD":
+            raise RuntimeError("boom")
+        return {"Ticker": ticker, "Price": 1.0}
+
+    with patch.object(hybrid, "fetch_single", side_effect=fake_fetch):
+        df = hybrid.fetch_batch(tickers, max_workers=2)
+
+    assert set(df.index.astype(str)) == set(tickers)
+    # BAD must still appear (as a row, possibly with no Price)
+    assert "BAD" in df.index.astype(str).tolist()
